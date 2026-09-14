@@ -6,6 +6,13 @@
       "headers": {
         "Authorization": "Bearer ${PAYLOAD_MCP_API_KEY}"
       }
+    },
+    "zapletane-production": {
+      "type": "http",
+      "url": "https://zapletane.zjav.sk/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PROD_MCP_KEY}"
+      }
     }
   }
 }
