@@ -48,14 +48,14 @@ const revalidateSiteSettings: GlobalAfterChangeHook = ({ doc, req: { payload, co
  */
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
-  label: 'Site Settings',
+  label: 'Nastavenia webu',
   access: {
     read: () => true,
     update: adminOnly,
   },
   admin: {
     description:
-      'Site-wide switches. The pre-launch page hides the whole storefront (the /admin panel stays reachable).',
+      'Prepínač režimu webu a obsah predspúšťacej stránky. Administrácia (/admin) funguje v každom režime.',
   },
   hooks: {
     afterChange: [revalidateSiteSettings],
@@ -65,18 +65,18 @@ export const SiteSettings: GlobalConfig = {
       name: 'comingSoonEnabled',
       type: 'checkbox',
       defaultValue: true,
-      label: 'Pre-launch page ("Čoskoro spúšťame")',
+      label: 'Režim webu — Coming soon / Produkcia',
       admin: {
         description:
-          'ON = every storefront page is replaced by the pre-launch page. /admin is unaffected. Owners can preview the real site with ?preview=<COMING_SOON_BYPASS>. Takes effect within a minute.',
+          'ZAPNUTÉ = Coming soon: návštevníci vidia predspúšťaciu stránku „Čoskoro spúšťame". VYPNUTÉ = Produkcia: plný e-shop. Náhľad produkcie počas Coming soon: ?preview=<COMING_SOON_BYPASS>. Zmena sa prejaví do minúty.',
       },
     },
     {
       name: 'comingSoon',
       type: 'group',
-      label: 'Pre-launch page content',
+      label: 'Obsah Coming soon stránky',
       admin: {
-        description: 'Slovak copy rendered on the pre-launch page. Leave blank to use the default.',
+        description: 'Texty predspúšťacej stránky. Prázdne pole = predvolený text.',
       },
       fields: [
         {
