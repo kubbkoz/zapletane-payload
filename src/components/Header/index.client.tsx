@@ -1,6 +1,8 @@
 'use client'
 
 import type { Header } from '@/payload-types'
+import type { ResolvedContact } from '@/lib/contact'
+import type { SocialLink, TopBarLink } from '@/lib/navigation'
 
 import { Logo } from '@/components/Logo'
 import { cn } from '@/utilities/cn'
@@ -14,7 +16,10 @@ import { SearchBar } from './SearchBar'
 import { TopBar } from './TopBar'
 
 type Props = {
+  contact: ResolvedContact
   header: Header
+  socialLinks: SocialLink[]
+  topBarLinks: TopBarLink[]
 }
 
 /**
@@ -33,7 +38,7 @@ type Props = {
  * reserves its own space without CLS (169px desktop fallback, as in the
  * original's critical CSS).
  */
-export function HeaderClient({ header }: Props) {
+export function HeaderClient({ contact, header, socialLinks, topBarLinks }: Props) {
   const navItems = header?.navItems || []
   const pathname = usePathname()
 
@@ -126,7 +131,7 @@ export function HeaderClient({ header }: Props) {
         )}
       >
         <div ref={navbarInnerRef}>
-          <TopBar isHidden={shouldHideTopBar} />
+          <TopBar contact={contact} isHidden={shouldHideTopBar} links={topBarLinks} />
 
           <div
             className={cn(
@@ -154,9 +159,12 @@ export function HeaderClient({ header }: Props) {
         </div>
 
         <MobileMenu
+          contact={contact}
           isOpen={isMobileMenuOpen}
           navItems={navItems}
           onClose={() => setIsMobileMenuOpen(false)}
+          secondaryLinks={topBarLinks}
+          socialLinks={socialLinks}
         />
       </nav>
 

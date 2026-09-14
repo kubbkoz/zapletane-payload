@@ -2,6 +2,11 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+import { CONTACT } from '@/lib/contact'
+import { FOOTER_DEFAULTS } from '@/lib/footerDefaults'
+import { homepageDefaultData } from '@/lib/homeDefaults'
+import { SOCIAL_LINKS, TOP_BAR_LINKS } from '@/lib/navigation'
+
 /** Minimal Lexical document with a single paragraph — enough for seed copy. */
 const paragraph = (text: string) => ({
   root: {
@@ -171,11 +176,96 @@ const seedCheckoutMethods = async (payload: Awaited<ReturnType<typeof getPayload
   }
 }
 
+/**
+ * Editable content (W2).
+ *
+ * Writes the *current hard-coded* values into the globals so an editor opens a
+ * populated admin form instead of empty fields. Deliberately additive and
+ * non-destructive:
+ *
+ *   - `homepage` is written only when the global has never been saved, so a
+ *     local edit is never stomped on by a re-seed.
+ *   - `footer` / `header` / `site-settings` already exist in some databases, so
+ *     only the fields that are still empty get filled in.
+ *
+ * Nothing here changes what the storefront renders — every value is the one the
+ * component fell back to anyway. Navigation items (`header.navItems`,
+ * `footer.navItems`) are NOT seeded: they were never hard-coded, so inventing
+ * them would be a visible change.
+ */
+const seedContentGlobals = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+  const homepage = await payload.findGlobal({ slug: 'homepage', depth: 0 })
+
+  if (!homepage?.updatedAt) {
+    await payload.updateGlobal({ slug: 'homepage', data: homepageDefaultData() })
+    console.log('seeded homepage global (hero, slogan, features, tabs, categories, gift CTA)')
+  }
+
+  // NB: `findGlobal` on a never-saved global returns the field defaults, so the
+  // checks below test `updatedAt` (has this global a row at all?) as well as
+  // the individual fields (does an existing row still miss them?).
+  const footer = await payload.findGlobal({ slug: 'footer', depth: 0 })
+
+  if (!footer?.updatedAt || !footer?.description || !footer?.socialLinks?.length) {
+    await payload.updateGlobal({
+      slug: 'footer',
+      data: {
+        description: footer?.description || FOOTER_DEFAULTS.description,
+        navTitle: footer?.navTitle || FOOTER_DEFAULTS.navTitle,
+        socialLinks: footer?.socialLinks?.length
+          ? footer.socialLinks
+          : SOCIAL_LINKS.map((social) => ({ platform: social.platform, url: social.url })),
+        contact: { ...FOOTER_DEFAULTS.contact, ...(footer?.contact || {}) },
+        support: { ...FOOTER_DEFAULTS.support, ...(footer?.support || {}) },
+        bottomBar: { ...FOOTER_DEFAULTS.bottomBar, ...(footer?.bottomBar || {}) },
+      },
+    })
+    console.log('seeded footer global (description, socials, column copy, bottom bar)')
+  }
+
+  const header = await payload.findGlobal({ slug: 'header', depth: 0 })
+
+  if (!header?.updatedAt || !header?.topBar?.links?.length) {
+    await payload.updateGlobal({
+      slug: 'header',
+      data: {
+        topBar: {
+          links: TOP_BAR_LINKS.map((item) => ({
+            href: item.href,
+            highlight: item.highlight,
+            icon: item.icon,
+            label: item.label,
+          })),
+        },
+      },
+    })
+    console.log('seeded header global (top bar links)')
+  }
+
+  const siteSettings = await payload.findGlobal({ slug: 'site-settings', depth: 0 })
+
+  if (!siteSettings?.updatedAt || !siteSettings?.contact?.phone || !siteSettings?.contact?.email) {
+    await payload.updateGlobal({
+      slug: 'site-settings',
+      data: {
+        contact: {
+          ...(siteSettings?.contact || {}),
+          companyName: siteSettings?.contact?.companyName || CONTACT.brandName,
+          email: siteSettings?.contact?.email || CONTACT.email.info,
+          phone: siteSettings?.contact?.phone || CONTACT.phone.display,
+        },
+      },
+    })
+    console.log('seeded site settings contact details (phone, e-mail, company name)')
+  }
+}
+
 const run = async () => {
   const payload = await getPayload({ config })
 
   await seedProducts(payload)
   await seedCheckoutMethods(payload)
+  await seedContentGlobals(payload)
 
   await payload.destroy()
 }

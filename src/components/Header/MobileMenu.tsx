@@ -1,12 +1,16 @@
 'use client'
 
 import type { Header } from '@/payload-types'
+import type { ResolvedContact } from '@/lib/contact'
+import type { SocialLink, TopBarLink } from '@/lib/navigation'
 
 import { Logo } from '@/components/Logo'
-import { CONTACT } from '@/lib/contact'
+import { SocialIcon } from '@/components/SocialIcon'
+import { DEFAULT_CONTACT } from '@/lib/contact'
+import { isExternalHref, SOCIAL_LINKS, TOP_BAR_LINKS } from '@/lib/navigation'
 import { useAuth } from '@/providers/Auth'
 import { cn } from '@/utilities/cn'
-import { BookOpen, Facebook, Instagram, Mail, Phone, User, X, Youtube } from 'lucide-react'
+import { BookOpen, Mail, Phone, User, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
@@ -16,10 +20,16 @@ import { navHref } from './navHref'
 import { SearchBar } from './SearchBar'
 
 type Props = {
+  contact?: ResolvedContact
   isOpen: boolean
   navItems: Header['navItems']
   onClose: () => void
+  secondaryLinks?: TopBarLink[]
+  socialLinks?: SocialLink[]
 }
+
+/** The only icons a secondary (TopBar) link may carry. */
+const SECONDARY_ICONS: Record<string, React.ElementType> = { BookOpen, Mail, Phone }
 
 /**
  * Full-screen mobile menu — REDESIGNED presentation (visible refresh, per the
@@ -31,12 +41,19 @@ type Props = {
  *   2. Search        compact SearchBar (mobile's only search entry point —
  *                     NavIcons hides its own search button below `lg`)
  *   3. Main nav       large display-type list, numbered, staggered entrance,
- *                     active route in `text-brand`
- *   4. Secondary      TopBar's quick links (blog / kontakty / všetko o
- *                     nákupe / o nás) + account link (mobile's only account
- *                     entry point — NavIcons hides it below `md`), small
- *                     uppercase font-tech
- *   5. Contact        phone + email + social icon-ring row
+ *                     active route in `text-brand`; an item's optional
+ *                     `children` (Header global, one level) render indented
+ *                     under it in the small uppercase font-tech face
+ *   4. Secondary      the TopBar's quick links — now the `header` global's
+ *                     `topBar.links` array, no longer hard-coded — + the
+ *                     account link (mobile's only account entry point:
+ *                     NavIcons hides it below `md`), small uppercase font-tech
+ *   5. Contact        phone + email + social icon-ring row, from the
+ *                     `site-settings` and `footer` globals
+ *
+ * Every CMS value arrives as a prop (this is a client component); each prop
+ * defaults to the constant the menu used to hard-code, so nothing changes until
+ * an editor changes it.
  *
  * Still rendered through a portal for the same reason as before: the <nav>
  * above it carries `gpu-boost` (`transform: translateZ(0)`), which would
@@ -45,7 +62,14 @@ type Props = {
  * (`HeaderClient`), which toggles `document.body.style.overflow` whenever
  * `isMobileMenuOpen` changes.
  */
-export function MobileMenu({ isOpen, navItems, onClose }: Props) {
+export function MobileMenu({
+  contact = DEFAULT_CONTACT,
+  isOpen,
+  navItems,
+  onClose,
+  secondaryLinks = TOP_BAR_LINKS,
+  socialLinks = SOCIAL_LINKS,
+}: Props) {
   const { user } = useAuth()
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
@@ -113,6 +137,7 @@ export function MobileMenu({ isOpen, navItems, onClose }: Props) {
               {items.map((item, index) => {
                 const href = navHref(item.link)
                 const isActive = pathname === href || pathname.startsWith(`${href}/`)
+                const children = (item.children || []).filter((child) => child?.link?.label)
 
                 return (
                   <RevealItem
@@ -149,6 +174,32 @@ export function MobileMenu({ isOpen, navItems, onClose }: Props) {
                         />
                       ) : null}
                     </Link>
+
+                    {/* Sub-items — indented onto the parent's label column, in
+                        the small uppercase face so they never compete with it. */}
+                    {children.length ? (
+                      <ul className="mb-4 flex flex-col gap-3 pl-9">
+                        {children.map((child) => {
+                          const childHref = navHref(child.link)
+                          const isChildActive = pathname === childHref
+
+                          return (
+                            <li key={child.id}>
+                              <Link
+                                className={cn(
+                                  'font-tech text-xs font-bold uppercase tracking-widest transition-colors hover:text-brand',
+                                  isChildActive ? 'text-brand' : 'text-gray-600',
+                                )}
+                                href={childHref}
+                                onClick={onClose}
+                              >
+                                {child.link?.label}
+                              </Link>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : null}
                   </RevealItem>
                 )
               })}
@@ -163,30 +214,24 @@ export function MobileMenu({ isOpen, navItems, onClose }: Props) {
           isOpen={isOpen}
         >
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 font-tech text-xs font-bold uppercase tracking-widest text-gray-600">
-            <Link
-              className="flex items-center gap-2 transition-colors hover:text-brand"
-              href="/blog"
-              onClick={onClose}
-            >
-              <BookOpen className="h-3.5 w-3.5 text-brand" /> Zapletane Blog
-            </Link>
-            <Link
-              className="transition-colors hover:text-brand"
-              href="/kontakty"
-              onClick={onClose}
-            >
-              Kontakty
-            </Link>
-            <Link
-              className="transition-colors hover:text-brand"
-              href="/vsetko-o-nakupe"
-              onClick={onClose}
-            >
-              Všetko o nákupe
-            </Link>
-            <Link className="transition-colors hover:text-brand" href="/o-nas" onClick={onClose}>
-              O nás
-            </Link>
+            {secondaryLinks.map((item) => {
+              const Icon = SECONDARY_ICONS[item.icon]
+
+              return (
+                <Link
+                  className={cn(
+                    'transition-colors hover:text-brand',
+                    Icon && 'flex items-center gap-2',
+                  )}
+                  href={item.href}
+                  key={item.id}
+                  onClick={onClose}
+                >
+                  {Icon ? <Icon className="h-3.5 w-3.5 text-brand" /> : null}
+                  {item.label}
+                </Link>
+              )
+            })}
             <Link
               className="flex items-center gap-2 transition-colors hover:text-brand"
               href={user ? '/account' : '/login'}
@@ -207,42 +252,32 @@ export function MobileMenu({ isOpen, navItems, onClose }: Props) {
           <div className="mb-6 flex flex-col gap-3">
             <a
               className="flex items-center gap-3 font-tech text-lg font-bold text-black transition-colors hover:text-brand"
-              href={CONTACT.phone.href}
+              href={contact.phone.href}
             >
-              <Phone className="h-5 w-5 text-brand" /> {CONTACT.phone.display}
+              <Phone className="h-5 w-5 text-brand" /> {contact.phone.display}
             </a>
             <a
               className="flex items-center gap-3 text-sm font-medium text-gray-600 transition-colors hover:text-brand"
-              href={CONTACT.email.href}
+              href={contact.email.href}
             >
-              <Mail className="h-5 w-5 text-brand" /> {CONTACT.email.info}
+              <Mail className="h-5 w-5 text-brand" /> {contact.email.info}
             </a>
           </div>
 
           <div className="flex items-center gap-3">
-            <a
-              aria-label="Sledujte nás na Facebooku"
-              className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
-              href={CONTACT.social.facebook}
-            >
-              <Facebook className="h-4 w-4" />
-            </a>
-            <a
-              aria-label="Sledujte nás na Instagrame"
-              className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
-              href={CONTACT.social.instagram}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <Instagram className="h-4 w-4" />
-            </a>
-            <a
-              aria-label="Sledujte nás na Youtube"
-              className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
-              href={CONTACT.social.youtube}
-            >
-              <Youtube className="h-4 w-4" />
-            </a>
+            {socialLinks.map((social) => (
+              <a
+                aria-label={social.label}
+                className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
+                href={social.url}
+                key={social.id}
+                {...(isExternalHref(social.url)
+                  ? { rel: 'noopener noreferrer', target: '_blank' }
+                  : {})}
+              >
+                <SocialIcon className="h-4 w-4" platform={social.platform} />
+              </a>
+            ))}
           </div>
         </RevealItem>
       </div>
@@ -274,9 +309,7 @@ function RevealItem({
     <div
       className={cn(
         'transition-[opacity,transform] ease-[var(--ease-out)] motion-reduce:transition-none motion-reduce:translate-y-0',
-        isOpen
-          ? 'translate-y-0 opacity-100 duration-500'
-          : 'translate-y-4 opacity-0 duration-150',
+        isOpen ? 'translate-y-0 opacity-100 duration-500' : 'translate-y-4 opacity-0 duration-150',
         className,
       )}
       style={{ transitionDelay: isOpen ? `${delayIndex * 60}ms` : '0ms' }}

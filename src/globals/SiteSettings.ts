@@ -1,40 +1,29 @@
-import type { GlobalAfterChangeHook, GlobalConfig } from 'payload'
-
-import { revalidateTag } from 'next/cache'
+import type { GlobalConfig } from 'payload'
 
 import { adminOnly } from '@/access/adminOnly'
 import { COMING_SOON_COPY } from '@/components/ComingSoon/copy'
 import { CONTACT } from '@/lib/contact'
+
+import { globalCacheTag, revalidateGlobalHook } from './revalidateGlobal'
 
 /**
  * Cache tag the storefront gate reads under (see `getSiteSettings`). Kept in
  * sync with `getCachedGlobal`'s `global_<slug>` convention so a manual
  * `revalidateTag` here and the generic helper never drift apart.
  */
-export const SITE_SETTINGS_TAG = 'global_site-settings'
+export const SITE_SETTINGS_TAG = globalCacheTag('site-settings')
 
 /**
- * Flush the gate's cached copy the moment someone flips the switch — from the
- * admin UI, the REST API or an MCP client. The 30s `revalidate` on the cached
- * read is only the safety net for the cases where this hook cannot run (a
- * direct DB write, or a revalidation outside a Next request scope).
+ * Flush the cached copy the moment someone saves — from the admin UI, the REST
+ * API or an MCP client. The 30s `revalidate` on the cached read is only the
+ * safety net for the cases where this hook cannot run (a direct DB write, or a
+ * revalidation outside a Next request scope: seed scripts, migrations, a
+ * standalone `payload` CLI run).
  */
-const revalidateSiteSettings: GlobalAfterChangeHook = ({ doc, req: { payload, context } }) => {
-  if (!context.disableRevalidate) {
-    try {
-      // 'max' = purge now, regardless of the tag's cache-life profile.
-      revalidateTag(SITE_SETTINGS_TAG, 'max')
-      payload.logger.info('Revalidated site settings (pre-launch gate)')
-    } catch (err) {
-      // revalidateTag throws when called outside a Next.js request scope
-      // (seed scripts, migrations, a standalone `payload` CLI run). The cached
-      // read's own 30s revalidate window covers those.
-      payload.logger.warn({ err }, 'Could not revalidate site settings cache tag')
-    }
-  }
-
-  return doc
-}
+const revalidateSiteSettings = revalidateGlobalHook(
+  'site-settings',
+  'site settings (pre-launch gate + contact details)',
+)
 
 /**
  * Site-wide switches that are not part of any single page's content.
@@ -117,6 +106,76 @@ export const SiteSettings: GlobalConfig = {
           type: 'text',
           defaultValue: CONTACT.email.info,
           label: 'E-mail (secondary contact button)',
+        },
+      ],
+    },
+    {
+      name: 'contact',
+      type: 'group',
+      label: 'Kontaktné údaje',
+      admin: {
+        description:
+          'Jediný zdroj pravdy pre telefón, e-mail a fakturačné údaje — číta ich horná lišta, mobilné menu aj pätička. Prázdne pole = pôvodná predvolená hodnota.',
+      },
+      fields: [
+        {
+          type: 'row',
+          fields: [
+            {
+              name: 'phone',
+              type: 'text',
+              defaultValue: CONTACT.phone.display,
+              label: 'Telefón',
+              admin: { width: '50%' },
+            },
+            {
+              name: 'email',
+              type: 'text',
+              defaultValue: CONTACT.email.info,
+              label: 'E-mail',
+              admin: { width: '50%' },
+            },
+          ],
+        },
+        {
+          name: 'companyName',
+          type: 'text',
+          defaultValue: CONTACT.brandName,
+          label: 'Obchodné meno',
+        },
+        {
+          type: 'row',
+          fields: [
+            {
+              name: 'ico',
+              type: 'text',
+              label: 'IČO',
+              admin: { width: '33%' },
+            },
+            {
+              name: 'dic',
+              type: 'text',
+              label: 'DIČ',
+              admin: { width: '33%' },
+            },
+            {
+              name: 'icDph',
+              type: 'text',
+              label: 'IČ DPH',
+              admin: { width: '33%' },
+            },
+          ],
+        },
+        {
+          name: 'address',
+          type: 'textarea',
+          label: 'Adresa',
+          admin: { description: 'Zalomenie riadku sa vykreslí ako nový riadok.' },
+        },
+        {
+          name: 'openingHours',
+          type: 'textarea',
+          label: 'Otváracie hodiny',
         },
       ],
     },

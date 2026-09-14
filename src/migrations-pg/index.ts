@@ -6,6 +6,8 @@ import * as migration_20260914_210500_reset_admin_password_2 from './20260914_21
 import * as migration_20260914_213000_eur_currency from './20260914_213000_eur_currency';
 import * as migration_20260914_222406_shipping_payments from './20260914_222406_shipping_payments';
 import * as migration_20260914_223000_mcp_shipping_payment_grants from './20260914_223000_mcp_shipping_payment_grants';
+import * as migration_20260914_230125_content_management from './20260914_230125_content_management';
+import * as migration_20260914_231500_content_defaults from './20260914_231500_content_defaults';
 
 export const migrations = [
   {
@@ -41,11 +43,21 @@ export const migrations = [
   {
     up: migration_20260914_222406_shipping_payments.up,
     down: migration_20260914_222406_shipping_payments.down,
-    name: '20260914_222406_shipping_payments'
+    name: '20260914_222406_shipping_payments',
   },
   {
     up: migration_20260914_223000_mcp_shipping_payment_grants.up,
     down: migration_20260914_223000_mcp_shipping_payment_grants.down,
-    name: '20260914_223000_mcp_shipping_payment_grants'
+    name: '20260914_223000_mcp_shipping_payment_grants',
+  },
+  {
+    up: migration_20260914_230125_content_management.up,
+    down: migration_20260914_230125_content_management.down,
+    name: '20260914_230125_content_management',
+  },
+  {
+    up: migration_20260914_231500_content_defaults.up,
+    down: migration_20260914_231500_content_defaults.down,
+    name: '20260914_231500_content_defaults',
   },
 ];

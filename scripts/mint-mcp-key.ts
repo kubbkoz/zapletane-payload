@@ -113,6 +113,8 @@ async function main() {
     users: findOnly,
     header: globalFullAccess,
     footer: globalFullAccess,
+    // W2 — editable homepage content (hero, slogan, value cards, tabs, gift CTA).
+    homepage: globalFullAccess,
     siteSettings: globalFullAccess,
   }
 

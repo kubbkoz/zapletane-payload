@@ -1,11 +1,15 @@
 import type { Category } from '@/payload-types'
+import type { CategorySectionContent } from '@/lib/homeDefaults'
 
 import { ArrowRight, Package } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
 
+import { CATEGORY_SECTION } from '@/lib/homeDefaults'
+
 type Props = {
   categories: Category[]
+  content?: CategorySectionContent
 }
 
 /**
@@ -15,7 +19,7 @@ type Props = {
  * rest of the page. Three tiles: a fourth would wrap to a lonely second row at
  * every breakpoint above sm.
  */
-export const HomeCategoryGrid: React.FC<Props> = ({ categories }) => {
+export const HomeCategoryGrid: React.FC<Props> = ({ categories, content = CATEGORY_SECTION }) => {
   const showcase = categories.slice(0, 3)
 
   if (!showcase.length) return null
@@ -24,17 +28,15 @@ export const HomeCategoryGrid: React.FC<Props> = ({ categories }) => {
     <section className="section-band bg-brand-50" id="kategorie">
       <div className="container-editorial grid gap-12 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-16">
         <div>
-          <p className="eyebrow">Sortiment</p>
+          <p className="eyebrow">{content.eyebrow}</p>
           <h2 className="section-h2 mt-4">
-            Vyberte si
+            {content.titleLine}
             <br />
-            <span className="text-brand">Kategóriu</span>
+            <span className="text-brand">{content.titleHighlight}</span>
           </h2>
-          <p className="mt-6 text-[15px] leading-[1.75] text-gray-700">
-            Objavte našu ponuku ručne pletených diek, hračiek a prútených dekorácií
-          </p>
-          <Link className="btn-primary group mt-8" href="/shop">
-            Prezrieť ponuku
+          <p className="mt-6 text-[15px] leading-[1.75] text-gray-700">{content.text}</p>
+          <Link className="btn-primary group mt-8" href={content.ctaHref || '/shop'}>
+            {content.ctaLabel}
             <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
           </Link>
         </div>

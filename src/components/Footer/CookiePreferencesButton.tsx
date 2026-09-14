@@ -13,7 +13,12 @@ import React from 'react'
  */
 export const COOKIE_PREFERENCES_EVENT = 'zapletane:cookie-preferences'
 
-export function CookiePreferencesButton() {
+type Props = {
+  /** Editable in the `footer` global; defaults to the original label. */
+  label?: string
+}
+
+export function CookiePreferencesButton({ label = 'Nastavenia cookies' }: Props) {
   return (
     <button
       className="cursor-pointer border-none bg-transparent p-0 text-[10px] font-normal uppercase tracking-wider text-white/55 transition-colors hover:text-white/80"
@@ -22,7 +27,7 @@ export function CookiePreferencesButton() {
       }}
       type="button"
     >
-      Nastavenia cookies
+      {label}
     </button>
   )
 }

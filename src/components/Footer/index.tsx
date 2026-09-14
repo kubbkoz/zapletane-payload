@@ -2,9 +2,12 @@ import type { Footer as FooterType } from '@/payload-types'
 
 import { FooterMenu } from '@/components/Footer/menu'
 import { Logo } from '@/components/Logo'
-import { CONTACT } from '@/lib/contact'
+import { SocialIcon } from '@/components/SocialIcon'
+import { renderCopyright, resolveFooterContent } from '@/lib/footerDefaults'
+import { isExternalHref, resolveSocialLinks } from '@/lib/navigation'
+import { getContact } from '@/utilities/getContact'
 import { getCachedGlobal } from '@/utilities/getGlobals'
-import { Facebook, Instagram, Mail, Phone, RotateCcw, Youtube } from 'lucide-react'
+import { Mail, Phone, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
 
@@ -18,12 +21,31 @@ import { CookiePreferencesButton } from './CookiePreferencesButton'
  * line along its top edge, then a 12-column grid: brand + socials (4),
  * quick links (2), contact (3), support (3), and the uppercase bottom bar.
  *
- * Links in the second column come from the `footer` global, which replaces the
- * original's four hard-coded Shopware category IDs.
+ * Every string, the link column and the social list now come from the `footer`
+ * global (cached under `global_footer`, revalidated by its afterChange hook);
+ * phone / e-mail / business details come from `site-settings` via `getContact`.
+ * `resolveFooterContent` falls back to the constants in
+ * `src/lib/footerDefaults.ts` field by field, so an older footer row renders
+ * exactly the copy it always did.
  */
 export async function Footer() {
-  const footer: FooterType = await getCachedGlobal('footer', 1)()
+  const [footer, contact] = await Promise.all([
+    getCachedGlobal('footer', 1)() as Promise<FooterType>,
+    getContact(),
+  ])
+
   const navItems = footer?.navItems || []
+  const content = resolveFooterContent(footer)
+  const socialLinks = resolveSocialLinks(footer)
+  const businessDetails = content.contact.showBusinessDetails
+    ? [
+        contact.ico ? `IČO: ${contact.ico}` : null,
+        contact.dic ? `DIČ: ${contact.dic}` : null,
+        contact.icDph ? `IČ DPH: ${contact.icDph}` : null,
+        contact.address,
+        contact.openingHours,
+      ].filter(Boolean)
+    : []
 
   return (
     <footer className="relative overflow-hidden border-t border-zinc-900 bg-black font-sans text-white">
@@ -37,34 +59,23 @@ export async function Footer() {
             <div className="flex flex-col items-start lg:col-span-4">
               <Logo className="mb-8" variant="light" />
               <p className="mb-8 max-w-sm text-sm leading-relaxed text-gray-300">
-                U nás nájdete ručne pletené deky a hračky, prútené dekorácie aj doplnky do
-                domácnosti. Každý kúsok vzniká s láskou a trpezlivosťou.
+                {content.description}
               </p>
 
               <div className="flex items-center gap-3">
-                <a
-                  aria-label="Sledujte nás na Facebooku"
-                  className="icon-ring h-11 w-11 hover:border-accent hover:bg-accent hover:text-white"
-                  href={CONTACT.social.facebook}
-                >
-                  <Facebook className="h-4 w-4" />
-                </a>
-                <a
-                  aria-label="Sledujte nás na Instagrame"
-                  className="icon-ring h-11 w-11 hover:border-accent hover:bg-accent hover:text-white"
-                  href={CONTACT.social.instagram}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  <Instagram className="h-4 w-4" />
-                </a>
-                <a
-                  aria-label="Sledujte nás na Youtube"
-                  className="icon-ring h-11 w-11 hover:border-accent hover:bg-accent hover:text-white"
-                  href={CONTACT.social.youtube}
-                >
-                  <Youtube className="h-4 w-4" />
-                </a>
+                {socialLinks.map((social) => (
+                  <a
+                    aria-label={social.label}
+                    className="icon-ring h-11 w-11 hover:border-accent hover:bg-accent hover:text-white"
+                    href={social.url}
+                    key={social.id}
+                    {...(isExternalHref(social.url)
+                      ? { rel: 'noopener noreferrer', target: '_blank' }
+                      : {})}
+                  >
+                    <SocialIcon className="h-4 w-4" platform={social.platform} />
+                  </a>
+                ))}
               </div>
             </div>
 
@@ -72,7 +83,7 @@ export async function Footer() {
             <div className="lg:col-span-2">
               <h2 className="footer-heading">
                 <span className="mr-3 h-4 w-1 bg-accent" />
-                Kategórie
+                {content.navTitle}
               </h2>
               <FooterMenu menu={navItems} />
             </div>
@@ -81,20 +92,20 @@ export async function Footer() {
             <div className="lg:col-span-3">
               <h2 className="footer-heading">
                 <span className="mr-3 h-4 w-1 bg-accent" />
-                Kontakt
+                {content.contact.heading}
               </h2>
               <ul className="space-y-6">
                 <li className="group flex items-start">
                   <Phone className="mr-4 mt-1 h-5 w-5 text-accent" />
                   <div>
                     <span className="mb-1 block text-[10px] font-normal uppercase tracking-wider text-white/60">
-                      Infolinka
+                      {content.contact.phoneLabel}
                     </span>
                     <a
                       className="font-tech text-xl font-bold text-white transition-colors group-hover:text-accent"
-                      href={CONTACT.phone.href}
+                      href={contact.phone.href}
                     >
-                      {CONTACT.phone.display}
+                      {contact.phone.display}
                     </a>
                   </div>
                 </li>
@@ -102,13 +113,13 @@ export async function Footer() {
                   <Mail className="mr-4 mt-1 h-5 w-5 text-accent" />
                   <div>
                     <span className="mb-1 block text-[10px] font-normal uppercase tracking-wider text-white/60">
-                      Email
+                      {content.contact.emailLabel}
                     </span>
                     <a
                       className="text-base text-gray-300 transition-colors group-hover:text-white"
-                      href={CONTACT.email.href}
+                      href={contact.email.href}
                     >
-                      {CONTACT.email.info}
+                      {contact.email.info}
                     </a>
                   </div>
                 </li>
@@ -116,43 +127,52 @@ export async function Footer() {
                   <RotateCcw className="mr-4 mt-1 h-5 w-5 text-accent" />
                   <div>
                     <span className="mb-1 block text-[10px] font-normal uppercase tracking-wider text-white/60">
-                      Reklamácia / Vrátenie
+                      {content.contact.returnsLabel}
                     </span>
                     <Link
                       className="text-base text-gray-300 transition-colors group-hover:text-accent"
-                      href="/odstupenie-od-zmluvy"
+                      href={content.contact.returnsHref}
                     >
-                      Vyplniť formulár
+                      {content.contact.returnsLinkLabel}
                     </Link>
                   </div>
                 </li>
               </ul>
+
+              {/* Business details — opt-in, and only when SiteSettings has them. */}
+              {businessDetails.length ? (
+                <ul className="mt-6 space-y-1 text-sm text-gray-400">
+                  {businessDetails.map((detail) => (
+                    <li className="whitespace-pre-line" key={detail as string}>
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
 
             {/* 4. Online support */}
             <div className="lg:col-span-3">
               <h2 className="footer-heading">
                 <span className="mr-3 h-4 w-1 bg-accent" />
-                Zákaznícka podpora
+                {content.support.heading}
               </h2>
 
-              <p className="mb-4 text-sm text-gray-300">
-                Sme tu pre vás každý pracovný deň a radi poradíme s výberom toho pravého.
-              </p>
+              <p className="mb-4 text-sm text-gray-300">{content.support.text}</p>
 
               <a
                 className="inline-flex items-center text-sm font-bold uppercase tracking-widest text-accent transition-colors hover:text-white"
-                href={CONTACT.email.href}
+                href={contact.email.href}
               >
-                <Mail className="mr-2 h-4 w-4" /> {CONTACT.email.info}
+                <Mail className="mr-2 h-4 w-4" /> {contact.email.info}
               </a>
             </div>
           </div>
 
           {/* Bottom bar */}
           <div className="flex flex-col items-center justify-between gap-4 border-t border-zinc-900 pt-8 text-[10px] font-normal uppercase tracking-wider text-white/55 md:flex-row">
-            <p>&copy; {new Date().getFullYear()} Zapletane. Všetky práva vyhradené.</p>
-            <CookiePreferencesButton />
+            <p>{renderCopyright(content.bottomBar.copyright)}</p>
+            <CookiePreferencesButton label={content.bottomBar.cookieButtonLabel} />
           </div>
         </div>
       </div>

@@ -18,9 +18,22 @@ async function getGlobal<T extends Global>(slug: T, depth = 0) {
 }
 
 /**
- * Returns a unstable_cache function mapped with the cache tag for the slug
+ * Returns a unstable_cache function mapped with the cache tag for the slug.
+ *
+ * Two freshness mechanisms, the same pair `getSiteSettings` / `getHomepage`
+ * document:
+ *
+ *   - tag `global_<slug>` — the floor. Every global registered in
+ *     `src/globals/index.ts` carries an afterChange hook built by
+ *     `revalidateGlobalHook`, so a save from the admin UI, the REST API or an
+ *     MCP client is live on the next request.
+ *   - `revalidate: 60` — the ceiling, for the changes that hook cannot see: a
+ *     direct database write, a CLI script, a restore. Without it a cached
+ *     global entry never expires on its own, so such a change would stay
+ *     invisible until the next deploy.
  */
 export const getCachedGlobal = <T extends Global>(slug: T, depth = 0) =>
-  unstable_cache(async () => getGlobal<T>(slug, depth), [slug], {
+  unstable_cache(async () => getGlobal<T>(slug, depth), [slug, String(depth)], {
+    revalidate: 60,
     tags: [`global_${slug}`],
   })

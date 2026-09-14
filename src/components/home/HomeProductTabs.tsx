@@ -2,6 +2,7 @@
 
 import React from 'react'
 
+import { PRODUCT_TABS } from '@/lib/homeDefaults'
 import { cn } from '@/utilities/cn'
 
 export type ProductTab = {
@@ -11,7 +12,10 @@ export type ProductTab = {
 }
 
 type Props = {
+  eyebrow?: string
   tabs: ProductTab[]
+  titleBefore?: string
+  titleHighlight?: string
 }
 
 /**
@@ -24,7 +28,12 @@ type Props = {
  * Each tab's cards are rendered on the server and handed in as `content`, so the
  * only thing that ships to the browser is the tab toggle.
  */
-export const HomeProductTabs: React.FC<Props> = ({ tabs }) => {
+export const HomeProductTabs: React.FC<Props> = ({
+  eyebrow = PRODUCT_TABS.eyebrow,
+  tabs,
+  titleBefore = PRODUCT_TABS.titleBefore,
+  titleHighlight = PRODUCT_TABS.titleHighlight,
+}) => {
   const [active, setActive] = React.useState(tabs[0]?.key)
 
   if (!tabs.length) return null
@@ -35,9 +44,10 @@ export const HomeProductTabs: React.FC<Props> = ({ tabs }) => {
     <section className="section-band bg-brand-50" id="produkty">
       <div className="container-editorial">
         <div className="mb-8 text-center md:mb-10">
-          <p className="eyebrow mb-4">Z dielne</p>
+          <p className="eyebrow mb-4">{eyebrow}</p>
           <h2 className="section-h2">
-            Naše <span className="text-brand">produkty</span>
+            {titleBefore ? `${titleBefore} ` : null}
+            <span className="text-brand">{titleHighlight}</span>
           </h2>
           <div className="section-decorator mx-auto mb-6 mt-6" />
 

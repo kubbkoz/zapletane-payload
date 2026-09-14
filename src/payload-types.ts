@@ -138,11 +138,13 @@ export interface Config {
   globals: {
     header: Header;
     footer: Footer;
+    homepage: Homepage;
     'site-settings': SiteSetting;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
+    homepage: HomepageSelect<false> | HomepageSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
   };
   locale: null;
@@ -1444,6 +1446,16 @@ export interface PayloadMcpApiKey {
      */
     update?: boolean | null;
   };
+  homepage?: {
+    /**
+     * Allow clients to find homepage global.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to update homepage global.
+     */
+    update?: boolean | null;
+  };
   siteSettings?: {
     /**
      * Allow clients to find site-settings global.
@@ -2368,6 +2380,12 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         find?: T;
         update?: T;
       };
+  homepage?:
+    | T
+    | {
+        find?: T;
+        update?: T;
+      };
   siteSettings?:
     | T
     | {
@@ -2438,9 +2456,41 @@ export interface Header {
           url?: string | null;
           label: string;
         };
+        /**
+         * Jedna úroveň. Na počítači sa zobrazia ako rozbaľovacie menu, na mobile odsadené pod rodičom.
+         */
+        children?:
+          | {
+              link: {
+                type?: ('reference' | 'custom') | null;
+                newTab?: boolean | null;
+                reference?: {
+                  relationTo: 'pages';
+                  value: number | Page;
+                } | null;
+                url?: string | null;
+                label: string;
+              };
+              id?: string | null;
+            }[]
+          | null;
         id?: string | null;
       }[]
     | null;
+  /**
+   * Odkazy vpravo v tenkej krémovej lište nad hlavičkou. Rovnaký zoznam sa zobrazuje aj v mobilnom menu.
+   */
+  topBar?: {
+    links?:
+      | {
+          label: string;
+          href: string;
+          icon?: ('none' | 'BookOpen' | 'Phone' | 'Mail') | null;
+          highlight?: boolean | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -2450,6 +2500,15 @@ export interface Header {
  */
 export interface Footer {
   id: number;
+  description?: string | null;
+  socialLinks?:
+    | {
+        platform: 'facebook' | 'instagram' | 'linkedin' | 'twitter' | 'youtube';
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  navTitle?: string | null;
   navItems?:
     | {
         link: {
@@ -2465,6 +2524,142 @@ export interface Footer {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Telefón a e-mail sa berú z Nastavenia webu → Kontaktné údaje; tu sa nastavujú iba popisy a odkaz na reklamáciu.
+   */
+  contact?: {
+    heading?: string | null;
+    phoneLabel?: string | null;
+    emailLabel?: string | null;
+    returnsLabel?: string | null;
+    returnsLinkLabel?: string | null;
+    returnsHref?: string | null;
+    showBusinessDetails?: boolean | null;
+  };
+  support?: {
+    heading?: string | null;
+    text?: string | null;
+  };
+  bottomBar?: {
+    /**
+     * {{year}} sa nahradí aktuálnym rokom.
+     */
+    copyright?: string | null;
+    cookieButtonLabel?: string | null;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * Obsah domovskej stránky: hero slider, slogan, sekcia „Prečo Zapletane", záložky produktov, sortiment a darčekový banner.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "homepage".
+ */
+export interface Homepage {
+  id: number;
+  hero?: {
+    slides?:
+      | {
+          /**
+           * Nahraný obrázok má prednosť. Ak nie je nahraný, použije sa statická cesta nižšie.
+           */
+          image?: (number | null) | Media;
+          /**
+           * Napr. /assets/images/hero/hero-kolekcia.webp
+           */
+          imageUrl?: string | null;
+          eyebrow?: string | null;
+          title?: string | null;
+          text?: string | null;
+          ctaLabel?: string | null;
+          ctaHref?: string | null;
+          secondaryCtaLabel?: string | null;
+          secondaryCtaHref?: string | null;
+          /**
+           * Zobrazujú sa iba na veľkých obrazovkách. X/Y sú percentá od ľavého horného rohu fotky.
+           */
+          hotspots?:
+            | {
+                x?: number | null;
+                y?: number | null;
+                label?: string | null;
+                price?: string | null;
+                /**
+                 * Ak je vyplnený, tlačidlo „Viac info" vedie na detail produktu.
+                 */
+                product?: (number | null) | Product;
+                href?: string | null;
+                id?: string | null;
+              }[]
+            | null;
+          id?: string | null;
+        }[]
+      | null;
+    perks?:
+      | {
+          icon?: ('Heart' | 'Leaf' | 'Sparkles' | 'Truck' | 'Hand' | 'Package' | 'Star' | 'Shield') | null;
+          label?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  /**
+   * Zloží sa ako „text pred · zvýraznené slovo · text za", oddelené medzerou.
+   */
+  slogan?: {
+    before?: string | null;
+    highlight?: string | null;
+    after?: string | null;
+  };
+  features?: {
+    eyebrow?: string | null;
+    /**
+     * Zalomenie riadku v tomto poli sa vykreslí ako <br>.
+     */
+    heading?: string | null;
+    text?: string | null;
+    cards?:
+      | {
+          icon?: ('Heart' | 'Leaf' | 'Sparkles' | 'Truck' | 'Hand' | 'Package' | 'Star' | 'Shield') | null;
+          title?: string | null;
+          text?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  productTabs?: {
+    eyebrow?: string | null;
+    titleBefore?: string | null;
+    titleHighlight?: string | null;
+    tabs?:
+      | {
+          label?: string | null;
+          sort?: ('-createdAt' | 'title' | 'priceInEUR' | '-priceInEUR') | null;
+          enabled?: boolean | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  categories?: {
+    eyebrow?: string | null;
+    titleLine?: string | null;
+    titleHighlight?: string | null;
+    text?: string | null;
+    ctaLabel?: string | null;
+    ctaHref?: string | null;
+  };
+  giftCta?: {
+    title?: string | null;
+    text?: string | null;
+    ctaLabel?: string | null;
+    ctaHref?: string | null;
+    /**
+     * Nahraný obrázok má prednosť. Ak nie je nahraný, použije sa statická cesta nižšie.
+     */
+    image?: (number | null) | Media;
+    imageUrl?: string | null;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -2493,6 +2688,22 @@ export interface SiteSetting {
     note?: string | null;
     phone?: string | null;
     email?: string | null;
+  };
+  /**
+   * Jediný zdroj pravdy pre telefón, e-mail a fakturačné údaje — číta ich horná lišta, mobilné menu aj pätička. Prázdne pole = pôvodná predvolená hodnota.
+   */
+  contact?: {
+    phone?: string | null;
+    email?: string | null;
+    companyName?: string | null;
+    ico?: string | null;
+    dic?: string | null;
+    icDph?: string | null;
+    /**
+     * Zalomenie riadku sa vykreslí ako nový riadok.
+     */
+    address?: string | null;
+    openingHours?: string | null;
   };
   /**
    * Bankové spojenie pre platbu prevodom. Zobrazí sa zákazníkovi na potvrdení objednávky spolu so sumou a variabilným symbolom.
@@ -2530,7 +2741,34 @@ export interface HeaderSelect<T extends boolean = true> {
               url?: T;
               label?: T;
             };
+        children?:
+          | T
+          | {
+              link?:
+                | T
+                | {
+                    type?: T;
+                    newTab?: T;
+                    reference?: T;
+                    url?: T;
+                    label?: T;
+                  };
+              id?: T;
+            };
         id?: T;
+      };
+  topBar?:
+    | T
+    | {
+        links?:
+          | T
+          | {
+              label?: T;
+              href?: T;
+              icon?: T;
+              highlight?: T;
+              id?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;
@@ -2541,6 +2779,15 @@ export interface HeaderSelect<T extends boolean = true> {
  * via the `definition` "footer_select".
  */
 export interface FooterSelect<T extends boolean = true> {
+  description?: T;
+  socialLinks?:
+    | T
+    | {
+        platform?: T;
+        url?: T;
+        id?: T;
+      };
+  navTitle?: T;
   navItems?:
     | T
     | {
@@ -2554,6 +2801,131 @@ export interface FooterSelect<T extends boolean = true> {
               label?: T;
             };
         id?: T;
+      };
+  contact?:
+    | T
+    | {
+        heading?: T;
+        phoneLabel?: T;
+        emailLabel?: T;
+        returnsLabel?: T;
+        returnsLinkLabel?: T;
+        returnsHref?: T;
+        showBusinessDetails?: T;
+      };
+  support?:
+    | T
+    | {
+        heading?: T;
+        text?: T;
+      };
+  bottomBar?:
+    | T
+    | {
+        copyright?: T;
+        cookieButtonLabel?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "homepage_select".
+ */
+export interface HomepageSelect<T extends boolean = true> {
+  hero?:
+    | T
+    | {
+        slides?:
+          | T
+          | {
+              image?: T;
+              imageUrl?: T;
+              eyebrow?: T;
+              title?: T;
+              text?: T;
+              ctaLabel?: T;
+              ctaHref?: T;
+              secondaryCtaLabel?: T;
+              secondaryCtaHref?: T;
+              hotspots?:
+                | T
+                | {
+                    x?: T;
+                    y?: T;
+                    label?: T;
+                    price?: T;
+                    product?: T;
+                    href?: T;
+                    id?: T;
+                  };
+              id?: T;
+            };
+        perks?:
+          | T
+          | {
+              icon?: T;
+              label?: T;
+              id?: T;
+            };
+      };
+  slogan?:
+    | T
+    | {
+        before?: T;
+        highlight?: T;
+        after?: T;
+      };
+  features?:
+    | T
+    | {
+        eyebrow?: T;
+        heading?: T;
+        text?: T;
+        cards?:
+          | T
+          | {
+              icon?: T;
+              title?: T;
+              text?: T;
+              id?: T;
+            };
+      };
+  productTabs?:
+    | T
+    | {
+        eyebrow?: T;
+        titleBefore?: T;
+        titleHighlight?: T;
+        tabs?:
+          | T
+          | {
+              label?: T;
+              sort?: T;
+              enabled?: T;
+              id?: T;
+            };
+      };
+  categories?:
+    | T
+    | {
+        eyebrow?: T;
+        titleLine?: T;
+        titleHighlight?: T;
+        text?: T;
+        ctaLabel?: T;
+        ctaHref?: T;
+      };
+  giftCta?:
+    | T
+    | {
+        title?: T;
+        text?: T;
+        ctaLabel?: T;
+        ctaHref?: T;
+        image?: T;
+        imageUrl?: T;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -2574,6 +2946,18 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         note?: T;
         phone?: T;
         email?: T;
+      };
+  contact?:
+    | T
+    | {
+        phone?: T;
+        email?: T;
+        companyName?: T;
+        ico?: T;
+        dic?: T;
+        icDph?: T;
+        address?: T;
+        openingHours?: T;
       };
   payments?:
     | T

@@ -13,6 +13,16 @@ import { HomeHero } from '@/components/home/HomeHero'
 import { HomeProductTabs, type ProductTab } from '@/components/home/HomeProductTabs'
 import { HomeSlogan } from '@/components/home/HomeSlogan'
 import { ProductGridItem } from '@/components/ProductGridItem'
+import {
+  resolveCategorySection,
+  resolveFeatures,
+  resolveGiftCta,
+  resolveHeroPerks,
+  resolveHeroSlides,
+  resolveProductTabs,
+  resolveSlogan,
+} from '@/lib/homeContent'
+import { getHomepage } from '@/utilities/getHomepage'
 
 /**
  * ZAPLETANE homepage.
@@ -21,6 +31,12 @@ import { ProductGridItem } from '@/components/ProductGridItem'
  * assortment → call-to-action" (DESIGN-SPEC §3.1): hero → slogan → values →
  * products → categories → gift CTA. Any blocks authored on the CMS `home` page
  * render underneath, so editorial content added later is never lost.
+ *
+ * All copy, imagery and the tab configuration come from the `homepage` global
+ * (cached under `global_homepage`, revalidated by its own afterChange hook); the
+ * resolvers in `src/lib/homeContent.ts` fall back to the constants the sections
+ * used to hard-code, so an unreachable or half-filled global renders exactly
+ * what shipped before.
  *
  * Every data-backed section returns null on an empty catalogue, so the page
  * still reads as a finished storefront against a fresh database.
@@ -34,12 +50,6 @@ const CARD_SELECT = {
   inventory: true,
   enableVariants: true,
 } as const
-
-const TABS: { key: string; label: string; sort: string }[] = [
-  { key: 'new', label: 'Nové', sort: '-createdAt' },
-  { key: 'all', label: 'Celá ponuka', sort: 'title' },
-  { key: 'value', label: 'Najvýhodnejšie', sort: 'priceInEUR' },
-]
 
 async function queryProducts(sort: string): Promise<Partial<Product>[]> {
   try {
@@ -96,28 +106,40 @@ async function queryHomeLayout() {
 }
 
 export default async function HomePage() {
+  const homepage = await getHomepage()
+  const tabsConfig = resolveProductTabs(homepage)
+
   const [tabProducts, categories, layout] = await Promise.all([
-    Promise.all(TABS.map((tab) => queryProducts(tab.sort))),
+    Promise.all(tabsConfig.tabs.map((tab) => queryProducts(tab.sort))),
     queryCategories(),
     queryHomeLayout(),
   ])
 
-  const tabs: ProductTab[] = TABS.map((tab, index) => ({
-    key: tab.key,
-    label: tab.label,
-    content: (tabProducts[index] || []).map((product) => (
-      <ProductGridItem key={product.id} product={product} />
-    )),
-  })).filter((tab, index) => (tabProducts[index] || []).length > 0)
+  const tabs: ProductTab[] = tabsConfig.tabs
+    .map((tab, index) => ({
+      key: tab.key,
+      label: tab.label,
+      content: (tabProducts[index] || []).map((product) => (
+        <ProductGridItem key={product.id} product={product} />
+      )),
+    }))
+    .filter((tab, index) => (tabProducts[index] || []).length > 0)
 
   return (
     <React.Fragment>
-      <HomeHero />
-      <HomeSlogan />
-      <HomeFeatures />
-      {tabs.length > 0 && <HomeProductTabs tabs={tabs} />}
-      <HomeCategoryGrid categories={categories} />
-      <HomeGiftCta />
+      <HomeHero perks={resolveHeroPerks(homepage)} slides={resolveHeroSlides(homepage)} />
+      <HomeSlogan slogan={resolveSlogan(homepage)} />
+      <HomeFeatures content={resolveFeatures(homepage)} />
+      {tabs.length > 0 && (
+        <HomeProductTabs
+          eyebrow={tabsConfig.eyebrow}
+          tabs={tabs}
+          titleBefore={tabsConfig.titleBefore}
+          titleHighlight={tabsConfig.titleHighlight}
+        />
+      )}
+      <HomeCategoryGrid categories={categories} content={resolveCategorySection(homepage)} />
+      <HomeGiftCta content={resolveGiftCta(homepage)} />
       {layout?.length ? <RenderBlocks blocks={layout} /> : null}
     </React.Fragment>
   )

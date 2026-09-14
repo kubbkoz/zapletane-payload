@@ -11,11 +11,13 @@
       (SiteSettings global + MCP), EUR mena, opravený košík/checkout,
       nové stock badge, brandovaný admin (light+dark), MCP server
       (lokál + produkcia), Vercel pipeline.
-- [ ] W1 Doprava + platby (dobierka, prevod, Comgate)
-- [ ] W2 Správa obsahu (hero, sekcie, footer, kontakty, navbar menu, meny)
-- [ ] W3 Custom filtre na /shop
-- [ ] W4 Redizajn mobilného hamburger menu
-- [ ] Finálna integrácia, build, push, deploy, Playwright verifikácia
+- [x] W1 Doprava + platby (dobierka, prevod, Comgate) — HOTOVÉ, nasadené
+- [x] W2 Správa obsahu (hero, sekcie, footer, kontakty, navbar menu) — implementované
+      a lokálne overené (identický render + revalidácia); meny = EUR-only, viď
+      „W2 — výsledok". Build/push/deploy robí manažér.
+- [x] W3 Custom filtre na /shop — HOTOVÉ, nasadené
+- [x] W4 Redizajn mobilného hamburger menu — HOTOVÉ, nasadené
+- [x] Finálna integrácia, build, push, deploy, Playwright verifikácia — HOTOVÉ
 
 ## Kľúčové fakty prostredia
 
@@ -100,6 +102,53 @@ Rozšír globals + kolekcie tak, aby VŠETOK hardcoded obsah bol editovateľný:
 Všetko: pg migrácie (aditívne), MCP expozícia, seed defaultov = aktuálne
 hardcoded hodnoty (zero vizuálna zmena po nasadení), frontend číta globals
 s unstable_cache + revalidateTag vzorom (pozri SiteSettings).
+
+### W2 — výsledok
+
+**Nový global `homepage`** (`src/globals/Homepage.ts`, registrovaný cez
+`globalConfigs` → automaticky aj v MCP): hero (slides s upload obrázkom +
+statickým fallbackom, eyebrow/title/text/CTA/sekundárne CTA, hotspoty s x/y %,
+názvom, cenou a odkazom na produkt; piliere s ikonou z whitelistu), slogan
+(pred/zvýraznené/za), „Prečo Zapletane" (eyebrow, nadpis s `\n` → `<br>`,
+odstavec, karty s ikonou), konfigurácia záložiek produktov (label + povolené
+`sort`), sekcia Sortiment a darčekový banner. Číta sa cez
+`src/utilities/getHomepage.ts` (unstable_cache, tag `global_homepage`,
+ceiling 60 s) a mapuje cez `src/lib/homeContent.ts`.
+
+**Rozšírené globals:** `header` (podpoložky menu — jedna úroveň, dropdown na
+desktope / odsadenie v mobilnom menu; editovateľné odkazy hornej lišty),
+`footer` (popis, sociálne siete, nadpisy stĺpcov, texty podpory, spodná lišta
+s `{{year}}`), `site-settings` (skupina `contact`: telefón, e-mail, obchodné
+meno, IČO, DIČ, IČ DPH, adresa, otváracie hodiny). Header aj Footer majú
+konečne vlastný `afterChange` revalidačný hook (`src/globals/revalidateGlobal.ts`).
+
+**Stratégia „nulovej zmeny":** každá nová vlastnosť má `defaultValue` rovný
+pôvodnej hardcoded hodnote (nikdy neuložený global vráti defaulty), každý
+komponent má navyše fallback na konštanty (`src/lib/homeDefaults.ts`,
+`footerDefaults.ts`, `navigation.ts`, `contact.ts`) pre riadok uložený pred
+pridaním poľa. Skalárne stĺpce v migrácii nesú pôvodný text ako SQL DEFAULT,
+takže Postgres ich doplní aj do existujúcich riadkov; nové array tabuľky
+dopĺňa dátová migrácia `20260914_231500_content_defaults`.
+
+**Meny (CZK): NEIMPLEMENTOVANÉ — zámerne, ostáva EUR-only.** W1 práve nasadil
+manuálny + Comgate adaptér, ktorý počíta poplatky na serveri v eurocentoch
+(`src/payments/shared/fees.ts`: `shipping-methods.price` a
+`payment-methods.surcharge` sú jednomenové skaláry pripočítané k medzisúčtu
+košíka), a Comgate `curr` je natvrdo `'EUR'` (`src/payments/comgate/api.ts`).
+Druhá mena by sa musela pretiahnuť cez celý reťazec naraz: plugin-ecommerce
+odvodzuje názvy cenových polí od kódu meny (pribudli by stĺpce `priceInCZK` na
+`products` aj `variants` — nie aditívna drobnosť, ale nový cenník), poplatky by
+potrebovali sumu na menu, objednávka a transakcia menu, ktorou sa reálne
+platilo, Comgate `curr` podľa nej a zvolený kurz/zaokrúhľovanie by bolo
+obchodné rozhodnutie, nie technické. Riziko destabilizácie práve dokončenej
+pokladne je neúmerné prínosu, kým neexistuje CZK cenník. **Čo treba na budúce
+zavedenie CZK:** (1) rozhodnúť cenotvorbu — vlastná CZK cena na produkte vs.
+prepočet kurzom; (2) `supportedCurrencies: [EUR, CZK]` v `src/plugins/index.ts`
++ migrácia na `price_in_czk` stĺpce a doplnenie cien; (3) sumy na menu pri
+doprave a platbe (alebo prepočet so zaokrúhlením na serveri); (4) menu uložiť
+na objednávke a posielať do Comgate ako `curr`; (5) currency switcher v hlavičke
+(`useCurrency().setCurrency`) + fallback na EUR pri produkte bez CZK ceny;
+(6) e2e test pokladne v oboch menách vrátane dobierky a vrátenia platby.
 
 ## W3 — Custom filtre /shop (Sonnet; frontend-only, paralelne s W1)
 

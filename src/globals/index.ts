@@ -1,5 +1,6 @@
 import { Footer } from './Footer'
 import { Header } from './Header'
+import { Homepage } from './Homepage'
 import { SiteSettings } from './SiteSettings'
 
 /**
@@ -12,4 +13,4 @@ import { SiteSettings } from './SiteSettings'
  * (find + update, per the plugin's globals-only-support-find/update rule)
  * without touching either config file again.
  */
-export const globalConfigs = [Header, Footer, SiteSettings]
+export const globalConfigs = [Header, Footer, Homepage, SiteSettings]

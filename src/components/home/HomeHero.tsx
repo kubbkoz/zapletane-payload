@@ -1,16 +1,18 @@
 'use client'
 
-import { ArrowRight, Hand, Leaf, Play, Plus, Truck } from 'lucide-react'
+import type { HeroPerk, HeroSlide } from '@/lib/homeDefaults'
+
+import { ArrowRight, Play, Plus } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 
+import { ContentIcon } from '@/components/ContentIcon'
+import { HERO_PERKS, HERO_SLIDES } from '@/lib/homeDefaults'
 import { cn } from '@/utilities/cn'
-import { HERO_PERKS, HERO_SLIDES, type HeroSlide } from './heroSlides'
-
-const perkIcons: Record<string, React.ElementType> = { Hand, Leaf, Truck }
 
 type Props = {
+  perks?: HeroPerk[]
   slides?: HeroSlide[]
 }
 
@@ -28,7 +30,7 @@ type Props = {
  * Crossfades are opacity-only (compositor-safe) and honour reduced motion; there
  * is no bounce/elastic easing anywhere (design.md §9).
  */
-export const HomeHero: React.FC<Props> = ({ slides = HERO_SLIDES }) => {
+export const HomeHero: React.FC<Props> = ({ perks = HERO_PERKS, slides = HERO_SLIDES }) => {
   const [current, setCurrent] = React.useState(0)
   const [activeHotspot, setActiveHotspot] = React.useState<string | null>(null)
 
@@ -85,20 +87,12 @@ export const HomeHero: React.FC<Props> = ({ slides = HERO_SLIDES }) => {
             </div>
 
             <ul className="mt-14 flex flex-wrap gap-9">
-              {HERO_PERKS.map((perk) => {
-                const Icon = perkIcons[perk.icon]
-                return (
-                  <li
-                    className="flex w-[92px] flex-col items-center text-center"
-                    key={perk.label}
-                  >
-                    {Icon ? <Icon className="size-8 text-brand" strokeWidth={1.4} /> : null}
-                    <span className="mt-3 text-[12px] leading-snug text-gray-700">
-                      {perk.label}
-                    </span>
-                  </li>
-                )
-              })}
+              {perks.map((perk) => (
+                <li className="flex w-[92px] flex-col items-center text-center" key={perk.label}>
+                  <ContentIcon className="size-8 text-brand" name={perk.icon} strokeWidth={1.4} />
+                  <span className="mt-3 text-[12px] leading-snug text-gray-700">{perk.label}</span>
+                </li>
+              ))}
             </ul>
           </div>
 
