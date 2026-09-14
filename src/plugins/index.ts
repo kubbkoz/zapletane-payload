@@ -4,6 +4,8 @@ import { Plugin } from 'payload'
 import { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { FixedToolbarFeature, HeadingFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import { ecommercePlugin } from '@payloadcms/plugin-ecommerce'
+import { mcpPlugin } from '@payloadcms/plugin-mcp'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 
 import { stripeAdapter } from '@payloadcms/plugin-ecommerce/payments/stripe'
 
@@ -15,6 +17,7 @@ import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
 import { customerOnlyFieldAccess } from '@/access/customerOnlyFieldAccess'
 import { isAdmin } from '@/access/isAdmin'
 import { isDocumentOwner } from '@/access/isDocumentOwner'
+import { globalConfigs } from '@/globals'
 
 const SITE_NAME = process.env.SITE_NAME || 'ZAPLETANE'
 
@@ -26,6 +29,32 @@ const generateURL: GenerateURL<Product | Page> = ({ doc }) => {
   const url = getServerSideURL()
 
   return doc?.slug ? `${url}/${doc.slug}` : url
+}
+
+// --- MCP capability ceilings (see the mcpPlugin() call below for how these
+// map onto specific collections) -------------------------------------------
+const mcpFullCrud = { create: true, delete: true, find: true, update: true }
+const mcpFindAndUpdate = { create: false, delete: false, find: true, update: true }
+const mcpFindOnly = { create: false, delete: false, find: true, update: false }
+
+type MCPCollectionEntry = NonNullable<NonNullable<MCPPluginConfig['collections']>['users']>
+
+/**
+ * Defense-in-depth for the `users` MCP find tool: strip auth-secret fields
+ * from the tool response text even though Payload's REST/Local API output
+ * already omits `hash`/`salt` from `users` documents by default.
+ */
+const redactUserSecrets: NonNullable<MCPCollectionEntry['overrideResponse']> = (response) => {
+  response.content = response.content.map((item) => ({
+    ...item,
+    text:
+      typeof item.text === 'string'
+        ? item.text
+            .replace(/"hash":\s*"[^"]*"/g, '"hash":"[redacted]"')
+            .replace(/"salt":\s*"[^"]*"/g, '"salt":"[redacted]"')
+        : item.text,
+  }))
+  return response
 }
 
 export const plugins: Plugin[] = [
@@ -132,5 +161,83 @@ export const plugins: Plugin[] = [
     products: {
       productsCollectionOverride: ProductsCollection,
     },
+  }),
+  // --- Model Context Protocol (MCP) server -------------------------------
+  // Approved scope (project owner sign-off, do not widen without new
+  // sign-off — see MCP-PLAN.md):
+  //   - full CRUD  : products, categories, pages, media, variants,
+  //                  variantOptions, and every registered global.
+  //   - find+update: orders, transactions, carts, addresses (no create/delete
+  //                  — these are financial/checkout records, not
+  //                  agent-authored content).
+  //   - find only  : users (no create/update/delete — avoids privilege
+  //                  escalation / account takeover via an MCP tool call).
+  // `globals` is built from `globalConfigs` (the same array `payload.config`
+  // registers globals from) so a newly added global is exposed automatically
+  // — no edit needed here.
+  mcpPlugin({
+    userCollection: 'users',
+    collections: {
+      products: {
+        description: 'Store catalog products: title, price, description, images, variants.',
+        enabled: mcpFullCrud,
+      },
+      categories: {
+        description: 'Product category taxonomy used for catalog navigation.',
+        enabled: mcpFullCrud,
+      },
+      pages: {
+        description: 'CMS content pages (non-catalog site content).',
+        enabled: mcpFullCrud,
+      },
+      media: {
+        description: 'Uploaded images/assets used by products and pages.',
+        enabled: mcpFullCrud,
+      },
+      variants: {
+        description: 'Per-product variant records (a specific combination of variant options).',
+        enabled: mcpFullCrud,
+      },
+      variantOptions: {
+        description: 'Selectable options belonging to a variant type (e.g. "Red", "XL").',
+        enabled: mcpFullCrud,
+      },
+      variantTypes: {
+        description: 'Variant type definitions (e.g. "Color", "Size") that group variant options.',
+        enabled: mcpFullCrud,
+      },
+      orders: {
+        description: 'Customer orders placed via checkout/Stripe. Read + status/fulfillment updates only — never agent-created or deleted.',
+        enabled: mcpFindAndUpdate,
+      },
+      transactions: {
+        description: 'Payment transactions linked to orders. Read + update only — financial records, never agent-created or deleted.',
+        enabled: mcpFindAndUpdate,
+      },
+      carts: {
+        description: "Customers' in-progress shopping carts. Read + update only.",
+        enabled: mcpFindAndUpdate,
+      },
+      addresses: {
+        description: 'Customer shipping/billing addresses. Read + update only.',
+        enabled: mcpFindAndUpdate,
+      },
+      users: {
+        description: 'Customer/admin accounts. Read-only — no create/update/delete tool is exposed for this collection.',
+        enabled: mcpFindOnly,
+        overrideResponse: redactUserSecrets,
+      },
+    },
+    globals: Object.fromEntries(
+      globalConfigs.map((global) => [
+        global.slug,
+        {
+          description: `Site-wide "${global.slug}" global configuration.`,
+          // Globals only ever support find/update (they're singletons) —
+          // `true` grants the maximum available, i.e. both.
+          enabled: true,
+        },
+      ]),
+    ) as NonNullable<MCPPluginConfig['globals']>,
   }),
 ]

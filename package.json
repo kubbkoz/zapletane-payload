@@ -16,6 +16,7 @@
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "lint": "cross-env NODE_OPTIONS=--no-deprecation eslint .",
     "lint:fix": "cross-env NODE_OPTIONS=--no-deprecation eslint . --fix",
+    "mcp:mint-key": "cross-env NODE_OPTIONS=--no-deprecation tsx scripts/mint-mcp-key.ts",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "reinstall": "cross-env NODE_OPTIONS=--no-deprecation rm -rf node_modules package-lock.json && npm install",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",

@@ -14,7 +14,7 @@ export default async function FindOrderPage() {
 
   return (
     <div className="container py-16">
-      <FindOrderForm initialEmail={user?.email} />
+      <FindOrderForm initialEmail={user && 'email' in user ? user.email : undefined} />
     </div>
   )
 }
