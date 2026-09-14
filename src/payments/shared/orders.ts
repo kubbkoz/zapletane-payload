@@ -96,6 +96,36 @@ export const checkoutCarryFields: Field[] = [
   },
 ]
 
+/**
+ * Refuse to start a second checkout on a cart that already became an order.
+ *
+ * The plugin's `initiate` endpoint loads the cart with a narrow `select` that
+ * omits `purchasedAt`, so it cannot tell. Without this, a double-submit (or a
+ * back button onto a stale checkout) would mint a second transaction and a
+ * second order for the same basket.
+ */
+export const assertCartIsNotPurchased = async ({
+  cartID,
+  cartsSlug = 'carts',
+  req,
+}: {
+  cartID: number | string
+  cartsSlug?: string
+  req: PayloadRequest
+}): Promise<void> => {
+  const cart = await req.payload.findByID({
+    id: cartID,
+    collection: cartsSlug as CollectionSlug,
+    depth: 0,
+    req,
+    select: { purchasedAt: true },
+  })
+
+  if (cart && 'purchasedAt' in cart && cart.purchasedAt) {
+    throw new Error('Tento košík už bol objednaný.')
+  }
+}
+
 /** Shape written into the adapter group by `initiatePayment`. */
 export type CheckoutCarryGroup = {
   codFee?: null | number

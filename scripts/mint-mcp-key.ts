@@ -101,6 +101,11 @@ async function main() {
     variants: fullCrud,
     variantOptions: fullCrud,
     variantTypes: fullCrud,
+    // W1 — doprava a platby. Shop configuration, same ceiling as the catalog.
+    // Field names are the camel-cased collection slugs (`shipping-methods` ->
+    // `shippingMethods`), which is how the MCP plugin generates them.
+    shippingMethods: fullCrud,
+    paymentMethods: fullCrud,
     orders: findAndUpdate,
     transactions: findAndUpdate,
     carts: findAndUpdate,
@@ -108,6 +113,7 @@ async function main() {
     users: findOnly,
     header: globalFullAccess,
     footer: globalFullAccess,
+    siteSettings: globalFullAccess,
   }
 
   // 3. Create, or rotate the existing dev key in place (idempotent re-runs).

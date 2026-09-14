@@ -4,6 +4,8 @@ import * as migration_20260914_201800_reset_admin_password from './20260914_2018
 import * as migration_20260914_204453_site_settings from './20260914_204453_site_settings';
 import * as migration_20260914_210500_reset_admin_password_2 from './20260914_210500_reset_admin_password_2';
 import * as migration_20260914_213000_eur_currency from './20260914_213000_eur_currency';
+import * as migration_20260914_222406_shipping_payments from './20260914_222406_shipping_payments';
+import * as migration_20260914_223000_mcp_shipping_payment_grants from './20260914_223000_mcp_shipping_payment_grants';
 
 export const migrations = [
   {
@@ -24,16 +26,26 @@ export const migrations = [
   {
     up: migration_20260914_204453_site_settings.up,
     down: migration_20260914_204453_site_settings.down,
-    name: '20260914_204453_site_settings'
+    name: '20260914_204453_site_settings',
   },
   {
     up: migration_20260914_210500_reset_admin_password_2.up,
     down: migration_20260914_210500_reset_admin_password_2.down,
-    name: '20260914_210500_reset_admin_password_2'
+    name: '20260914_210500_reset_admin_password_2',
   },
   {
     up: migration_20260914_213000_eur_currency.up,
     down: migration_20260914_213000_eur_currency.down,
-    name: '20260914_213000_eur_currency'
+    name: '20260914_213000_eur_currency',
+  },
+  {
+    up: migration_20260914_222406_shipping_payments.up,
+    down: migration_20260914_222406_shipping_payments.down,
+    name: '20260914_222406_shipping_payments'
+  },
+  {
+    up: migration_20260914_223000_mcp_shipping_payment_grants.up,
+    down: migration_20260914_223000_mcp_shipping_payment_grants.down,
+    name: '20260914_223000_mcp_shipping_payment_grants'
   },
 ];

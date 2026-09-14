@@ -5,6 +5,7 @@ import type { Order, Transaction } from '@/payload-types'
 
 import { calculateOrderTotal, resolveFees } from '@/payments/shared/fees'
 import {
+  assertCartIsNotPurchased,
   checkoutCarryFields,
   createOrderFromTransaction,
   flattenCartItems,
@@ -140,6 +141,8 @@ export const comgateAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =
       if (!customerEmail) {
         throw new Error('Na dokončenie objednávky je potrebný e-mail.')
       }
+
+      await assertCartIsNotPurchased({ cartID: cart.id, req })
 
       const requestData = (req.data ?? {}) as Record<string, unknown>
 
