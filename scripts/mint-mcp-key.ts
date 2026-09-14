@@ -100,6 +100,7 @@ async function main() {
     media: fullCrud,
     variants: fullCrud,
     variantOptions: fullCrud,
+    variantTypes: fullCrud,
     orders: findAndUpdate,
     transactions: findAndUpdate,
     carts: findAndUpdate,

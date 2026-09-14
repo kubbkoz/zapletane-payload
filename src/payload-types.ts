@@ -1177,6 +1177,24 @@ export interface PayloadMcpApiKey {
      */
     delete?: boolean | null;
   };
+  variantTypes?: {
+    /**
+     * Allow clients to find variantTypes.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create variantTypes.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update variantTypes.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete variantTypes.
+     */
+    delete?: boolean | null;
+  };
   orders?: {
     /**
      * Allow clients to find orders.
@@ -2022,6 +2040,14 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         delete?: T;
       };
   variantOptions?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  variantTypes?:
     | T
     | {
         find?: T;
