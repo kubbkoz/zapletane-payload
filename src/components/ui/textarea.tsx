@@ -2,12 +2,17 @@ import * as React from 'react'
 
 import { cn } from '@/utilities/cn'
 
+/** Multi-line field — same `form-input` treatment as <Input />. */
 function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
   return (
     <textarea
       data-slot="textarea"
       className={cn(
-        'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        'field-sizing-content flex min-h-24 w-full rounded-default border border-transparent bg-gray-50 px-4 py-3 font-sans text-sm font-medium text-black outline-none transition-all duration-300',
+        'placeholder:text-gray-400 selection:bg-brand selection:text-white',
+        'focus:border-brand focus:bg-white focus-visible:border-brand focus-visible:bg-white',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        'aria-invalid:border-error aria-invalid:bg-error-light',
         className,
       )}
       {...props}

@@ -54,10 +54,18 @@ export const ConfirmOrder: React.FC = () => {
   }, [cart, confirmOrder, router, searchParams])
 
   return (
-    <div className="text-center w-full flex flex-col items-center justify-start gap-4">
-      <h1 className="text-2xl">Confirming Order</h1>
+    <div className="flex w-full flex-col items-center justify-start gap-5 text-center">
+      <p className="eyebrow">Ešte chvíľu</p>
+      <h1 className="font-sans text-2xl font-bold tracking-tight text-black md:text-3xl">
+        Potvrdzujeme vašu objednávku
+      </h1>
+      <div className="section-decorator" />
+      <p className="max-w-[420px] font-sans text-sm leading-relaxed text-gray-600">
+        Nezatvárajte prosím toto okno — hneď ako platbu potvrdíme, presmerujeme vás na zhrnutie
+        objednávky.
+      </p>
 
-      <LoadingSpinner className="w-12 h-6" />
+      <LoadingSpinner className="text-brand" size="large" />
     </div>
   )
 }

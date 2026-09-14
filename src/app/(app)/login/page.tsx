@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import { RenderParams } from '@/components/RenderParams'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
 
@@ -16,30 +17,51 @@ export default async function Login() {
   const { user } = await payload.auth({ headers })
 
   if (user) {
-    redirect(`/account?warning=${encodeURIComponent('You are already logged in.')}`)
+    redirect(`/account?warning=${encodeURIComponent('Už ste prihlásený.')}`)
   }
 
   return (
-    <div className="container">
-      <div className="max-w-xl mx-auto my-12">
-        <RenderParams />
+    <div className="relative overflow-hidden bg-brand-50 py-16 md:py-24">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-32 -top-32 -z-0 size-96 rounded-full bg-brand/5 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-32 -left-32 -z-0 size-96 rounded-full bg-brand/5 blur-3xl"
+      />
 
-        <h1 className="mb-4 text-[1.8rem]">Log in</h1>
-        <p className="mb-8">
-          {`This is where your customers will login to manage their account, review their order history, and more. To manage all users, `}
-          <Link href="/admin/collections/users">login to the admin dashboard</Link>.
-        </p>
-        <LoginForm />
+      <div className="container-page relative">
+        <div className="mx-auto mb-8 max-w-md">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 transition-colors hover:text-brand"
+          >
+            <ArrowLeft className="size-4" />
+            Späť na hlavnú stránku
+          </Link>
+        </div>
+
+        <div className="mx-auto max-w-md">
+          <p className="eyebrow text-center">Môj účet</p>
+          <h1 className="section-h2 mt-3 text-center text-[32px] sm:text-[38px]">Prihlásenie</h1>
+          <div className="section-decorator mx-auto mt-5" />
+
+          <div className="mt-10 rounded-default border border-gray-100 bg-white p-8 shadow-panel md:p-10">
+            <RenderParams className="mb-6" />
+            <LoginForm />
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'Login or create an account to get started.',
+  description: 'Prihláste sa alebo si vytvorte účet v ZAPLETANE e-shope.',
   openGraph: {
-    title: 'Login',
+    title: 'Prihlásenie',
     url: '/login',
   },
-  title: 'Login',
+  title: 'Prihlásenie',
 }

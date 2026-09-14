@@ -1,7 +1,6 @@
 'use client'
 
 import { Message } from '@/components/Message'
-import { Button } from '@/components/ui/button'
 import { PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { useRouter } from 'next/navigation'
 import React, { useCallback, FormEvent } from 'react'
@@ -97,8 +96,8 @@ export const CheckoutForm: React.FC<Props> = ({
               }
             } catch (err) {
               console.log({ err })
-              const msg = err instanceof Error ? err.message : 'Something went wrong.'
-              setError(`Error while confirming order: ${msg}`)
+              const msg = err instanceof Error ? err.message : 'Niečo sa pokazilo.'
+              setError(`Chyba pri potvrdzovaní objednávky: ${msg}`)
               setIsLoading(false)
             }
           }
@@ -107,8 +106,8 @@ export const CheckoutForm: React.FC<Props> = ({
             setIsLoading(false)
           }
         } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Something went wrong.'
-          setError(`Error while submitting payment: ${msg}`)
+          const msg = err instanceof Error ? err.message : 'Niečo sa pokazilo.'
+          setError(`Chyba pri odosielaní platby: ${msg}`)
           setIsLoading(false)
           setProcessingPayment(false)
         }
@@ -137,9 +136,13 @@ export const CheckoutForm: React.FC<Props> = ({
       {error && <Message error={error} />}
       <PaymentElement />
       <div className="mt-8 flex gap-4">
-        <Button disabled={!stripe || isLoading} type="submit" variant="default">
-          {isLoading ? 'Loading...' : 'Pay now'}
-        </Button>
+        <button
+          className="btn-checkout text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!stripe || isLoading}
+          type="submit"
+        >
+          {isLoading ? 'Spracúvam...' : 'Zaplatiť'}
+        </button>
       </div>
     </form>
   )

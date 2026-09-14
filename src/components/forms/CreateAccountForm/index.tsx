@@ -2,11 +2,19 @@
 
 import { FormError } from '@/components/forms/FormError'
 import { FormItem } from '@/components/forms/FormItem'
-import { Message } from '@/components/Message'
+import {
+  errorBannerClassName,
+  inputIconClassName,
+  inputIconWrapClassName,
+  inputWithIconClassName,
+  labelClassName,
+  primarySubmitClassName,
+} from '@/components/forms/formStyles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/providers/Auth'
+import { AlertCircle, Loader2, Lock, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useRef, useState } from 'react'
@@ -47,7 +55,7 @@ export const CreateAccountForm: React.FC = () => {
       })
 
       if (!response.ok) {
-        const message = response.statusText || 'There was an error creating the account.'
+        const message = response.statusText || 'Nastala chyba pri vytváraní účtu.'
         setError(message)
         return
       }
@@ -62,76 +70,105 @@ export const CreateAccountForm: React.FC = () => {
         await login(data)
         clearTimeout(timer)
         if (redirect) router.push(redirect)
-        else router.push(`/account?success=${encodeURIComponent('Account created successfully')}`)
+        else router.push(`/account?success=${encodeURIComponent('Účet bol úspešne vytvorený.')}`)
       } catch (_) {
         clearTimeout(timer)
-        setError('There was an error with the credentials provided. Please try again.')
+        setError('Nastala chyba pri prihlásení. Skúste to prosím znova.')
       }
     },
     [login, router, searchParams],
   )
 
   return (
-    <form className="max-w-lg py-4" onSubmit={handleSubmit(onSubmit)}>
-      <div className="prose dark:prose-invert mb-6">
-        <p>
-          {`This is where new customers can signup and create a new account. To manage all users, `}
-          <Link href="/admin/collections/users">login to the admin dashboard</Link>.
-        </p>
+    <div className="mx-auto max-w-md">
+      <div className="flex items-center gap-4">
+        <span className="h-8 w-1.5 shrink-0 bg-brand" />
+        <h1 className="font-sans text-3xl font-bold uppercase tracking-tighter text-black">
+          Registrácia
+        </h1>
       </div>
 
-      <Message error={error} />
+      <form className="mt-8" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {error && (
+          <div className={`${errorBannerClassName} mb-6`}>
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
 
-      <div className="flex flex-col gap-8 mb-8">
-        <FormItem>
-          <Label htmlFor="email" className="mb-2">
-            Email Address
-          </Label>
-          <Input
-            id="email"
-            {...register('email', { required: 'Email is required.' })}
-            type="email"
-          />
-          {errors.email && <FormError message={errors.email.message} />}
-        </FormItem>
+        <div className="flex flex-col gap-5">
+          <FormItem>
+            <Label htmlFor="email" className={labelClassName}>
+              E-mail *
+            </Label>
+            <div className={inputIconWrapClassName}>
+              <Mail className={inputIconClassName} />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="email@priklad.sk"
+                className={inputWithIconClassName}
+                {...register('email', { required: 'E-mail je povinný.' })}
+              />
+            </div>
+            {errors.email && <FormError message={errors.email.message} />}
+          </FormItem>
 
-        <FormItem>
-          <Label htmlFor="password" className="mb-2">
-            New password
-          </Label>
-          <Input
-            id="password"
-            {...register('password', { required: 'Password is required.' })}
-            type="password"
-          />
-          {errors.password && <FormError message={errors.password.message} />}
-        </FormItem>
+          <FormItem>
+            <Label htmlFor="password" className={labelClassName}>
+              Heslo * (min. 8 znakov)
+            </Label>
+            <div className={inputIconWrapClassName}>
+              <Lock className={inputIconClassName} />
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className={inputWithIconClassName}
+                {...register('password', { required: 'Heslo je povinné.' })}
+              />
+            </div>
+            {errors.password && <FormError message={errors.password.message} />}
+          </FormItem>
 
-        <FormItem>
-          <Label htmlFor="passwordConfirm" className="mb-2">
-            Confirm Password
-          </Label>
-          <Input
-            id="passwordConfirm"
-            {...register('passwordConfirm', {
-              required: 'Please confirm your password.',
-              validate: (value) => value === password.current || 'The passwords do not match',
-            })}
-            type="password"
-          />
-          {errors.passwordConfirm && <FormError message={errors.passwordConfirm.message} />}
-        </FormItem>
-      </div>
-      <Button disabled={loading} type="submit" variant="default">
-        {loading ? 'Processing' : 'Create Account'}
-      </Button>
+          <FormItem>
+            <Label htmlFor="passwordConfirm" className={labelClassName}>
+              Potvrďte heslo *
+            </Label>
+            <div className={inputIconWrapClassName}>
+              <Lock className={inputIconClassName} />
+              <Input
+                id="passwordConfirm"
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className={inputWithIconClassName}
+                {...register('passwordConfirm', {
+                  required: 'Potvrďte prosím heslo.',
+                  validate: (value) => value === password.current || 'Heslá sa nezhodujú.',
+                })}
+              />
+            </div>
+            {errors.passwordConfirm && <FormError message={errors.passwordConfirm.message} />}
+          </FormItem>
+        </div>
 
-      <div className="prose dark:prose-invert mt-8">
-        <p>
-          {'Already have an account? '}
-          <Link href={`/login${allParams}`}>Login</Link>
-        </p>
-      </div>
-    </form>
+        <Button className={`${primarySubmitClassName} mt-8`} disabled={loading} type="submit">
+          {loading && <Loader2 className="size-4 animate-spin" />}
+          {loading ? 'Registrujem...' : 'Vytvoriť účet'}
+        </Button>
+
+        <div className="mt-6 flex flex-col items-center gap-3 border-t border-gray-100 pt-6 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            Už máte účet?{' '}
+            <Link href={`/login${allParams}`} className="text-brand hover:underline">
+              Prihláste sa
+            </Link>
+          </p>
+        </div>
+      </form>
+    </div>
   )
 }

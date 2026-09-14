@@ -2,11 +2,19 @@
 
 import { FormError } from '@/components/forms/FormError'
 import { FormItem } from '@/components/forms/FormItem'
-import { Message } from '@/components/Message'
+import {
+  errorBannerClassName,
+  inputIconClassName,
+  inputIconWrapClassName,
+  inputWithIconClassName,
+  labelClassName,
+  primarySubmitClassName,
+} from '@/components/forms/formStyles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/providers/Auth'
+import { AlertCircle, Loader2, Lock, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useRef } from 'react'
@@ -38,53 +46,89 @@ export const LoginForm: React.FC = () => {
         if (redirect?.current) router.push(redirect.current)
         else router.push('/account')
       } catch (_) {
-        setError('There was an error with the credentials provided. Please try again.')
+        setError('Nastala chyba pri prihlásení. Skontrolujte prosím zadané údaje a skúste to znova.')
       }
     },
     [login, router],
   )
 
   return (
-    <form className="" onSubmit={handleSubmit(onSubmit)}>
-      <Message className="classes.message" error={error} />
-      <div className="flex flex-col gap-8">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <div className="flex flex-col gap-5">
+        {error && (
+          <div className={errorBannerClassName}>
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+
         <FormItem>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            {...register('email', { required: 'Email is required.' })}
-          />
+          <Label htmlFor="email" className={labelClassName}>
+            E-mail
+          </Label>
+          <div className={inputIconWrapClassName}>
+            <Mail className={inputIconClassName} />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="vas@email.sk"
+              className={inputWithIconClassName}
+              {...register('email', { required: 'E-mail je povinný.' })}
+            />
+          </div>
           {errors.email && <FormError message={errors.email.message} />}
         </FormItem>
 
         <FormItem>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            {...register('password', { required: 'Please provide a password.' })}
-          />
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password" className={labelClassName}>
+              Heslo
+            </Label>
+            <Link
+              href={`/forgot-password${allParams}`}
+              className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
+            >
+              Zabudli ste heslo?
+            </Link>
+          </div>
+          <div className={inputIconWrapClassName}>
+            <Lock className={inputIconClassName} />
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              className={inputWithIconClassName}
+              {...register('password', { required: 'Zadajte prosím heslo.' })}
+            />
+          </div>
           {errors.password && <FormError message={errors.password.message} />}
         </FormItem>
 
-        <div className="text-primary/70 mb-6 prose prose-a:hover:text-primary dark:prose-invert">
-          <p>
-            Forgot your password?{' '}
-            <Link href={`/forgot-password${allParams}`}>Click here to reset it</Link>
-          </p>
-        </div>
-      </div>
+        <Button
+          className={primarySubmitClassName}
+          disabled={isLoading}
+          size="lg"
+          type="submit"
+          variant="default"
+        >
+          {isLoading && <Loader2 className="size-4 animate-spin" />}
+          {isLoading ? 'Prihlasujem...' : 'Prihlásiť sa'}
+        </Button>
 
-      <div className="flex gap-4 justify-between">
-        <Button asChild variant="outline" size="lg">
-          <Link href={`/create-account${allParams}`} className="grow max-w-[50%]">
-            Create an account
-          </Link>
-        </Button>
-        <Button className="grow" disabled={isLoading} size="lg" type="submit" variant="default">
-          {isLoading ? 'Processing' : 'Continue'}
-        </Button>
+        <div className="mt-2 flex flex-col items-center gap-3 border-t border-gray-100 pt-6 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            Ešte nemáte účet?
+          </p>
+          <Button
+            asChild
+            variant="outline"
+            className="h-12 w-full rounded-default border-gray-200 text-[13px] font-bold uppercase tracking-widest text-black hover:border-brand hover:text-brand"
+          >
+            <Link href={`/create-account${allParams}`}>Zaregistrovať sa</Link>
+          </Button>
+        </div>
       </div>
     </form>
   )

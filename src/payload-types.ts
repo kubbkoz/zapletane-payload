@@ -134,10 +134,12 @@ export interface Config {
   globals: {
     header: Header;
     footer: Footer;
+    'site-settings': SiteSetting;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
+    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
   };
   locale: null;
   widgets: {
@@ -1261,6 +1263,16 @@ export interface PayloadMcpApiKey {
      */
     update?: boolean | null;
   };
+  siteSettings?: {
+    /**
+     * Allow clients to find site-settings global.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to update site-settings global.
+     */
+    update?: boolean | null;
+  };
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -2096,6 +2108,12 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         find?: T;
         update?: T;
       };
+  siteSettings?:
+    | T
+    | {
+        find?: T;
+        update?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   enableAPIKey?: T;
@@ -2191,6 +2209,35 @@ export interface Footer {
   createdAt?: string | null;
 }
 /**
+ * Site-wide switches. The pre-launch page hides the whole storefront (the /admin panel stays reachable).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings".
+ */
+export interface SiteSetting {
+  id: number;
+  /**
+   * ON = every storefront page is replaced by the pre-launch page. /admin is unaffected. Owners can preview the real site with ?preview=<COMING_SOON_BYPASS>. Takes effect within a minute.
+   */
+  comingSoonEnabled?: boolean | null;
+  /**
+   * Slovak copy rendered on the pre-launch page. Leave blank to use the default.
+   */
+  comingSoon?: {
+    eyebrow?: string | null;
+    /**
+     * A line break in this field becomes a <br> in the headline.
+     */
+    title?: string | null;
+    body?: string | null;
+    note?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header_select".
  */
@@ -2231,6 +2278,26 @@ export interface FooterSelect<T extends boolean = true> {
               label?: T;
             };
         id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings_select".
+ */
+export interface SiteSettingsSelect<T extends boolean = true> {
+  comingSoonEnabled?: T;
+  comingSoon?:
+    | T
+    | {
+        eyebrow?: T;
+        title?: T;
+        body?: T;
+        note?: T;
+        phone?: T;
+        email?: T;
       };
   updatedAt?: T;
   createdAt?: T;

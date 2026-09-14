@@ -41,7 +41,10 @@ const colorVariantOptions = [
   { label: 'White', value: 'white' },
 ]
 
-const globals: GlobalSlug[] = ['header', 'footer']
+// Narrowed on purpose (not `GlobalSlug[]`): the loop below resets `navItems`,
+// a field only the nav globals have. `site-settings` is a switchboard, not
+// seedable content, so it stays out of the reset.
+const globals = ['header', 'footer'] as const satisfies readonly GlobalSlug[]
 
 const baseAddressUSData: Transaction['billingAddress'] = {
   title: 'Dr.',

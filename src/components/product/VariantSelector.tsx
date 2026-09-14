@@ -1,13 +1,22 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import type { Product } from '@/payload-types'
 
 import { createUrl } from '@/utilities/createUrl'
-import clsx from 'clsx'
+import { cn } from '@/utilities/cn'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import React from 'react'
 
+/**
+ * PDP variant chip selector — DESIGN-SPEC §3.3:
+ * `min-w-[3.5rem] w-auto px-4 h-12 flex items-center justify-center font-bold
+ *  text-sm border font-sans focus:ring-1 focus:ring-black rounded-sm`
+ *
+ * Stock colouring follows the card's chip language: selected = filled brand,
+ * available = quiet gray border that warms to brand on hover, sold out = grayed
+ * with the same inline-SVG diagonal strike (stroke #E4D2CB) used everywhere else.
+ * All routing/param logic below is unchanged from the template.
+ */
 export function VariantSelector({ product }: { product: Product }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -32,9 +41,9 @@ export function VariantSelector({ product }: { product: Product }) {
     }
 
     return (
-      <dl className="" key={type.id}>
-        <dt className="mb-4 text-sm">{type.label}</dt>
-        <dd className="flex flex-wrap gap-3">
+      <dl className="flex flex-col" key={type.id}>
+        <dt className="form-label">{type.label}</dt>
+        <dd className="flex flex-wrap gap-2">
           <React.Fragment>
             {options?.map((option) => {
               if (!option || typeof option !== 'object') {
@@ -95,12 +104,17 @@ export function VariantSelector({ product }: { product: Product }) {
                 searchParams.get(optionKeyLowerCase) === String(optionID)
 
               return (
-                <Button
-                  variant={'ghost'}
+                <button
                   aria-disabled={!isAvailableForSale}
-                  className={clsx('px-2', {
-                    'bg-primary/5 text-primary': isActive,
-                  })}
+                  className={cn(
+                    'relative flex h-12 w-auto min-w-[3.5rem] items-center justify-center rounded-sm border px-4 font-sans text-sm font-bold transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-black',
+                    isActive && 'border-brand bg-brand text-white',
+                    !isActive &&
+                      isAvailableForSale &&
+                      'border-gray-200 bg-white text-black hover:border-brand hover:text-brand',
+                    !isAvailableForSale &&
+                      'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400 opacity-60',
+                  )}
                   disabled={!isAvailableForSale}
                   key={option.id}
                   onClick={() => {
@@ -108,10 +122,18 @@ export function VariantSelector({ product }: { product: Product }) {
                       scroll: false,
                     })
                   }}
-                  title={`${option.label} ${!isAvailableForSale ? ' (Out of Stock)' : ''}`}
+                  title={`${option.label}${!isAvailableForSale ? ' (Vypredané)' : ''}`}
+                  type="button"
                 >
                   {option.label}
-                </Button>
+                  {!isAvailableForSale && (
+                    <span className="pointer-events-none absolute inset-0 overflow-hidden">
+                      <svg className="h-full w-full" preserveAspectRatio="none">
+                        <line x1="0" y1="100%" x2="100%" y2="0" stroke="#E4D2CB" strokeWidth="1" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
               )
             })}
           </React.Fragment>

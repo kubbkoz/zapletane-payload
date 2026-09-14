@@ -606,3 +606,22 @@ button {
     }
   }
 }
+
+/* ============================================================================
+   Appended by the layout pass — new classes only, nothing above is modified.
+   ============================================================================ */
+@layer components {
+  /* §2.1 — spacer that reserves the fixed navbar's height. The real value is
+     written to --navbar-height-current by the navbar's ResizeObserver; these
+     fallbacks are the same ones the Nuxt app baked into its inline critical
+     CSS (169px desktop, 106px below lg) so the first paint has no CLS. */
+  .navbar-spacer {
+    height: var(--navbar-height-current, 169px);
+    will-change: height;
+  }
+  @media (max-width: 1023.98px) {
+    .navbar-spacer {
+      height: var(--navbar-height-current, 106px);
+    }
+  }
+}

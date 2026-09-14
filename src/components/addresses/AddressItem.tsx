@@ -3,6 +3,7 @@
 import React from 'react'
 import type { Address } from '@/payload-types'
 import { CreateAddressModal } from '@/components/addresses/CreateAddressModal'
+import { Edit2, MapPin, Phone, Tag } from 'lucide-react'
 
 type Props = {
   address: Partial<Omit<Address, 'country'>> & { country?: string } // Allow address to be partial and entirely optional as this is entirely for display purposes
@@ -36,26 +37,41 @@ export const AddressItem: React.FC<Props> = ({
   }
 
   return (
-    <div className="flex items-center">
-      <div className="grow">
-        <p className="font-medium">
-          {address.title && <span>{address.title} </span>}
-          {address.firstName} {address.lastName}
-        </p>
-        <p>{address.company && <span>{address.company} </span>}</p>
-        <p>{address.phone && <span>{address.phone}</span>}</p>
-        <p>
-          {address.addressLine1}
-          {address.addressLine2 && <>, {address.addressLine2}</>}
-        </p>
-        <p>
-          {address.city}, {address.state} {address.postalCode}
-        </p>
-        <p>{address.country}</p>
+    <div className="flex flex-col gap-4 font-sans">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand">
+          <MapPin className="size-4" />
+        </span>
+        <div className="min-w-0 grow">
+          <p className="text-sm font-bold text-black">
+            {address.title && <span>{address.title} </span>}
+            {address.firstName} {address.lastName}
+          </p>
+          {address.company && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-gray-500">
+              <Tag className="size-3" /> {address.company}
+            </p>
+          )}
+          {address.phone && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+              <Phone className="size-3" /> {address.phone}
+            </p>
+          )}
+        </div>
       </div>
 
+      <p className="pl-11 text-sm leading-relaxed text-gray-600">
+        {address.addressLine1}
+        {address.addressLine2 && <>, {address.addressLine2}</>}
+        <br />
+        {address.city}
+        {address.state ? `, ${address.state}` : ''} {address.postalCode}
+        <br />
+        {address.country}
+      </p>
+
       {!hideActions && address.id && (
-        <div className="shrink flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-4 border-t border-gray-100 pl-11 pt-4">
           {actions ? (
             actions
           ) : (
@@ -65,8 +81,10 @@ export const AddressItem: React.FC<Props> = ({
                 <CreateAddressModal
                   addressID={address.id}
                   initialData={address}
-                  buttonText={'Edit'}
-                  modalTitle={'Edit address'}
+                  buttonText="Upraviť"
+                  buttonIcon={<Edit2 className="size-3" />}
+                  buttonVariant="link"
+                  modalTitle="Upraviť adresu"
                 />
               )}
               {afterActions}

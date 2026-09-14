@@ -1,18 +1,29 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import type { Product, Variant } from '@/payload-types'
 
 import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
-import clsx from 'clsx'
+import { Loader2, ShoppingCart } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import React, { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
+
+import { cn } from '@/utilities/cn'
+
 type Props = {
   product: Product
+  className?: string
 }
 
-export function AddToCart({ product }: Props) {
+/**
+ * PDP primary CTA. Visual layer only — the cart wiring (useCart/addItem, the
+ * inventory-aware disabled rule) is byte-for-byte the template's.
+ *
+ * Styling is `BaseButton variant="primary" size="lg"` from DESIGN-SPEC §3.7:
+ * bg-accent / hover bg-accent-dark, white text, uppercase tracking-widest,
+ * rounded-default — full width on mobile, fixed min-width on desktop (§3.3).
+ */
+export function AddToCart({ product, className }: Props) {
   const { addItem, cart, isLoading } = useCart()
   const searchParams = useSearchParams()
 
@@ -45,7 +56,7 @@ export function AddToCart({ product }: Props) {
         product: product.id,
         variant: selectedVariant?.id ?? undefined,
       }).then(() => {
-        toast.success('Item added to cart.')
+        toast.success('Produkt bol pridaný do košíka.')
       })
     },
     [addItem, product, selectedVariant],
@@ -94,18 +105,32 @@ export function AddToCart({ product }: Props) {
     return false
   }, [selectedVariant, cart?.items, product])
 
+  const label = useMemo<string>(() => {
+    if (isLoading) return 'Pridávam...'
+    if (product.enableVariants && !selectedVariant) return 'Vyberte si veľkosť'
+    if (product.enableVariants ? selectedVariant?.inventory === 0 : product.inventory === 0) {
+      return 'Vypredané'
+    }
+    return 'Pridať do košíka'
+  }, [isLoading, product.enableVariants, product.inventory, selectedVariant])
+
   return (
-    <Button
-      aria-label="Add to cart"
-      variant={'outline'}
-      className={clsx({
-        'hover:opacity-90': true,
-      })}
+    <button
+      aria-label="Pridať do košíka"
+      className={cn(
+        'inline-flex w-full items-center justify-center gap-3 rounded-default border border-accent bg-accent px-8 py-4 font-sans text-sm font-bold uppercase tracking-widest text-white transition-colors duration-300 hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[260px]',
+        className,
+      )}
       disabled={disabled || isLoading}
       onClick={addToCart}
       type="submit"
     >
-      Add To Cart
-    </Button>
+      {isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <ShoppingCart className="h-4 w-4" />
+      )}
+      {label}
+    </button>
   )
 }

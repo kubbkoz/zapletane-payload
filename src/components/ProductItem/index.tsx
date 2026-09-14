@@ -1,9 +1,6 @@
 import { Media } from '@/components/Media'
-import { OrderStatus } from '@/components/OrderStatus'
 import { Price } from '@/components/Price'
-import { Button } from '@/components/ui/button'
-import { Media as MediaType, Order, Product, Variant } from '@/payload-types'
-import { formatDateTime } from '@/utilities/formatDateTime'
+import { Product, Variant } from '@/payload-types'
 import Link from 'next/link'
 
 type Props = {
@@ -17,6 +14,11 @@ type Props = {
   currencyCode?: string
 }
 
+/**
+ * Order / summary line item. Same visual grammar as the cart drawer row: cream
+ * photo stage with `mix-blend-multiply`, DM Sans title that warms to brand on
+ * hover, option chips, `font-tech` price. Slovak labels per DESIGN-SPEC §5.
+ */
 export const ProductItem: React.FC<Props> = ({
   product,
   style = 'default',
@@ -59,46 +61,61 @@ export const ProductItem: React.FC<Props> = ({
   const itemURL = `/products/${product.slug}${variant ? `?variant=${variant.id}` : ''}`
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="flex items-stretch justify-stretch h-20 w-20 p-2 rounded-lg border">
-        <div className="relative w-full h-full">
-          {image && typeof image !== 'string' && (
-            <Media className="" fill imgClassName="rounded-lg object-cover" resource={image} />
-          )}
-        </div>
-      </div>
-      <div className="flex grow justify-between items-center">
-        <div className="flex flex-col gap-1">
-          <p className="font-medium text-lg">
-            <Link href={itemURL}>{title}</Link>
-          </p>
-          {variant && (
-            <p className="text-sm font-mono text-primary/50 tracking-widest">
-              {variant.options
-                ?.map((option) => {
-                  if (typeof option === 'object') return option.label
-                  return null
-                })
-                .join(', ')}
-            </p>
-          )}
-          <div>
-            {'x'}
-            {quantity}
-          </div>
-        </div>
+    <div className="flex items-start gap-4">
+      <Link
+        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-sm border border-gray-100 bg-gray-50"
+        href={itemURL}
+      >
+        {image && typeof image !== 'string' && (
+          <Media
+            className="h-full w-full"
+            fill
+            imgClassName="object-contain p-2 mix-blend-multiply"
+            resource={image}
+          />
+        )}
+      </Link>
 
-        {itemPrice && quantity && (
-          <div className="text-right">
-            <p className="font-medium text-lg">Subtotal</p>
-            <Price
-              className="font-mono text-primary/50 text-sm"
-              amount={itemPrice * quantity}
-              currencyCode={currencyCode}
-            />
+      <div className="flex grow flex-col gap-1">
+        <Link
+          className="font-sans text-sm font-medium leading-snug text-black transition-colors hover:text-brand"
+          href={itemURL}
+        >
+          {title}
+        </Link>
+
+        {variant && (
+          <div className="flex flex-wrap gap-1">
+            {variant.options?.map((option, index) => {
+              if (typeof option !== 'object') return null
+              return (
+                <span
+                  className="inline-flex items-center rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 font-tech text-[10px] font-bold uppercase tracking-wider text-gray-600"
+                  key={index}
+                >
+                  {option.label}
+                </span>
+              )
+            })}
           </div>
         )}
+
+        <span className="font-tech text-[11px] font-bold uppercase tracking-widest text-gray-500">
+          Množstvo: {quantity}
+        </span>
       </div>
+
+      {itemPrice && quantity && (
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Medzisúčet</p>
+          <Price
+            amount={itemPrice * quantity}
+            as="span"
+            className="font-tech text-base font-bold leading-none text-black"
+            currencyCode={currencyCode}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -13,17 +13,21 @@ export default async function FindOrderPage() {
   const { user } = await payload.auth({ headers })
 
   return (
-    <div className="container py-16">
-      <FindOrderForm initialEmail={user && 'email' in user ? user.email : undefined} />
+    <div className="bg-brand-50 py-16 md:py-24">
+      <div className="container-page">
+        <div className="mx-auto max-w-md rounded-default border border-gray-100 bg-white p-8 shadow-panel md:p-10">
+          <FindOrderForm initialEmail={user && 'email' in user ? user.email : undefined} />
+        </div>
+      </div>
     </div>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'Find your order using your email and order ID.',
+  description: 'Nájdite svoju objednávku pomocou emailu a čísla objednávky.',
   openGraph: mergeOpenGraph({
-    title: 'Find order',
+    title: 'Nájsť objednávku',
     url: '/find-order',
   }),
-  title: 'Find order',
+  title: 'Nájsť objednávku',
 }

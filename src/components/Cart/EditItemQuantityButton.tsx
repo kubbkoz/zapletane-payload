@@ -2,10 +2,16 @@
 
 import { CartItem } from '@/components/Cart'
 import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
-import clsx from 'clsx'
 import { MinusIcon, PlusIcon } from 'lucide-react'
 import React, { useMemo } from 'react'
 
+import { cn } from '@/utilities/cn'
+
+/**
+ * Quantity stepper half. 44×44 minimum hit area (WCAG 2.5.5, called out for the
+ * cart in DESIGN-SPEC §3.4), near-square corners, brand-brown hover. All
+ * increment/decrement/inventory logic below is the template's, unchanged.
+ */
 export function EditItemQuantityButton({ type, item }: { item: CartItem; type: 'minus' | 'plus' }) {
   const { decrementItem, incrementItem, isLoading } = useCart()
 
@@ -34,36 +40,30 @@ export function EditItemQuantityButton({ type, item }: { item: CartItem; type: '
   }, [item, type])
 
   return (
-    <form>
-      <button
-        disabled={disabled || isLoading}
-        aria-label={type === 'plus' ? 'Increase item quantity' : 'Reduce item quantity'}
-        className={clsx(
-          'ease hover:cursor-pointer flex h-full min-w-[36px] max-w-[36px] flex-none items-center justify-center rounded-full px-2 transition-all duration-200 hover:border-neutral-800 hover:opacity-80',
-          {
-            'cursor-not-allowed': disabled || isLoading,
-            'ml-auto': type === 'minus',
-          },
-        )}
-        onClick={(e: React.FormEvent<HTMLButtonElement>) => {
-          e.preventDefault()
+    <button
+      aria-label={type === 'plus' ? 'Zvýšiť množstvo' : 'Znížiť množstvo'}
+      className={cn(
+        'flex h-11 w-11 flex-none items-center justify-center text-gray-600 transition-colors duration-200 hover:bg-gray-50 hover:text-brand',
+        {
+          'cursor-not-allowed text-gray-300 hover:bg-transparent hover:text-gray-300':
+            disabled || isLoading,
+        },
+      )}
+      disabled={disabled || isLoading}
+      onClick={(e: React.FormEvent<HTMLButtonElement>) => {
+        e.preventDefault()
 
-          if (item.id) {
-            if (type === 'plus') {
-              incrementItem(item.id)
-            } else {
-              decrementItem(item.id)
-            }
+        if (item.id) {
+          if (type === 'plus') {
+            incrementItem(item.id)
+          } else {
+            decrementItem(item.id)
           }
-        }}
-        type="button"
-      >
-        {type === 'plus' ? (
-          <PlusIcon className="h-4 w-4 dark:text-neutral-500 hover:text-blue-300" />
-        ) : (
-          <MinusIcon className="h-4 w-4 dark:text-neutral-500 hover:text-blue-300" />
-        )}
-      </button>
-    </form>
+        }
+      }}
+      type="button"
+    >
+      {type === 'plus' ? <PlusIcon className="h-4 w-4" /> : <MinusIcon className="h-4 w-4" />}
+    </button>
   )
 }

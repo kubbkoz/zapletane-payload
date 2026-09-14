@@ -1,5 +1,6 @@
 import { Footer } from './Footer'
 import { Header } from './Header'
+import { SiteSettings } from './SiteSettings'
 
 /**
  * Single source of truth for registered Payload globals.
@@ -11,4 +12,4 @@ import { Header } from './Header'
  * (find + update, per the plugin's globals-only-support-find/update rule)
  * without touching either config file again.
  */
-export const globalConfigs = [Header, Footer]
+export const globalConfigs = [Header, Footer, SiteSettings]

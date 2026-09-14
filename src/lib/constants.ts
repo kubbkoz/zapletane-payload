@@ -4,15 +4,16 @@ export type SortFilterItem = {
   title: string
 }
 
+// Slovak-first storefront — sort labels are user-facing copy (DESIGN-SPEC §5).
 export const defaultSort: SortFilterItem = {
   slug: null,
   reverse: false,
-  title: 'Alphabetic A-Z',
+  title: 'Abecedne A–Z',
 }
 
 export const sorting: SortFilterItem[] = [
   defaultSort,
-  { slug: '-createdAt', reverse: true, title: 'Latest arrivals' },
-  { slug: 'priceInUSD', reverse: false, title: 'Price: Low to high' }, // asc
-  { slug: '-priceInUSD', reverse: true, title: 'Price: High to low' },
+  { slug: '-createdAt', reverse: true, title: 'Najnovšie' },
+  { slug: 'priceInUSD', reverse: false, title: 'Cena: od najnižšej' }, // asc
+  { slug: '-priceInUSD', reverse: true, title: 'Cena: od najvyššej' },
 ]

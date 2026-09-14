@@ -16,17 +16,19 @@ export default async function ConfirmOrderPage({
   const paymentIntent = searchParams.paymentId
 
   return (
-    <div className="container min-h-[90vh] flex py-12">
-      <ConfirmOrder />
+    <div className="flex min-h-[70vh] items-center bg-gray-50">
+      <div className="container-page flex py-16">
+        <ConfirmOrder />
+      </div>
     </div>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'Confirm order.',
+  description: 'Potvrdzujeme vašu objednávku.',
   openGraph: mergeOpenGraph({
-    title: 'Confirming order',
+    title: 'Potvrdzujeme objednávku',
     url: '/checkout/confirm-order',
   }),
-  title: 'Confirming order',
+  title: 'Potvrdzujeme objednávku',
 }

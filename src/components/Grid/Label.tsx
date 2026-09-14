@@ -9,21 +9,27 @@ type Props = {
   title: string
 }
 
+/**
+ * Tile caption. Title rides a frosted white chip, price a solid accent chip —
+ * both `rounded-default`, never pills (design.md: no `rounded-full` on anything
+ * carrying a text label).
+ */
 export const Label: React.FC<Props> = ({ amount, position = 'bottom', title }) => {
   return (
     <div
-      className={clsx('absolute bottom-0 left-0 flex w-full px-4 pb-4 @container/label', {
+      className={clsx('@container/label absolute bottom-0 left-0 flex w-full px-3 pb-3', {
         '': position === 'center',
       })}
     >
-      <div className="flex items-end justify-between text-sm grow font-semibold ">
-        <h3 className="mr-4 font-mono line-clamp-2 border p-2 px-3 leading-none tracking-tight rounded-full bg-white/70 text-black backdrop-blur-md dark:border-neutral-800 dark:bg-black/70 dark:text-white">
+      <div className="flex grow items-end justify-between gap-2 text-sm">
+        <h3 className="line-clamp-2 rounded-default border border-gray-100 bg-white/85 p-2 px-3 font-sans text-[12px] font-medium leading-tight tracking-tight text-black backdrop-blur-md">
           {title}
         </h3>
 
         <Price
           amount={amount}
-          className="flex-none rounded-full bg-blue-600 p-2 text-white"
+          as="span"
+          className="flex-none rounded-default bg-accent p-2 px-3 font-tech text-[12px] font-bold leading-none text-white"
           currencyCodeClassName="hidden @[275px]/label:inline"
         />
       </div>

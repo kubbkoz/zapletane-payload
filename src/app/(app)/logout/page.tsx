@@ -7,17 +7,19 @@ import { LogoutPage } from './LogoutPage'
 
 export default async function Logout() {
   return (
-    <div className="container max-w-lg my-16">
-      <LogoutPage />
+    <div className="bg-brand-50 py-16 md:py-24">
+      <div className="container-page mx-auto max-w-lg">
+        <LogoutPage />
+      </div>
     </div>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'You have been logged out.',
+  description: 'Boli ste odhlásený z vášho ZAPLETANE účtu.',
   openGraph: mergeOpenGraph({
-    title: 'Logout',
+    title: 'Odhlásenie',
     url: '/logout',
   }),
-  title: 'Logout',
+  title: 'Odhlásenie',
 }

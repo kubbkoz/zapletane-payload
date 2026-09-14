@@ -2,10 +2,18 @@
 
 import { FormError } from '@/components/forms/FormError'
 import { FormItem } from '@/components/forms/FormItem'
-import { Message } from '@/components/Message'
+import {
+  errorBannerClassName,
+  inputIconClassName,
+  inputIconWrapClassName,
+  inputWithIconClassName,
+  labelClassName,
+  primarySubmitClassName,
+} from '@/components/forms/formStyles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AlertCircle, CheckCircle, Loader2, Mail } from 'lucide-react'
 import Link from 'next/link'
 import React, { Fragment, useCallback, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -17,6 +25,7 @@ type FormData = {
 export const ForgotPasswordForm: React.FC = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const {
     formState: { errors },
@@ -25,6 +34,7 @@ export const ForgotPasswordForm: React.FC = () => {
   } = useForm<FormData>()
 
   const onSubmit = useCallback(async (data: FormData) => {
+    setIsLoading(true)
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_SERVER_URL}/api/users/forgot-password`,
       {
@@ -35,58 +45,71 @@ export const ForgotPasswordForm: React.FC = () => {
         method: 'POST',
       },
     )
+    setIsLoading(false)
 
     if (response.ok) {
       setSuccess(true)
       setError('')
     } else {
-      setError(
-        'There was a problem while attempting to send you a password reset email. Please try again.',
-      )
+      setError('Nepodarilo sa odoslať email na obnovenie hesla. Skúste to prosím znova.')
     }
   }, [])
 
+  if (success) {
+    return (
+      <div className="flex flex-col items-center py-6 text-center">
+        <CheckCircle className="mb-5 size-16 text-success" />
+        <h1 className="mb-2 font-sans text-lg font-black uppercase tracking-wide text-black">
+          Email bol odoslaný
+        </h1>
+        <p className="mb-8 max-w-xs text-sm text-gray-500">
+          Ak je tento email v našej databáze, čoskoro dostanete odkaz na zmenu hesla.
+        </p>
+        <Button asChild variant="outline" className="rounded-default border-gray-200">
+          <Link href="/login">Späť na prihlásenie</Link>
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <Fragment>
-      {!success && (
-        <React.Fragment>
-          <h1 className="text-xl mb-4">Forgot Password</h1>
-          <div className="prose dark:prose-invert mb-8">
-            <p>
-              {`Please enter your email below. You will receive an email message with instructions on
-              how to reset your password. To manage your all users, `}
-              <Link href="/admin/collections/users">login to the admin dashboard</Link>.
-            </p>
-          </div>
-          <form className="max-w-lg" onSubmit={handleSubmit(onSubmit)}>
-            <Message className="mb-8" error={error} />
+      <h1 className="section-h2 mb-3 text-center text-[32px] sm:text-[38px]">Obnovenie hesla</h1>
+      <p className="mb-8 text-center text-sm text-gray-500">
+        Zadajte Váš email a pošleme Vám odkaz na vytvorenie nového hesla.
+      </p>
 
-            <FormItem className="mb-8">
-              <Label htmlFor="email" className="mb-2">
-                Email address
-              </Label>
-              <Input
-                id="email"
-                {...register('email', { required: 'Please provide your email.' })}
-                type="email"
-              />
-              {errors.email && <FormError message={errors.email.message} />}
-            </FormItem>
-
-            <Button type="submit" variant="default">
-              Forgot Password
-            </Button>
-          </form>
-        </React.Fragment>
-      )}
-      {success && (
-        <React.Fragment>
-          <h1 className="text-xl mb-4">Request submitted</h1>
-          <div className="prose dark:prose-invert">
-            <p>Check your email for a link that will allow you to securely reset your password.</p>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        {error && (
+          <div className={`${errorBannerClassName} mb-6`}>
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <p>{error}</p>
           </div>
-        </React.Fragment>
-      )}
+        )}
+
+        <FormItem>
+          <Label htmlFor="email" className={labelClassName}>
+            E-mail
+          </Label>
+          <div className={inputIconWrapClassName}>
+            <Mail className={inputIconClassName} />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="vas@email.sk"
+              className={inputWithIconClassName}
+              {...register('email', { required: 'Zadajte prosím Váš email.' })}
+            />
+          </div>
+          {errors.email && <FormError message={errors.email.message} />}
+        </FormItem>
+
+        <Button className={`${primarySubmitClassName} mt-6`} disabled={isLoading} type="submit">
+          {isLoading && <Loader2 className="size-4 animate-spin" />}
+          {isLoading ? 'Odosielam...' : 'Odoslať odkaz'}
+        </Button>
+      </form>
     </Fragment>
   )
 }

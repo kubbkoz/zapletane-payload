@@ -2,12 +2,19 @@
 
 import { FormError } from '@/components/forms/FormError'
 import { FormItem } from '@/components/forms/FormItem'
-import { Message } from '@/components/Message'
+import {
+  inputClassName,
+  inputIconClassName,
+  inputIconWrapClassName,
+  inputWithIconClassName,
+  labelClassName,
+} from '@/components/forms/formStyles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { User } from '@/payload-types'
 import { useAuth } from '@/providers/Auth'
+import { Loader2, Lock, Mail } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -53,7 +60,7 @@ export const AccountForm: React.FC = () => {
         if (response.ok) {
           const json = await response.json()
           setUser(json.doc)
-          toast.success('Successfully updated account.')
+          toast.success('Účet bol úspešne aktualizovaný.')
           setChangePassword(false)
           reset({
             name: json.doc.name,
@@ -62,7 +69,7 @@ export const AccountForm: React.FC = () => {
             passwordConfirm: '',
           })
         } else {
-          toast.error('There was a problem updating your account.')
+          toast.error('Nastala chyba pri aktualizácii účtu.')
         }
       }
     },
@@ -73,7 +80,7 @@ export const AccountForm: React.FC = () => {
     if (user === null) {
       router.push(
         `/login?error=${encodeURIComponent(
-          'You must be logged in to view this page.',
+          'Pre zobrazenie tejto stránky sa musíte prihlásiť.',
         )}&redirect=${encodeURIComponent('/account')}`,
       )
     }
@@ -90,45 +97,47 @@ export const AccountForm: React.FC = () => {
   }, [user, router, reset, changePassword])
 
   return (
-    <form className="max-w-xl" onSubmit={handleSubmit(onSubmit)}>
+    <form onSubmit={handleSubmit(onSubmit)}>
       {!changePassword ? (
         <Fragment>
-          <div className="prose dark:prose-invert mb-8">
-            <p className="">
-              {'Change your account details below, or '}
-              <Button
-                className="px-0 text-inherit underline hover:cursor-pointer"
-                onClick={() => setChangePassword(!changePassword)}
-                type="button"
-                variant="link"
-              >
-                click here
-              </Button>
-              {' to change your password.'}
-            </p>
-          </div>
+          <p className="mb-6 text-sm text-gray-500">
+            {'Zmeňte údaje svojho účtu nižšie, alebo '}
+            <button
+              className="font-bold text-brand underline underline-offset-2 hover:no-underline"
+              onClick={() => setChangePassword(!changePassword)}
+              type="button"
+            >
+              kliknite sem
+            </button>
+            {' pre zmenu hesla.'}
+          </p>
 
-          <div className="flex flex-col gap-8 mb-8">
+          <div className="mb-8 flex flex-col gap-5">
             <FormItem>
-              <Label htmlFor="email" className="mb-2">
-                Email Address
+              <Label htmlFor="email" className={labelClassName}>
+                E-mail
               </Label>
-              <Input
-                id="email"
-                {...register('email', { required: 'Please provide an email.' })}
-                type="email"
-              />
+              <div className={inputIconWrapClassName}>
+                <Mail className={inputIconClassName} />
+                <Input
+                  id="email"
+                  {...register('email', { required: 'Zadajte prosím email.' })}
+                  type="email"
+                  className={inputWithIconClassName}
+                />
+              </div>
               {errors.email && <FormError message={errors.email.message} />}
             </FormItem>
 
             <FormItem>
-              <Label htmlFor="name" className="mb-2">
-                Name
+              <Label htmlFor="name" className={labelClassName}>
+                Meno
               </Label>
               <Input
                 id="name"
-                {...register('name', { required: 'Please provide a name.' })}
+                {...register('name', { required: 'Zadajte prosím meno.' })}
                 type="text"
+                className={inputClassName}
               />
               {errors.name && <FormError message={errors.name.message} />}
             </FormItem>
@@ -136,57 +145,67 @@ export const AccountForm: React.FC = () => {
         </Fragment>
       ) : (
         <Fragment>
-          <div className="prose dark:prose-invert mb-8">
-            <p>
-              {'Change your password below, or '}
-              <Button
-                className="px-0 text-inherit underline hover:cursor-pointer"
-                onClick={() => setChangePassword(!changePassword)}
-                type="button"
-                variant="link"
-              >
-                cancel
-              </Button>
-              .
-            </p>
-          </div>
+          <p className="mb-6 text-sm text-gray-500">
+            {'Zmeňte heslo nižšie, alebo '}
+            <button
+              className="font-bold text-brand underline underline-offset-2 hover:no-underline"
+              onClick={() => setChangePassword(!changePassword)}
+              type="button"
+            >
+              zrušiť
+            </button>
+            .
+          </p>
 
-          <div className="flex flex-col gap-8 mb-8">
+          <div className="mb-8 flex flex-col gap-5">
             <FormItem>
-              <Label htmlFor="password" className="mb-2">
-                New password
+              <Label htmlFor="password" className={labelClassName}>
+                Nové heslo
               </Label>
-              <Input
-                id="password"
-                {...register('password', { required: 'Please provide a new password.' })}
-                type="password"
-              />
+              <div className={inputIconWrapClassName}>
+                <Lock className={inputIconClassName} />
+                <Input
+                  id="password"
+                  {...register('password', { required: 'Zadajte prosím nové heslo.' })}
+                  type="password"
+                  className={inputWithIconClassName}
+                />
+              </div>
               {errors.password && <FormError message={errors.password.message} />}
             </FormItem>
 
             <FormItem>
-              <Label htmlFor="passwordConfirm" className="mb-2">
-                Confirm password
+              <Label htmlFor="passwordConfirm" className={labelClassName}>
+                Potvrďte heslo
               </Label>
-              <Input
-                id="passwordConfirm"
-                {...register('passwordConfirm', {
-                  required: 'Please confirm your new password.',
-                  validate: (value) => value === password.current || 'The passwords do not match',
-                })}
-                type="password"
-              />
+              <div className={inputIconWrapClassName}>
+                <Lock className={inputIconClassName} />
+                <Input
+                  id="passwordConfirm"
+                  {...register('passwordConfirm', {
+                    required: 'Potvrďte prosím nové heslo.',
+                    validate: (value) => value === password.current || 'Heslá sa nezhodujú.',
+                  })}
+                  type="password"
+                  className={inputWithIconClassName}
+                />
+              </div>
               {errors.passwordConfirm && <FormError message={errors.passwordConfirm.message} />}
             </FormItem>
           </div>
         </Fragment>
       )}
-      <Button disabled={isLoading || isSubmitting || !isDirty} type="submit" variant="default">
+      <Button
+        disabled={isLoading || isSubmitting || !isDirty}
+        type="submit"
+        className="h-11 rounded-default text-[13px] font-bold uppercase tracking-widest"
+      >
+        {(isLoading || isSubmitting) && <Loader2 className="size-4 animate-spin" />}
         {isLoading || isSubmitting
-          ? 'Processing'
+          ? 'Prebieha spracovanie...'
           : changePassword
-            ? 'Change Password'
-            : 'Update Account'}
+            ? 'Zmeniť heslo'
+            : 'Aktualizovať účet'}
       </Button>
     </form>
   )

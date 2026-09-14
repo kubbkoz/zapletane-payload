@@ -1,5 +1,5 @@
 'use client'
-import { Button } from '@/components/ui/button'
+import { Button, type ButtonProps } from '@/components/ui/button'
 import React, { useState } from 'react'
 import {
   Dialog,
@@ -12,11 +12,15 @@ import {
 import { AddressForm } from '@/components/forms/AddressForm'
 import { Address } from '@/payload-types'
 import { DefaultDocumentIDType } from 'payload'
+import { Plus } from 'lucide-react'
 
 type Props = {
   addressID?: DefaultDocumentIDType
   initialData?: Partial<Omit<Address, 'country'>> & { country?: string }
   buttonText?: string
+  buttonIcon?: React.ReactNode
+  buttonVariant?: ButtonProps['variant']
+  buttonClassName?: string
   modalTitle?: string
   callback?: (address: Partial<Address>) => void
   skipSubmission?: boolean
@@ -26,8 +30,11 @@ type Props = {
 export const CreateAddressModal: React.FC<Props> = ({
   addressID,
   initialData,
-  buttonText = 'Add a new address',
-  modalTitle = 'Add a new address',
+  buttonText = 'Pridať novú adresu',
+  buttonIcon,
+  buttonVariant = 'outline',
+  buttonClassName,
+  modalTitle = 'Pridať novú adresu',
   callback,
   skipSubmission,
   disabled,
@@ -52,12 +59,27 @@ export const CreateAddressModal: React.FC<Props> = ({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild disabled={disabled}>
-        <Button variant={'outline'}>{buttonText}</Button>
+        <Button
+          variant={buttonVariant}
+          className={
+            buttonClassName ??
+            (buttonVariant === 'link'
+              ? 'h-auto gap-1.5 p-0 text-[11px] font-bold uppercase tracking-widest text-black hover:text-brand hover:no-underline'
+              : 'rounded-default border-gray-200 text-[11px] font-bold uppercase tracking-widest hover:border-brand hover:text-brand')
+          }
+        >
+          {buttonIcon ?? (buttonVariant !== 'link' && <Plus className="size-3.5" />)}
+          {buttonText}
+        </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="rounded-default border-gray-100 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{modalTitle}</DialogTitle>
-          <DialogDescription>This address will be connected to your account.</DialogDescription>
+          <DialogTitle className="pr-6 font-sans text-lg font-black uppercase tracking-wide text-black">
+            {modalTitle}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-gray-500">
+            Táto adresa bude priradená k vášmu účtu.
+          </DialogDescription>
         </DialogHeader>
 
         <AddressForm

@@ -1,16 +1,15 @@
 import type { Media, Product } from '@/payload-types'
 
 import { RenderBlocks } from '@/blocks/RenderBlocks'
-import { GridTileImage } from '@/components/Grid/tile'
 import { Gallery } from '@/components/product/Gallery'
 import { ProductDescription } from '@/components/product/ProductDescription'
+import { ProductGridItem } from '@/components/ProductGridItem'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { draftMode } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import React, { Suspense } from 'react'
-import { Button } from '@/components/ui/button'
 import { ChevronLeftIcon } from 'lucide-react'
 import { Metadata } from 'next'
 
@@ -117,26 +116,34 @@ export default async function ProductPage({ params }: Args) {
         }}
         type="application/ld+json"
       />
-      <div className="container pt-8 pb-8">
-        <Button asChild variant="ghost" className="mb-4">
-          <Link href="/shop">
-            <ChevronLeftIcon />
-            All products
+      <div className="bg-brand-50">
+        <div className="container-editorial pb-16 pt-8 lg:pb-24">
+          <Link
+            className="inline-flex items-center gap-1 font-sans text-[11px] font-bold uppercase tracking-widest text-gray-500 transition-colors hover:text-brand"
+            href="/shop"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+            Všetky produkty
           </Link>
-        </Button>
-        <div className="flex flex-col gap-12 rounded-lg border p-8 md:py-12 lg:flex-row lg:gap-8 bg-primary-foreground">
-          <div className="h-full w-full basis-full lg:basis-1/2">
-            <Suspense
-              fallback={
-                <div className="relative aspect-square h-full max-h-[550px] w-full overflow-hidden" />
-              }
-            >
-              {Boolean(gallery?.length) && <Gallery gallery={gallery} />}
-            </Suspense>
-          </div>
 
-          <div className="basis-full lg:basis-1/2">
-            <ProductDescription product={product} />
+          <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-start lg:gap-16">
+            <div className="h-full w-full">
+              <Suspense
+                fallback={
+                  <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm bg-gray-50" />
+                }
+              >
+                {Boolean(gallery?.length) ? (
+                  <Gallery gallery={gallery} />
+                ) : (
+                  <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm bg-gray-100" />
+                )}
+              </Suspense>
+            </div>
+
+            <div className="lg:pt-2">
+              <ProductDescription product={product} />
+            </div>
           </div>
         </div>
       </div>
@@ -144,9 +151,7 @@ export default async function ProductPage({ params }: Args) {
       {product.layout?.length ? <RenderBlocks blocks={product.layout} /> : <></>}
 
       {relatedProducts.length ? (
-        <div className="container">
-          <RelatedProducts products={relatedProducts as Product[]} />
-        </div>
+        <RelatedProducts products={relatedProducts as Product[]} />
       ) : (
         <></>
       )}
@@ -158,27 +163,21 @@ function RelatedProducts({ products }: { products: Product[] }) {
   if (!products.length) return null
 
   return (
-    <div className="py-8">
-      <h2 className="mb-4 text-2xl font-bold">Related Products</h2>
-      <ul className="flex w-full gap-4 overflow-x-auto pt-1">
-        {products.map((product) => (
-          <li
-            className="aspect-square w-full flex-none min-[475px]:w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5"
-            key={product.id}
-          >
-            <Link className="relative h-full w-full" href={`/products/${product.slug}`}>
-              <GridTileImage
-                label={{
-                  amount: product.priceInUSD!,
-                  title: product.title,
-                }}
-                media={product.meta?.image as Media}
-              />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <section className="section-band border-t border-gray-100 bg-white">
+      <div className="container-editorial">
+        <p className="eyebrow">Z tej istej dielne</p>
+        <h2 className="section-h2 mt-4">
+          Mohlo by sa vám <span className="text-brand">páčiť</span>
+        </h2>
+        <div className="section-decorator mt-6" />
+
+        <div className="mt-10 grid grid-cols-2 gap-x-1 gap-y-8 md:gap-4 lg:grid-cols-4">
+          {products.map((product) => (
+            <ProductGridItem key={product.id} product={product} />
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 

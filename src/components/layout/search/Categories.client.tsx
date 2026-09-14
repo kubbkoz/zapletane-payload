@@ -9,6 +9,11 @@ type Props = {
   category: Category
 }
 
+/**
+ * Listing category filter link. Quiet gray by default, brand brown when active —
+ * the same "active = accent, inactive = gray-600 hover:brand" language the
+ * navbar and the homepage product tabs use.
+ */
 export const CategoryItem: React.FC<Props> = ({ category }) => {
   const router = useRouter()
   const pathname = usePathname()
@@ -35,9 +40,13 @@ export const CategoryItem: React.FC<Props> = ({ category }) => {
   return (
     <button
       onClick={() => setQuery()}
-      className={clsx('hover:cursor-pointer', {
-        ' underline': isActive,
-      })}
+      className={clsx(
+        'flex w-full items-center border-l-2 py-1.5 pl-3 text-left font-sans text-[13px] transition-colors duration-150 hover:cursor-pointer',
+        isActive
+          ? 'border-brand font-semibold text-brand'
+          : 'border-transparent text-gray-600 hover:border-brand-300 hover:text-black',
+      )}
+      type="button"
     >
       {category.title}
     </button>

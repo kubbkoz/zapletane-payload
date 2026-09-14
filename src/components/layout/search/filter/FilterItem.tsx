@@ -11,6 +11,11 @@ import React from 'react'
 import type { ListItem } from '.'
 import type { PathFilterItem as PathFilterItemType } from '.'
 
+const itemClass =
+  'flex w-full items-center border-l-2 py-1.5 pl-3 font-sans text-[13px] transition-colors duration-150'
+const inactiveClass = 'border-transparent text-gray-600 hover:border-brand-300 hover:text-black'
+const activeClass = 'border-brand font-semibold text-brand'
+
 function PathFilterItem({ item }: { item: PathFilterItemType }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -21,14 +26,9 @@ function PathFilterItem({ item }: { item: PathFilterItemType }) {
   newParams.delete('q')
 
   return (
-    <li className="mt-2 flex text-black dark:text-white" key={item.title}>
+    <li className="flex" key={item.title}>
       <DynamicTag
-        className={clsx(
-          'w-full text-sm underline-offset-4 hover:underline dark:hover:text-neutral-100',
-          {
-            'underline underline-offset-4': active,
-          },
-        )}
+        className={clsx(itemClass, active ? activeClass : inactiveClass)}
         href={createUrl(item.path, newParams)}
       >
         {item.title}
@@ -52,11 +52,9 @@ function SortFilterItem({ item }: { item: SortFilterItemType }) {
   const DynamicTag = active ? 'p' : Link
 
   return (
-    <li className="mt-2 flex text-sm text-black dark:text-white" key={item.title}>
+    <li className="flex" key={item.title}>
       <DynamicTag
-        className={clsx('w-full hover:underline hover:underline-offset-4', {
-          'underline underline-offset-4': active,
-        })}
+        className={clsx(itemClass, active ? activeClass : inactiveClass)}
         href={href}
         prefetch={!active ? false : undefined}
       >

@@ -16,6 +16,12 @@ type Props = {
   media: MediaType
 }
 
+/**
+ * Shared photo tile (carousel / three-up grid). Same stage treatment as the
+ * product card: cream backdrop, `object-contain` + `mix-blend-multiply` so white
+ * studio backgrounds melt in, hairline border that goes espresso on hover,
+ * `rounded-default` corners.
+ */
 export const GridTileImage: React.FC<Props> = ({
   active,
   isInteractive = true,
@@ -25,21 +31,21 @@ export const GridTileImage: React.FC<Props> = ({
   return (
     <div
       className={clsx(
-        'group flex h-full w-full items-center justify-center overflow-hidden rounded-lg border bg-white hover:border-blue-600 dark:bg-black',
+        'group flex h-full w-full items-center justify-center overflow-hidden rounded-default border bg-gray-50 transition-colors duration-200',
         {
-          'border-2 border-blue-600': active,
-          'border-neutral-200 dark:border-neutral-800': !active,
+          'border-black': active,
+          'border-gray-100 hover:border-black': !active,
           relative: label,
         },
       )}
     >
       {props.media ? (
         <Media
-          className={clsx('relative h-full w-full object-cover', {
-            'transition duration-300 ease-in-out group-hover:scale-105': isInteractive,
-          })}
+          className={clsx('relative h-full w-full')}
           height={80}
-          imgClassName="h-full w-full object-cover"
+          imgClassName={clsx('h-full w-full object-contain p-4 mix-blend-multiply', {
+            'transition-transform duration-500 ease-out group-hover:scale-105': isInteractive,
+          })}
           resource={props.media}
           width={80}
         />

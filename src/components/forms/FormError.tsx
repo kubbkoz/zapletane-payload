@@ -13,5 +13,9 @@ export const FormError: React.FC<Props> = ({ message, as, className }) => {
     return null
   }
 
-  return <Element className={clsx('text-error text-sm', className)}>{message}</Element>
+  return (
+    <Element className={clsx('font-sans text-xs font-medium text-error', className)}>
+      {message}
+    </Element>
+  )
 }

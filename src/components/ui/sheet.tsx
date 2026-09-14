@@ -30,7 +30,9 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80',
+        // ZAPLETANE "Aero" off-canvas standard (design.md §18): a light,
+        // blurred scrim — never the default near-opaque black curtain.
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/30 backdrop-blur-sm',
         className,
       )}
       {...props}
@@ -66,9 +68,11 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
-          <XIcon className="size-4" />
-          <span className="sr-only">Close</span>
+        {/* Aero-panel close affordance (design.md §18): a 40×40 chip on a faint
+            ink wash, not a bare 16px glyph — keeps the WCAG 2.5.5 touch target. */}
+        <SheetPrimitive.Close className="focus:ring-ring absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-default bg-gray-900/5 text-gray-500 transition-colors hover:bg-gray-900/10 hover:text-black focus:outline-hidden focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none">
+          <XIcon className="size-5" />
+          <span className="sr-only">Zavrieť</span>
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
     </SheetPortal>

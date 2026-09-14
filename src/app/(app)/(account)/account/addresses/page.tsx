@@ -18,7 +18,7 @@ export default async function AddressesPage() {
 
   if (!user) {
     redirect(
-      `/login?warning=${encodeURIComponent('Please login to access your account settings.')}`,
+      `/login?warning=${encodeURIComponent('Prihláste sa prosím pre prístup k nastaveniam účtu.')}`,
     )
   }
 
@@ -46,24 +46,30 @@ export default async function AddressesPage() {
 
   return (
     <>
-      <div className="border p-8 rounded-lg bg-primary-foreground">
-        <h1 className="text-3xl font-medium mb-8">Addresses</h1>
+      <div>
+        <p className="eyebrow">Môj účet</p>
+        <h1 className="section-h2 mt-3 text-[32px] sm:text-[38px]">Moje adresy</h1>
+      </div>
 
-        <div className="mb-8">
-          <AddressListing />
+      <div className="rounded-default border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <h2 className="font-sans text-xl font-black uppercase tracking-wide text-black">
+            Uložené adresy
+          </h2>
+          <CreateAddressModal />
         </div>
 
-        <CreateAddressModal />
+        <AddressListing />
       </div>
     </>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'Manage your addresses.',
+  description: 'Spravujte doručovacie a fakturačné adresy vášho účtu.',
   openGraph: mergeOpenGraph({
-    title: 'Addresses',
+    title: 'Moje adresy',
     url: '/account/addresses',
   }),
-  title: 'Addresses',
+  title: 'Moje adresy',
 }

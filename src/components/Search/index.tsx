@@ -10,6 +10,12 @@ type Props = {
   className?: string
 }
 
+/**
+ * Storefront search field — the `form-input-with-icon` shortcut (DESIGN-SPEC
+ * §1.4): cream fill, transparent border that turns brand-brown and the fill
+ * white on focus, near-square corners, with the glyph riding in the left gutter.
+ * Placeholder is the locale's own string ("Hľadať produkt, kategóriu...").
+ */
 export const Search: React.FC<Props> = ({ className }) => {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -32,18 +38,29 @@ export const Search: React.FC<Props> = ({ className }) => {
 
   return (
     <form className={cn('relative w-full', className)} onSubmit={onSubmit}>
+      <label className="sr-only" htmlFor="storefront-search">
+        Hľadať
+      </label>
       <input
         autoComplete="off"
-        className="w-full rounded-lg border bg-white px-4 py-2 text-sm text-black placeholder:text-neutral-500 dark:border-neutral-800 dark:bg-black dark:text-white dark:placeholder:text-neutral-400"
+        className="form-input-with-icon pr-28 placeholder:text-gray-400"
         defaultValue={searchParams?.get('q') || ''}
+        id="storefront-search"
         key={searchParams?.get('q')}
         name="search"
-        placeholder="Search for products..."
+        placeholder="Hľadať produkt, kategóriu..."
         type="text"
       />
-      <div className="absolute right-0 top-0 mr-3 flex h-full items-center">
-        <SearchIcon className="h-4" />
+      <div className="pointer-events-none absolute left-0 top-0 ml-4 flex h-full items-center text-gray-400">
+        <SearchIcon className="h-4 w-4" />
       </div>
+      <button
+        aria-label="Hľadať"
+        className="absolute right-1.5 top-1/2 flex h-9 -translate-y-1/2 items-center rounded-default bg-brand px-4 font-sans text-[10px] font-bold uppercase tracking-widest text-white transition-colors duration-200 hover:bg-brand-600"
+        type="submit"
+      >
+        Hľadať
+      </button>
     </form>
   )
 }

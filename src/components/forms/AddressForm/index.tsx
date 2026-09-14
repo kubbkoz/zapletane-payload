@@ -13,12 +13,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Loader2 } from 'lucide-react'
 
 import { titles } from './constants'
 import { Button } from '@/components/ui/button'
 import { deepMergeSimple } from 'payload/shared'
 import { FormError } from '@/components/forms/FormError'
 import { FormItem } from '@/components/forms/FormItem'
+import {
+  inputClassName,
+  labelClassName,
+  primarySubmitClassName,
+  selectTriggerClassName,
+} from '@/components/forms/formStyles'
 
 type AddressFormValues = {
   title?: string | null
@@ -53,7 +60,7 @@ export const AddressForm: React.FC<Props> = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
     setValue,
   } = useForm<AddressFormValues>({
     defaultValues: initialData,
@@ -81,11 +88,13 @@ export const AddressForm: React.FC<Props> = ({
   )
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <div className="flex flex-col gap-4 mb-8">
-        <div className="flex flex-col md:flex-row gap-4">
-          <FormItem className="shrink">
-            <Label htmlFor="title">Title</Label>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <FormItem className="sm:w-32 sm:shrink-0">
+            <Label htmlFor="title" className={labelClassName}>
+              Oslovenie
+            </Label>
 
             <Select
               {...register('title')}
@@ -94,8 +103,8 @@ export const AddressForm: React.FC<Props> = ({
               }}
               defaultValue={initialData?.title || ''}
             >
-              <SelectTrigger id="title">
-                <SelectValue placeholder="Title" />
+              <SelectTrigger id="title" className={selectTriggerClassName}>
+                <SelectValue placeholder="Oslovenie" />
               </SelectTrigger>
               <SelectContent>
                 {titles.map((title) => (
@@ -108,86 +117,139 @@ export const AddressForm: React.FC<Props> = ({
             {errors.title && <FormError message={errors.title.message} />}
           </FormItem>
 
-          <FormItem>
-            <Label htmlFor="firstName">First name*</Label>
+          <FormItem className="sm:flex-1">
+            <Label htmlFor="firstName" className={labelClassName}>
+              Meno*
+            </Label>
             <Input
               id="firstName"
               autoComplete="given-name"
-              {...register('firstName', { required: 'First name is required.' })}
+              className={inputClassName}
+              {...register('firstName', { required: 'Meno je povinné.' })}
             />
             {errors.firstName && <FormError message={errors.firstName.message} />}
           </FormItem>
 
-          <FormItem>
-            <Label htmlFor="lastName">Last name*</Label>
+          <FormItem className="sm:flex-1">
+            <Label htmlFor="lastName" className={labelClassName}>
+              Priezvisko*
+            </Label>
             <Input
               autoComplete="family-name"
               id="lastName"
-              {...register('lastName', { required: 'Last name is required.' })}
+              className={inputClassName}
+              {...register('lastName', { required: 'Priezvisko je povinné.' })}
             />
             {errors.lastName && <FormError message={errors.lastName.message} />}
           </FormItem>
         </div>
 
-        <FormItem>
-          <Label htmlFor="phone">Phone</Label>
-          <Input type="tel" id="phone" autoComplete="mobile tel" {...register('phone')} />
-          {errors.phone && <FormError message={errors.phone.message} />}
-        </FormItem>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <FormItem className="sm:flex-1">
+            <Label htmlFor="phone" className={labelClassName}>
+              Telefón
+            </Label>
+            <Input
+              type="tel"
+              id="phone"
+              autoComplete="mobile tel"
+              className={inputClassName}
+              {...register('phone')}
+            />
+            {errors.phone && <FormError message={errors.phone.message} />}
+          </FormItem>
+
+          <FormItem className="sm:flex-1">
+            <Label htmlFor="company" className={labelClassName}>
+              Spoločnosť
+            </Label>
+            <Input
+              id="company"
+              autoComplete="organization"
+              className={inputClassName}
+              {...register('company')}
+            />
+            {errors.company && <FormError message={errors.company.message} />}
+          </FormItem>
+        </div>
 
         <FormItem>
-          <Label htmlFor="company">Company</Label>
-          <Input id="company" autoComplete="organization" {...register('company')} />
-          {errors.company && <FormError message={errors.company.message} />}
-        </FormItem>
-
-        <FormItem>
-          <Label htmlFor="addressLine1">Address line 1*</Label>
+          <Label htmlFor="addressLine1" className={labelClassName}>
+            Ulica a číslo*
+          </Label>
           <Input
             id="addressLine1"
             autoComplete="address-line1"
-            {...register('addressLine1', { required: 'Address line 1 is required.' })}
+            placeholder="Hlavná 123"
+            className={inputClassName}
+            {...register('addressLine1', { required: 'Ulica a číslo sú povinné.' })}
           />
           {errors.addressLine1 && <FormError message={errors.addressLine1.message} />}
         </FormItem>
 
         <FormItem>
-          <Label htmlFor="addressLine2">Address line 2</Label>
-          <Input id="addressLine2" autoComplete="address-line2" {...register('addressLine2')} />
+          <Label htmlFor="addressLine2" className={labelClassName}>
+            Doplňujúce údaje
+          </Label>
+          <Input
+            id="addressLine2"
+            autoComplete="address-line2"
+            className={inputClassName}
+            {...register('addressLine2')}
+          />
           {errors.addressLine2 && <FormError message={errors.addressLine2.message} />}
         </FormItem>
 
-        <FormItem>
-          <Label htmlFor="city">City*</Label>
-          <Input
-            id="city"
-            autoComplete="address-level2"
-            {...register('city', { required: 'City is required.' })}
-          />
-          {errors.city && <FormError message={errors.city.message} />}
-        </FormItem>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <FormItem className="sm:flex-1">
+            <Label htmlFor="city" className={labelClassName}>
+              Mesto*
+            </Label>
+            <Input
+              id="city"
+              autoComplete="address-level2"
+              placeholder="Bratislava"
+              className={inputClassName}
+              {...register('city', { required: 'Mesto je povinné.' })}
+            />
+            {errors.city && <FormError message={errors.city.message} />}
+          </FormItem>
+
+          <FormItem className="sm:w-32 sm:shrink-0">
+            <Label htmlFor="postalCode" className={labelClassName}>
+              PSČ*
+            </Label>
+            <Input
+              id="postalCode"
+              placeholder="831 01"
+              className={inputClassName}
+              {...register('postalCode', { required: 'PSČ je povinné.' })}
+            />
+            {errors.postalCode && <FormError message={errors.postalCode.message} />}
+          </FormItem>
+        </div>
 
         <FormItem>
-          <Label htmlFor="state">State</Label>
-          <Input id="state" autoComplete="address-level1" {...register('state')} />
+          <Label htmlFor="state" className={labelClassName}>
+            Kraj
+          </Label>
+          <Input
+            id="state"
+            autoComplete="address-level1"
+            className={inputClassName}
+            {...register('state')}
+          />
           {errors.state && <FormError message={errors.state.message} />}
         </FormItem>
 
         <FormItem>
-          <Label htmlFor="postalCode">Zip Code*</Label>
-          <Input
-            id="postalCode"
-            {...register('postalCode', { required: 'Postal code is required.' })}
-          />
-          {errors.postalCode && <FormError message={errors.postalCode.message} />}
-        </FormItem>
-
-        <FormItem>
-          <Label htmlFor="country">Country*</Label>
+          <Label htmlFor="country" className={labelClassName}>
+            Krajina*
+          </Label>
 
           <Select
             {...register('country', {
-              required: 'Country is required.',
+              required: 'Krajina je povinná.',
             })}
             onValueChange={(value) => {
               setValue('country', value, { shouldValidate: true })
@@ -195,8 +257,8 @@ export const AddressForm: React.FC<Props> = ({
             required
             defaultValue={initialData?.country || ''}
           >
-            <SelectTrigger id="country" className="w-full">
-              <SelectValue placeholder="Country" />
+            <SelectTrigger id="country" className={selectTriggerClassName}>
+              <SelectValue placeholder="Krajina" />
             </SelectTrigger>
             <SelectContent>
               {supportedCountries.map((country) => {
@@ -220,7 +282,10 @@ export const AddressForm: React.FC<Props> = ({
         </FormItem>
       </div>
 
-      <Button type="submit">Submit</Button>
+      <Button type="submit" disabled={isSubmitting} className={primarySubmitClassName}>
+        {isSubmitting && <Loader2 className="size-4 animate-spin" />}
+        {isSubmitting ? 'Ukladám...' : 'Uložiť adresu'}
+      </Button>
     </form>
   )
 }

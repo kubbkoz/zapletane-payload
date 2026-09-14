@@ -113,53 +113,69 @@ export default async function Order({ params, searchParams }: PageProps) {
   }
 
   return (
-    <div className="">
-      <div className="flex gap-8 justify-between items-center mb-6">
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         {user ? (
-          <div className="flex gap-4">
-            <Button asChild variant="ghost">
-              <Link href="/orders">
-                <ChevronLeftIcon />
-                All orders
-              </Link>
-            </Button>
-          </div>
+          <Button
+            asChild
+            variant="ghost"
+            className="gap-2 px-0 text-[11px] font-bold uppercase tracking-widest text-gray-500 hover:text-brand"
+          >
+            <Link href="/orders">
+              <ChevronLeftIcon className="size-4" />
+              Všetky objednávky
+            </Link>
+          </Button>
         ) : (
-          <div></div>
+          <div />
         )}
 
-        <h1 className="text-sm uppercase font-mono px-2 bg-primary/10 rounded tracking-[0.07em]">
-          <span className="">{`Order #${order.id}`}</span>
+        <h1 className="rounded-default bg-brand-100 px-3 py-1.5 font-sans text-xs font-bold uppercase tracking-[0.15em] text-brand">
+          {`Objednávka #${order.id}`}
         </h1>
       </div>
 
-      <div className="bg-card border rounded-lg px-6 py-4 flex flex-col gap-12">
-        <div className="flex flex-col gap-6 lg:flex-row lg:justify-between">
-          <div className="">
-            <p className="font-mono uppercase text-primary/50 mb-1 text-sm">Order Date</p>
-            <p className="text-lg">
+      <div className="flex flex-col gap-10 rounded-default border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-6 border-b border-gray-100 pb-8 sm:flex-row sm:justify-between">
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Dátum objednávky
+            </p>
+            <p className="font-sans text-lg font-bold text-black">
               <time dateTime={order.createdAt}>
                 {formatDateTime({ date: order.createdAt, format: 'MMMM dd, yyyy' })}
               </time>
             </p>
           </div>
 
-          <div className="">
-            <p className="font-mono uppercase text-primary/50 mb-1 text-sm">Total</p>
-            {order.amount && <Price className="text-lg" amount={order.amount} />}
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Celková suma
+            </p>
+            {order.amount != null && (
+              <Price
+                className="font-sans text-lg font-black text-black"
+                amount={order.amount}
+                currencyCode={order.currency ?? undefined}
+              />
+            )}
           </div>
 
           {order.status && (
-            <div className="grow max-w-1/3">
-              <p className="font-mono uppercase text-primary/50 mb-1 text-sm">Status</p>
-              <OrderStatus className="text-sm" status={order.status} />
+            <div className="sm:max-w-[33%]">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                Stav
+              </p>
+              <OrderStatus status={order.status} />
             </div>
           )}
         </div>
 
-        {order.items && (
+        {order.items && order.items.length > 0 && (
           <div>
-            <h2 className="font-mono text-primary/50 mb-4 uppercase text-sm">Items</h2>
+            <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Položky objednávky
+            </h2>
             <ul className="flex flex-col gap-6">
               {order.items?.map((item, index) => {
                 if (typeof item.product === 'string') {
@@ -167,7 +183,11 @@ export default async function Order({ params, searchParams }: PageProps) {
                 }
 
                 if (!item.product || typeof item.product !== 'object') {
-                  return <div key={index}>This item is no longer available.</div>
+                  return (
+                    <div key={index} className="text-sm text-gray-500">
+                      Táto položka už nie je dostupná.
+                    </div>
+                  )
                 }
 
                 const variant =
@@ -188,8 +208,10 @@ export default async function Order({ params, searchParams }: PageProps) {
         )}
 
         {order.shippingAddress && (
-          <div>
-            <h2 className="font-mono text-primary/50 mb-4 uppercase text-sm">Shipping Address</h2>
+          <div className="border-t border-gray-100 pt-8">
+            <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Doručovacia adresa
+            </h2>
 
             {/* @ts-expect-error - some kind of type hell */}
             <AddressItem address={order.shippingAddress} hideActions />
@@ -204,11 +226,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params
 
   return {
-    description: `Order details for order ${id}.`,
+    description: `Detail objednávky #${id}.`,
     openGraph: mergeOpenGraph({
-      title: `Order ${id}`,
+      title: `Objednávka #${id}`,
       url: `/orders/${id}`,
     }),
-    title: `Order ${id}`,
+    title: `Objednávka #${id}`,
   }
 }

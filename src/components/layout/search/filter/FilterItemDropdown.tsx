@@ -40,17 +40,19 @@ export function FilterItemDropdown({ list }: { list: ListItem[] }) {
   return (
     <div className="relative" ref={ref}>
       <div
-        className="flex w-full items-center justify-between rounded border border-black/30 px-4 py-2 text-sm dark:border-white/30"
+        className="flex w-full cursor-pointer items-center justify-between rounded-default border border-gray-200 bg-white px-4 py-3 font-sans text-sm font-medium text-black transition-colors duration-200 hover:border-brand"
         onClick={() => {
           setOpenSelect(!openSelect)
         }}
       >
         <div>{active}</div>
-        <ChevronDownIcon className="h-4" />
+        <ChevronDownIcon
+          className={`h-4 w-4 text-gray-500 transition-transform duration-300 ${openSelect ? 'rotate-180' : ''}`}
+        />
       </div>
       {openSelect && (
         <div
-          className="absolute z-40 w-full rounded-b-md bg-white p-4 shadow-md dark:bg-black"
+          className="absolute z-40 mt-1 w-full rounded-default border border-gray-200 bg-white p-3 shadow-card-hover"
           onClick={() => {
             setOpenSelect(false)
           }}
