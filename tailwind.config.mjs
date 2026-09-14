@@ -42,49 +42,14 @@ export default {
       },
     },
     extend: {
-      borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
-      },
-      colors: {
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
-        background: 'hsl(var(--background))',
-        border: 'hsl(var(--border))',
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
-        },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        foreground: 'hsl(var(--foreground))',
-        input: 'hsl(var(--input))',
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
-        },
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-        },
-        ring: 'hsl(var(--ring))',
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-        },
-        success: 'hsl(var(--success))',
-        error: 'hsl(var(--error))',
-        warning: 'hsl(var(--warning))',
-      },
+      // borderRadius / colors / fontFamily are intentionally NOT duplicated
+      // here — they're defined once, as the source of truth, in the
+      // CSS-first `@theme` / `@theme inline` blocks in globals.css (Tailwind
+      // v4 convention). Redefining them here previously wrapped the (now
+      // hex/oklch) CSS vars in `hsl(var(--x))`, producing invalid color
+      // values — trimmed rather than fixed, to keep ZAPLETANE tokens in one
+      // place. What remains below (container/keyframes/animation/typography)
+      // has no CSS-first equivalent and stays here.
       typography: {
         DEFAULT: {
           css: {
@@ -101,10 +66,6 @@ export default {
           },
         },
       },
-      fontFamily: {
-        mono: ['var(--font-geist-mono)'],
-        sans: ['var(--font-geist-sans)'],
-      },
       keyframes: {
         fadeIn: {
           from: { opacity: 0 },
@@ -113,6 +74,45 @@ export default {
         fadeOut: {
           from: { opacity: 1 },
           to: { opacity: 0 },
+        },
+        // ZAPLETANE animations (design.md §9 / main.css). Kebab-case names
+        // matching the original app exactly — distinct from the camelCase
+        // fadeIn/fadeOut pair above (unrelated shadcn/template animations).
+        'fade-in': {
+          '0%': { opacity: 0 },
+          '100%': { opacity: 1 },
+        },
+        'slide-up': {
+          '0%': { transform: 'translateY(20px)', opacity: 0 },
+          '100%': { transform: 'translateY(0)', opacity: 1 },
+        },
+        'pulse-slow': {
+          '0%, 100%': { opacity: 1 },
+          '50%': { opacity: 0.5 },
+        },
+        heartbeat: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '25%': { transform: 'scale(1.15)' },
+          '50%': { transform: 'scale(1)' },
+          '75%': { transform: 'scale(1.15)' },
+        },
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '25%': { transform: 'translateX(-4px)' },
+          '75%': { transform: 'translateX(4px)' },
+        },
+        'soft-float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-4px)' },
+        },
+        'typing-dot': {
+          '0%, 100%': { transform: 'scale(0.85)', opacity: 0.85 },
+          '50%': { transform: 'scale(1)', opacity: 1 },
+        },
+        'cart-pop': {
+          '0%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.18)' },
+          '100%': { transform: 'scale(1)' },
         },
         in: {
           '0%': { transform: 'translateX(100%)' },
@@ -162,6 +162,16 @@ export default {
         fadeIn: 'fadeIn .3s ease-in-out',
         fadeOut: 'fadeOut .3s ease-in-out',
         carousel: 'marquee 60s linear infinite',
+        // ZAPLETANE animations (design.md §9) — hard rule: no bounce/elastic
+        // easing anywhere (reads as "cheap/AI-generated"); use these instead.
+        'fade-in': 'fade-in 0.5s ease-out',
+        'slide-up': 'slide-up 0.8s ease-out',
+        'pulse-slow': 'pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        heartbeat: 'heartbeat 1.5s infinite',
+        shake: 'shake 0.4s',
+        'soft-float': 'soft-float 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite',
+        'typing-dot': 'typing-dot 1.2s ease-in-out infinite',
+        'cart-pop': 'cart-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
         'slide-in-from-left': 'slide-in-from-left 0.2s ease-out',
         'slide-out-to-left': 'slide-out-to-left 0.2s ease-out',
         'slide-in-from-right': 'slide-in-from-right 0.2s ease-out',

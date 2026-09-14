@@ -323,7 +323,7 @@ export const CheckoutPage: React.FC = () => {
                         theme === 'dark' ? cssVariables.colors.base0 : cssVariables.colors.base1000,
                       colorText: theme === 'dark' ? '#858585' : cssVariables.colors.base1000,
                       colorTextPlaceholder: '#858585',
-                      fontFamily: 'Geist, sans-serif',
+                      fontFamily: '"DM Sans", sans-serif',
                       fontSizeBase: '16px',
                       fontWeightBold: '600',
                       fontWeightNormal: '500',

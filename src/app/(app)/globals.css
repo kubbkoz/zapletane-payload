@@ -11,14 +11,25 @@
 @custom-variant 2xl (@media (width >= theme(--breakpoint-2xl)));
 
 @layer base {
+  /* ZAPLETANE global heading reset (design.md §3 / main.css). Applies to
+     every h1–h6 unless a component overrides font-family with a more
+     specific class (e.g. .font-sans on the PDP H1). font-size stays unset —
+     Tailwind size utilities on each heading control that, same as before.
+     font-style is force-locked to normal: Unbounded has NO italic cut, so a
+     browser-synthesized fake oblique must never be allowed to render. */
   h1,
   h2,
   h3,
   h4,
   h5,
   h6 {
-    font-weight: unset;
+    font-family: var(--font-display);
+    font-weight: 500;
     font-size: unset;
+    font-style: normal;
+    letter-spacing: -0.02em;
+    text-transform: none;
+    margin: 0;
   }
 }
 
@@ -43,8 +54,104 @@
   --breakpoint-lg: 64rem;
   --breakpoint-xl: 80rem;
   --breakpoint-2xl: 86rem;
-  --font-mono: var(--font-geist-mono);
-  --font-sans: var(--font-geist-sans);
+
+  /* ZAPLETANE typography — DM Sans (body/UI, aliased as font-tech for
+     template compat) + Unbounded (display: wordmark + all headings).
+     Both self-hosted via @fontsource, imported in layout.tsx. */
+  --font-sans:
+    'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-tech:
+    'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Unbounded Variable', 'Unbounded', 'DM Sans', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* ZAPLETANE letter-spacing scale (overrides Tailwind defaults — every
+     shortcut using tracking-wide/wider/widest depends on these exact values) */
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.08em;
+  --tracking-widest: 0.15em;
+
+  /* ZAPLETANE color tokens — "Teplo domova" earthy palette.
+     Source of truth: zapletane-store/uno.config.ts + design.md §2.
+     Zero hardcoded hex in components — use these tokens/shortcuts only. */
+  --color-brand: #755650;
+  --color-brand-dark: #5a423d;
+  --color-brand-600: #8e6b64;
+  --color-brand-500: #a67f76;
+  --color-brand-400: #bc9a92;
+  --color-brand-300: #d3b7ae;
+  --color-brand-100: #f2e9e5;
+  --color-brand-50: #faf7f5;
+
+  /* accent = identical hex family to brand, deliberately NOT orange.
+     Reserved for: checkout/conversion CTA, badges/discounts, the one
+     highlighted word in a section H2, the section decorator line. */
+  --color-accent: #755650;
+  --color-accent-dark: #5a423d;
+  --color-accent-50: #faf7f5;
+  --color-accent-100: #f2e9e5;
+  --color-accent-200: #e4d2cb;
+  --color-accent-300: #d3b7ae;
+  --color-accent-400: #bc9a92;
+  --color-accent-500: #a67f76;
+  --color-accent-600: #755650;
+  --color-accent-700: #5a423d;
+  --color-accent-800: #5a423d;
+  --color-accent-900: #3d2c29;
+
+  /* legacy "amber" alias — kept so any leftover amber-* usage doesn't fall
+     through to Tailwind's default yellow. Treat as == accent. */
+  --color-amber: #755650;
+  --color-amber-dark: #5a423d;
+  --color-amber-50: #faf7f5;
+  --color-amber-100: #f2e9e5;
+  --color-amber-200: #e4d2cb;
+  --color-amber-300: #d3b7ae;
+  --color-amber-400: #bc9a92;
+  --color-amber-500: #a67f76;
+  --color-amber-600: #755650;
+  --color-amber-700: #5a423d;
+  --color-amber-800: #5a423d;
+  --color-amber-900: #3d2c29;
+
+  /* warm espresso "black" — text-black/bg-black read as this everywhere */
+  --color-black: #241917;
+
+  /* warm neutrals replacing cool gray/zinc across the whole UI */
+  --color-gray-50: #faf7f5;
+  --color-gray-100: #f2e9e5;
+  --color-gray-200: #e4d2cb;
+  --color-gray-300: #d3b7ae;
+  --color-gray-400: #bc9a92;
+  --color-gray-500: #8a6f68;
+  --color-gray-600: #75564f;
+  --color-gray-700: #5a423d;
+  --color-gray-800: #3d2c29;
+  --color-gray-900: #2e211f;
+
+  --color-zinc-50: #faf7f5;
+  --color-zinc-100: #f2e9e5;
+  --color-zinc-200: #e4d2cb;
+  --color-zinc-300: #d8bfb7;
+  --color-zinc-400: #a67f76;
+  --color-zinc-500: #8e6b64;
+  --color-zinc-600: #65504b;
+  --color-zinc-700: #4e3a36;
+  --color-zinc-800: #3d2c29;
+  --color-zinc-900: #241917;
+  --color-zinc-950: #140e0d;
+
+  /* Shape — near-square corners. rounded-default (3px) on CTA/inputs/cards,
+     rounded-sm (2px) on small elements. Never rounded-full on buttons
+     (icon-ring is the one documented exception). */
+  --radius-default: 3px;
+
+  /* Brand-tinted shadows — rgba base 36,25,23 = #241917 ink, so every shadow
+     reads warm/brown instead of neutral black. */
+  --shadow-panel: 0 40px 100px rgba(36, 25, 23, 0.16);
+  --shadow-card-hover: 0 20px 50px rgba(36, 25, 23, 0.1);
+  --shadow-tooltip: 0 10px 25px rgba(36, 25, 23, 0.22);
+  --shadow-panel-top: 0 -10px 30px rgba(36, 25, 23, 0.06);
 }
 
 @layer utilities {
@@ -84,83 +191,169 @@
       max-width: var(--breakpoint-2xl);
     }
   }
+
+  /* container-page — page-level shortcut, same recipe as .container but with
+     the padding step at lg instead of md (matches uno.config's literal
+     `container mx-auto px-4 lg:px-8` shortcut string exactly). */
+  .container-page {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @variant sm {
+    .container-page {
+      max-width: var(--breakpoint-sm);
+    }
+  }
+  @variant md {
+    .container-page {
+      max-width: var(--breakpoint-md);
+    }
+  }
+  @variant lg {
+    .container-page {
+      max-width: var(--breakpoint-lg);
+      padding-inline: 2rem;
+    }
+  }
+  @variant xl {
+    .container-page {
+      max-width: var(--breakpoint-xl);
+    }
+  }
+  @variant 2xl {
+    .container-page {
+      max-width: var(--breakpoint-2xl);
+    }
+  }
+
+  /* scrollbar-hide / scrollbar-default (carousel/horizontal-scroll rows) */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-default {
+    scrollbar-width: auto;
+  }
+
+  /* safe-area insets (notch / home indicator) — requires
+     viewport-fit=cover in the viewport meta tag, otherwise env() is 0 */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+@utility gpu-boost {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 :root {
-  --background: oklch(100% 0 0deg);
-  --foreground: oklch(14.5% 0 0deg);
-  --card: oklch(96.5% 0.005 265deg);
-  --card-foreground: oklch(14.5% 0 0deg);
-  --popover: oklch(100% 0 0deg);
-  --popover-foreground: oklch(14.5% 0 0deg);
-  --primary: oklch(20.5% 0 0deg);
-  --primary-foreground: oklch(98.5% 0 0deg);
-  --secondary: oklch(97% 0 0deg);
-  --secondary-foreground: oklch(20.5% 0 0deg);
-  --muted: oklch(97% 0 0deg);
-  --muted-foreground: oklch(55.6% 0 0deg);
-  --accent: oklch(97% 0 0deg);
-  --accent-foreground: oklch(20.5% 0 0deg);
-  --destructive: oklch(57.7% 0.245 27.325deg);
-  --destructive-foreground: oklch(57.7% 0.245 27.325deg);
-  --border: oklch(92.2% 0 0deg);
-  --input: oklch(92.2% 0 0deg);
-  --ring: oklch(70.8% 0 0deg);
+  /* shadcn semantic vars mapped onto ZAPLETANE tokens — existing shadcn/ui
+     primitives (button, card, dialog, input, select…) inherit the brand
+     automatically through these, with no component-level changes needed. */
+  --background: #faf7f5; /* brand-50 — cream page background, not white */
+  --foreground: #241917; /* ink */
+  --card: #ffffff;
+  --card-foreground: #241917;
+  --popover: #ffffff;
+  --popover-foreground: #241917;
+  --primary: #755650; /* brand — default filled-button CTA */
+  --primary-foreground: #ffffff;
+  --secondary: #f2e9e5; /* brand-100 */
+  --secondary-foreground: #241917;
+  --muted: #faf7f5; /* brand-50 */
+  --muted-foreground: #8a6f68; /* gray-500 */
+  --accent: #755650; /* == brand DEFAULT — never orange, see design.md §2 */
+  --accent-foreground: #ffffff;
+  --destructive: #ba1a1a; /* error */
+  --destructive-foreground: #ffffff;
+  --border: #e4d2cb; /* gray-200 / brand-200 */
+  --input: #e4d2cb;
+  --ring: #755650; /* brand — focus rings */
   --chart-1: oklch(64.6% 0.222 41.116deg);
   --chart-2: oklch(60% 0.118 184.704deg);
   --chart-3: oklch(39.8% 0.07 227.392deg);
   --chart-4: oklch(82.8% 0.189 84.429deg);
   --chart-5: oklch(76.9% 0.188 70.08deg);
-  --radius: 0.625rem;
-  --sidebar: oklch(98.5% 0 0deg);
-  --sidebar-foreground: oklch(14.5% 0 0deg);
-  --sidebar-primary: oklch(20.5% 0 0deg);
-  --sidebar-primary-foreground: oklch(98.5% 0 0deg);
-  --sidebar-accent: oklch(97% 0 0deg);
-  --sidebar-accent-foreground: oklch(20.5% 0 0deg);
-  --sidebar-border: oklch(92.2% 0 0deg);
-  --sidebar-ring: oklch(70.8% 0 0deg);
-  --success: oklch(78% 0.08 200deg);
-  --warning: oklch(89% 0.1 75deg);
-  --error: oklch(75% 0.15 25deg);
+  --radius: 3px; /* near-square corners, matches rounded-default */
+  --sidebar: #faf7f5;
+  --sidebar-foreground: #241917;
+  --sidebar-primary: #755650;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f2e9e5;
+  --sidebar-accent-foreground: #241917;
+  --sidebar-border: #e4d2cb;
+  --sidebar-ring: #755650;
+  --success: #1b7d3a;
+  --success-light: #eef7f0;
+  --warning: oklch(89% 0.1 75deg); /* no ZAPLETANE equivalent — left as-is */
+  --error: #ba1a1a;
+  --error-light: #fbeeee;
+
+  /* ZAPLETANE motion tokens (design.md §9 / main.css) — for arbitrary-value
+     transitions, e.g. transition-[background-color] duration-[var(--t-fast)] */
+  --t-fast: 150ms; /* hover color, chip toggle */
+  --t-base: 200ms; /* buttons, icons */
+  --t-slow: 300ms; /* panels, modals, drawers */
+  --t-panel: 350ms; /* cart sidebar / offcanvas */
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1); /* spring-like panels */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* smooth deceleration */
+  --header-height: 80px; /* reference value; actual navbar height is
+                             measured at runtime by later header component */
 }
 
 [data-theme='dark'] {
-  --background: oklch(14.5% 0 0deg);
-  --foreground: oklch(98.5% 0 0deg);
-  --card: oklch(17% 0 0deg);
-  --card-foreground: oklch(98.5% 0 0deg);
-  --popover: oklch(14.5% 0 0deg);
-  --popover-foreground: oklch(98.5% 0 0deg);
-  --primary: oklch(98.5% 0 0deg);
-  --primary-foreground: oklch(20.5% 0 0deg);
-  --secondary: oklch(26.9% 0 0deg);
-  --secondary-foreground: oklch(98.5% 0 0deg);
-  --muted: oklch(26.9% 0 0deg);
-  --muted-foreground: oklch(70.8% 0 0deg);
-  --accent: oklch(26.9% 0 0deg);
-  --accent-foreground: oklch(98.5% 0 0deg);
-  --destructive: oklch(39.6% 0.141 25.723deg);
-  --destructive-foreground: oklch(63.7% 0.237 25.331deg);
-  --border: oklch(26.9% 0 0deg);
-  --input: oklch(26.9% 0 0deg);
-  --ring: oklch(43.9% 0 0deg);
-  --chart-1: oklch(48.8% 0.243 264.376deg);
-  --chart-2: oklch(69.6% 0.17 162.48deg);
-  --chart-3: oklch(76.9% 0.188 70.08deg);
-  --chart-4: oklch(62.7% 0.265 303.9deg);
-  --chart-5: oklch(64.5% 0.246 16.439deg);
-  --sidebar: oklch(20.5% 0 0deg);
-  --sidebar-foreground: oklch(98.5% 0 0deg);
-  --sidebar-primary: oklch(48.8% 0.243 264.376deg);
-  --sidebar-primary-foreground: oklch(98.5% 0 0deg);
-  --sidebar-accent: oklch(26.9% 0 0deg);
-  --sidebar-accent-foreground: oklch(98.5% 0 0deg);
-  --sidebar-border: oklch(26.9% 0 0deg);
-  --sidebar-ring: oklch(43.9% 0 0deg);
-  --success: oklch(28% 0.1 200deg);
-  --warning: oklch(35% 0.08 70deg);
-  --error: oklch(45% 0.1 25deg);
+  /* ZAPLETANE is a light-only, warm-cream design (design.md — no dark
+     variant exists). The provider/toggle mechanism stays intact (next-themes
+     wiring in src/providers/Theme is untouched, defaultTheme is 'light'),
+     but the tokens themselves are deliberately locked to the light palette
+     so a stray dark preference or the ThemeSelector can never mismatch the
+     brand. If a real dark variant is ever designed, redefine these here. */
+  --background: #faf7f5;
+  --foreground: #241917;
+  --card: #ffffff;
+  --card-foreground: #241917;
+  --popover: #ffffff;
+  --popover-foreground: #241917;
+  --primary: #755650;
+  --primary-foreground: #ffffff;
+  --secondary: #f2e9e5;
+  --secondary-foreground: #241917;
+  --muted: #faf7f5;
+  --muted-foreground: #8a6f68;
+  --accent: #755650;
+  --accent-foreground: #ffffff;
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+  --border: #e4d2cb;
+  --input: #e4d2cb;
+  --ring: #755650;
+  --chart-1: oklch(64.6% 0.222 41.116deg);
+  --chart-2: oklch(60% 0.118 184.704deg);
+  --chart-3: oklch(39.8% 0.07 227.392deg);
+  --chart-4: oklch(82.8% 0.189 84.429deg);
+  --chart-5: oklch(76.9% 0.188 70.08deg);
+  --sidebar: #faf7f5;
+  --sidebar-foreground: #241917;
+  --sidebar-primary: #755650;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f2e9e5;
+  --sidebar-accent-foreground: #241917;
+  --sidebar-border: #e4d2cb;
+  --sidebar-ring: #755650;
+  --success: #1b7d3a;
+  --success-light: #eef7f0;
+  --warning: oklch(89% 0.1 75deg);
+  --error: #ba1a1a;
+  --error-light: #fbeeee;
 }
 
 @theme inline {
@@ -188,10 +381,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* hardcoded (not calc'd off --radius) to guarantee exact 1:1 values —
+     rounded-sm = 2px, everything else stays near-square per design.md */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -201,8 +396,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-success: var(--success);
+  --color-success-light: var(--success-light);
   --color-warning: var(--warning);
   --color-error: var(--error);
+  --color-error-light: var(--error-light);
 }
 
 @layer base {
@@ -226,5 +423,186 @@ html[data-theme='light'] {
 a,
 input,
 button {
-  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-50 dark:focus-visible:ring-neutral-600 dark:focus-visible:ring-offset-neutral-900;
+  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-50;
+}
+
+/* ============================================================================
+   ZAPLETANE shortcuts — 1:1 port of every UnoCSS shortcut in
+   zapletane-store/uno.config.ts, expanded here as Tailwind v4 component
+   classes under the SAME class names. Feature-component phases should use
+   these exact names rather than re-deriving the utility strings inline.
+   ============================================================================ */
+@layer components {
+  /* §1.4 — Glass panel */
+  .glass-panel {
+    @apply bg-white/90 backdrop-blur-lg;
+  }
+
+  /* §1.4 / §3.1 — Section H2 (display font, homepage marketing sections).
+     Usage: <h2 class="section-h2">Nadpis <span class="text-accent">slovo</span></h2> */
+  .section-h2 {
+    @apply text-[38px] sm:text-[46px] font-display font-medium normal-case tracking-tight leading-[1.1];
+  }
+
+  /* §1.4 — thin accent line under a section-h2. Usage: <div class="section-decorator mb-6" /> */
+  .section-decorator {
+    @apply h-px w-16 bg-brand-400;
+  }
+
+  /* §1.4 — kicker text above a headline. Never smaller than 11px/0.22em or the tracking becomes illegible. */
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.22em] text-gray-700;
+  }
+
+  /* §1.4 — primary filled CTA. brand-700 carries white text at 6.5:1, hover brand-600 at 4.7:1 (both AA).
+     NOTE: the original UnoCSS shortcut string starts with a literal `group` class — UnoCSS shortcuts expand
+     to real DOM classes, but Tailwind's @apply only merges CSS declarations, so `group` (a marker utility
+     with no CSS output) can't be baked in here. If a consumer needs `group-hover:` children (e.g. an
+     ArrowRight icon that slides on hover), add `group` alongside `btn-primary` on the element:
+     className="btn-primary group". */
+  .btn-primary {
+    @apply inline-flex h-12 items-center gap-4 rounded-sm bg-brand px-6 text-[13px] font-medium tracking-wide text-white transition-[transform,background-color] duration-200 hover:bg-brand-600 active:translate-y-px;
+  }
+
+  /* §1.4 — thin-bordered card on cream background */
+  .card-editorial {
+    @apply rounded-sm border border-gray-200 bg-white/60;
+  }
+
+  /* §1.3 — editorial container: narrower + bigger gutter than .container-page */
+  .container-editorial {
+    @apply mx-auto w-full max-w-[1180px] px-6 lg:px-10;
+  }
+
+  /* §1.4 — badge chip. Usage: <div class="brand-badge"><span class="brand-badge-text">TEXT</span></div> */
+  .brand-badge {
+    @apply inline-block rounded-default bg-accent px-3 py-1;
+  }
+  .brand-badge-text {
+    @apply block font-tech text-xs font-bold uppercase tracking-widest text-white;
+  }
+
+  /* §1.4 — carousel nav arrow button */
+  .btn-nav-arrow {
+    @apply flex h-12 w-12 items-center justify-center rounded-default border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:border-brand hover:bg-brand hover:text-white;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.4 — tab / filter buttons */
+  .btn-tab-active {
+    @apply rounded-default border border-brand bg-brand px-5 py-2 font-sans text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all duration-300;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  .btn-tab-inactive {
+    @apply rounded-default border border-gray-200 bg-white px-5 py-2 font-sans text-sm font-bold uppercase tracking-wider text-gray-600 transition-all duration-300 hover:border-brand hover:text-brand;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.4 — PDP action grid button (wishlist/compare/watch). `group` is NOT baked in — the template adds
+     it itself (`className="btn-action-grid group"`), same as the original UnoCSS shortcut's own comment. */
+  .btn-action-grid {
+    @apply flex min-h-[44px] flex-col items-center justify-center rounded-default border border-gray-200 bg-white px-1 py-2 text-center text-[10px] font-bold uppercase text-black transition-colors hover:border-brand hover:text-brand;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.4 — form inputs */
+  .form-input {
+    @apply w-full rounded-default border border-transparent bg-gray-50 px-4 py-3 font-sans text-sm font-medium outline-none transition-all duration-300 focus:border-brand focus:bg-white;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  .form-input-with-icon {
+    @apply w-full rounded-default border border-transparent bg-gray-50 py-3 pl-12 pr-4 font-sans text-sm font-medium outline-none transition-all duration-300 focus:border-brand focus:bg-white;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  .form-label {
+    @apply mb-2 block text-[10px] font-bold uppercase tracking-widest text-gray-500;
+  }
+
+  /* §1.4 — tech corners (dark cards, maps) */
+  .tech-corner-tl {
+    @apply absolute left-0 top-0 z-10 h-3 w-3 border-l-2 border-t-2 border-accent;
+  }
+  .tech-corner-br {
+    @apply absolute bottom-0 right-0 z-10 h-3 w-3 border-b-2 border-r-2 border-accent;
+  }
+
+  /* §1.4 — full-width checkout / conversion CTA */
+  .btn-checkout {
+    @apply flex w-full items-center justify-center rounded-default bg-accent py-4 font-bold uppercase tracking-widest text-white shadow-xl transition-all duration-300 hover:bg-accent-dark;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.4 — secondary (light) button */
+  .btn-secondary {
+    @apply rounded-default bg-gray-50 font-bold uppercase tracking-widest text-gray-600 transition-all duration-300 hover:bg-gray-100 hover:text-black;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.4 — small inline accent CTA (e.g. coupon apply) */
+  .btn-accent-sm {
+    @apply flex-shrink-0 bg-accent px-5 py-3 font-sans text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-accent-dark disabled:opacity-50;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.4 — press feedback (transform-based, GPU-safe) */
+  .press-feedback {
+    @apply transition-transform duration-150 active:scale-95;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* §1.3 — vertical section rhythm */
+  .section-band {
+    @apply py-16 md:py-24;
+  }
+
+  /* §2.2/§2.3 — icon-only circular affordance. Documented rounded-full exception — icon-only elements
+     only, never text-labeled buttons. Consumer adds size (w-11 h-11 / w-14 h-14) and, on links,
+     hover:bg-accent hover:border-accent hover:text-white. */
+  .icon-ring {
+    @apply flex items-center justify-center rounded-full border border-white/25 text-white/80 transition-colors duration-300;
+  }
+
+  /* §2.2 — footer column heading. font-extrabold (800), deliberately NOT font-black (900) — only
+     400/500/700/800 DM Sans weights are loaded, so 900 has no real @font-face and would faux-bold. */
+  .footer-heading {
+    @apply mb-8 flex items-center font-tech text-lg font-extrabold uppercase tracking-widest text-white;
+  }
+
+  /* §2.1 — Logo wordmark (src/components/Logo). Kept as real classes (not just Tailwind utilities)
+     since the mark's em-relative sizing needs an explicit rem base + its own breakpoint. */
+  .logo-wordmark {
+    font-size: 1.4rem;
+    letter-spacing: -0.03em;
+  }
+  .logo-mark {
+    width: 1.5em;
+    height: 1.19em;
+    flex: 0 0 auto;
+    margin-right: 0.3em;
+  }
+  @media (max-width: 1023.98px) {
+    .logo-wordmark {
+      font-size: 1.26rem;
+    }
+  }
 }
