@@ -30,7 +30,11 @@ import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 
 const apiKey = `${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`
-const stripe = loadStripe(apiKey)
+// Real keys only: with the placeholder/dummy key Stripe.js throws at init and
+// takes the whole checkout down. Payments render a "coming soon" notice until
+// a real publishable key is configured.
+const stripeConfigured = /^pk_(test|live)_[A-Za-z0-9]{20,}$/.test(apiKey) && !apiKey.includes('dummy')
+const stripe = stripeConfigured ? loadStripe(apiKey) : null
 
 /**
  * Checkout flow — VISUAL LAYER ONLY.
@@ -198,7 +202,7 @@ export const CheckoutPage: React.FC = () => {
                     E-mailová adresa
                   </Label>
                   <Input
-                    className="form-input"
+                    className="form-input border-gray-200 bg-white"
                     disabled={!emailEditable}
                     id="email"
                     name="email"
@@ -360,6 +364,25 @@ export const CheckoutPage: React.FC = () => {
                 </h2>
                 <div className="section-decorator mt-4 mb-8" />
                 {error && <p className="mb-4 font-sans text-sm text-error">{error}</p>}
+                {!stripeConfigured && (
+                  <div className="rounded-default border border-brand-200 bg-brand-100 p-5">
+                    <p className="font-sans text-sm font-semibold text-brand-800">
+                      Online platba kartou bude dostupná už čoskoro.
+                    </p>
+                    <p className="mt-2 font-sans text-[13px] leading-relaxed text-gray-700">
+                      Medzitým nás kontaktujte na{' '}
+                      <a className="font-medium text-brand underline" href="mailto:info@zapletane.sk">
+                        info@zapletane.sk
+                      </a>{' '}
+                      alebo na čísle{' '}
+                      <a className="font-medium text-brand underline" href="tel:+421915675870">
+                        +421 915 675 870
+                      </a>{' '}
+                      a objednávku vybavíme osobne.
+                    </p>
+                  </div>
+                )}
+                {stripeConfigured && (
                 <Elements
                   options={{
                     appearance: {
@@ -401,6 +424,7 @@ export const CheckoutPage: React.FC = () => {
                     </button>
                   </div>
                 </Elements>
+                )}
               </section>
             )}
           </Suspense>
@@ -429,12 +453,12 @@ export const CheckoutPage: React.FC = () => {
                     if (!quantity) return null
 
                     let image = gallery?.[0]?.image || meta?.image
-                    let price = product?.priceInUSD
+                    let price = product?.priceInEUR
 
                     const isVariant = Boolean(variant) && typeof variant === 'object'
 
                     if (isVariant) {
-                      price = variant?.priceInUSD
+                      price = variant?.priceInEUR
 
                       const imageVariant = product.gallery?.find((item: GalleryItem) => {
                         if (!item.variantOption) return false

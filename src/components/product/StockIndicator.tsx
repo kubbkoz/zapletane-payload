@@ -7,12 +7,11 @@ import { cn } from '@/utilities/cn'
 import {
   getStockState,
   lowStockNote,
-  stockChipClass,
+  stockBadgeClass,
+  stockDotClass,
   stockLabel,
   stockTextClass,
 } from '@/utilities/stockStatus'
-
-import './stock-pulse.css'
 
 type Props = {
   product: Product
@@ -66,20 +65,14 @@ export const StockIndicator: React.FC<Props> = ({ product }) => {
     <div className="flex flex-wrap items-center gap-3">
       <div
         className={cn(
-          'relative flex h-8 items-center justify-center rounded-sm border px-3 text-center font-tech',
-          stockChipClass[state],
+          'inline-flex h-7 items-center gap-2 rounded-sm px-3',
+          stockBadgeClass[state],
         )}
       >
-        <span className="whitespace-nowrap text-[11px] font-bold uppercase leading-none tracking-widest text-black">
+        <span className={cn('h-2 w-2 rounded-full', stockDotClass[state])} />
+        <span className="whitespace-nowrap font-sans text-[12px] font-semibold leading-none">
           {stockLabel[state]}
         </span>
-        {state === 'soldOut' && (
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <svg className="h-full w-full" preserveAspectRatio="none">
-              <line x1="0" y1="100%" x2="100%" y2="0" stroke="#E4D2CB" strokeWidth="1" />
-            </svg>
-          </div>
-        )}
       </div>
 
       {note && (

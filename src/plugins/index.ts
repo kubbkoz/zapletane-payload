@@ -3,7 +3,7 @@ import { seoPlugin } from '@payloadcms/plugin-seo'
 import { Plugin } from 'payload'
 import { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { FixedToolbarFeature, HeadingFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
-import { ecommercePlugin } from '@payloadcms/plugin-ecommerce'
+import { ecommercePlugin, EUR } from '@payloadcms/plugin-ecommerce'
 import { mcpPlugin } from '@payloadcms/plugin-mcp'
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 
@@ -114,6 +114,13 @@ export const plugins: Plugin[] = [
       customerOnlyFieldAccess,
       isAdmin,
       isDocumentOwner,
+    },
+    // Slovak storefront sells in euros. The plugin derives the price field
+    // names from the currency code (priceInEUR), formats via Intl with the
+    // EUR symbol, and Stripe intents are created in EUR.
+    currencies: {
+      defaultCurrency: 'EUR',
+      supportedCurrencies: [EUR],
     },
     customers: {
       slug: 'users',

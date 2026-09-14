@@ -3,6 +3,7 @@ import * as migration_20260914_194649_seed_admin from './20260914_194649_seed_ad
 import * as migration_20260914_201800_reset_admin_password from './20260914_201800_reset_admin_password';
 import * as migration_20260914_204453_site_settings from './20260914_204453_site_settings';
 import * as migration_20260914_210500_reset_admin_password_2 from './20260914_210500_reset_admin_password_2';
+import * as migration_20260914_213000_eur_currency from './20260914_213000_eur_currency';
 
 export const migrations = [
   {
@@ -24,5 +25,15 @@ export const migrations = [
     up: migration_20260914_204453_site_settings.up,
     down: migration_20260914_204453_site_settings.down,
     name: '20260914_204453_site_settings'
+  },
+  {
+    up: migration_20260914_210500_reset_admin_password_2.up,
+    down: migration_20260914_210500_reset_admin_password_2.down,
+    name: '20260914_210500_reset_admin_password_2'
+  },
+  {
+    up: migration_20260914_213000_eur_currency.up,
+    down: migration_20260914_213000_eur_currency.down,
+    name: '20260914_213000_eur_currency'
   },
 ];

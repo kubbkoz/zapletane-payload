@@ -1,3 +1,309 @@
+/* =============================================================================
+   ZAPLETANE — Payload admin theme
+   =============================================================================
+
+   Loaded by src/app/(payload)/layout.tsx *after* `@payloadcms/next/css`.
+
+   Payload ships all of its own CSS inside `@layer payload-default` (see the
+   `<style>@layer payload-default, payload;</style>` that RootLayout injects into
+   <head>). Everything in this file is UNLAYERED, and unlayered declarations beat
+   layered ones regardless of specificity — so a plain `:root { --x: … }` here
+   overrides Payload's own `:root` and even its `html[data-theme='dark']` rules.
+
+   That cuts both ways: any `--theme-*` variable declared in `:root` below also
+   leaks into dark mode, so every such variable MUST be re-declared in the
+   `html[data-theme='dark']` block. The raw `--color-*` ramps are theme-agnostic
+   (Payload maps them onto `--theme-elevation-*` differently per theme), so those
+   are declared once.
+
+   Authoritative variable names come from
+   node_modules/@payloadcms/ui/dist/scss/{colors,app}.scss.
+
+   Strategy
+   --------
+   1. Replace the neutral `--color-base-*` ramp with a warm ZAPLETANE ramp
+      (white → cream → brand browns → warm black #241917 → black). Payload's own
+      light mapping (elevation-N = base-N) and dark mapping (elevation-N =
+      inverted base) then produce both themes from this single ramp:
+
+        LIGHT  bg #FAF7F5 · surfaces #FFFFFF/#F2E9E5/#E4D2CB · text #241917
+        DARK   ground #150E0D · panels #1C1312/#241917 · brand browns at
+               elevation 300–600 · cream text #F2E9E5
+
+   2. Replace `--color-success-*` (green, #1B7D3A family) and `--color-error-*`
+      (#BA1A1A family). `--color-warning-*` is left alone — Payload's default
+      warning ramp is already a warm ochre that sits well in this palette.
+
+   3. Brand the action colour at component level (`--zap-action`), because
+      Payload's primary button is driven by the elevation ramp, not by a
+      dedicated accent variable.
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   1. Raw palette — theme-agnostic, declared once
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* Warm neutral ramp. 0 = white, 800 = ink (#241917), 1000 = black.
+     Steps 600/700 land on the brand browns so Payload's mid-elevations read
+     as brand rather than as grey. */
+  --color-base-0: #ffffff;
+  --color-base-50: #faf7f5;
+  --color-base-100: #f2e9e5;
+  --color-base-150: #e4d2cb;
+  --color-base-200: #d3b7ae;
+  --color-base-250: #c6a79e;
+  --color-base-300: #bc9a92;
+  --color-base-350: #ae8c83;
+  --color-base-400: #a67f76;
+  --color-base-450: #9a7169;
+  --color-base-500: #8e6b64;
+  --color-base-550: #82615a;
+  --color-base-600: #755650;
+  --color-base-650: #684c47;
+  --color-base-700: #5a423d;
+  --color-base-750: #46332f;
+  --color-base-800: #241917;
+  --color-base-850: #1c1312;
+  --color-base-900: #150e0d;
+  --color-base-950: #0c0807;
+  --color-base-1000: #000000;
+
+  /* Success — real green (#1B7D3A family), not Payload's default blue. */
+  --color-success-50: #f0f7f2;
+  --color-success-100: #dcefe3;
+  --color-success-150: #c2e3ce;
+  --color-success-200: #a8d7ba;
+  --color-success-250: #8ccaa4;
+  --color-success-300: #6fbc8d;
+  --color-success-350: #52ad76;
+  --color-success-400: #389e60;
+  --color-success-450: #24904f;
+  --color-success-500: #1b7d3a;
+  --color-success-550: #177034;
+  --color-success-600: #14632e;
+  --color-success-650: #125728;
+  --color-success-700: #104a23;
+  --color-success-750: #0e3e1e;
+  --color-success-800: #0c3219;
+  --color-success-850: #0a2714;
+  --color-success-900: #081d10;
+  --color-success-950: #06140b;
+
+  /* Error — #BA1A1A family. */
+  --color-error-50: #fdf2f2;
+  --color-error-100: #fbe1e1;
+  --color-error-150: #f7c7c7;
+  --color-error-200: #f2adad;
+  --color-error-250: #ec9292;
+  --color-error-300: #e47474;
+  --color-error-350: #db5757;
+  --color-error-400: #d13b3b;
+  --color-error-450: #c62a2a;
+  --color-error-500: #ba1a1a;
+  --color-error-550: #a81717;
+  --color-error-600: #961515;
+  --color-error-650: #851312;
+  --color-error-700: #741110;
+  --color-error-750: #630f0f;
+  --color-error-800: #520d0d;
+  --color-error-850: #420b0b;
+  --color-error-900: #310808;
+  --color-error-950: #210606;
+
+  /* Brand scale, verbatim from the storefront tokens (globals.css @theme). */
+  --zap-brand: #755650;
+  --zap-brand-dark: #5a423d;
+  --zap-brand-600: #8e6b64;
+  --zap-brand-500: #a67f76;
+  --zap-brand-400: #bc9a92;
+  --zap-brand-300: #d3b7ae;
+  --zap-brand-200: #e4d2cb;
+  --zap-brand-100: #f2e9e5;
+  --zap-brand-50: #faf7f5;
+  --zap-ink: #241917;
+
+  /* Typography — DM Sans everywhere, Unbounded only where noted in §5.
+     Both self-hosted via @fontsource; the CSS is pulled into the admin bundle
+     by src/components/admin/BrandFonts (registered as an admin provider). */
+  --font-body:
+    'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --zap-font-display: 'Unbounded Variable', 'Unbounded', var(--font-body);
+}
+
+/* -----------------------------------------------------------------------------
+   2. Light theme
+   -------------------------------------------------------------------------- */
+
+:root,
+html[data-theme='light'] {
+  /* Cream page ground, while elevation-0 (#FFFFFF) stays the surface colour for
+     inputs, tables and panels — the same white-on-cream separation the
+     storefront uses. */
+  --theme-bg: var(--color-base-50);
+  --theme-overlay: rgba(36, 25, 23, 0.55);
+
+  /* `--theme-text` is already elevation-800 = #241917, so it is left alone. */
+
+  --zap-action: var(--zap-brand);
+  --zap-action-hover: var(--zap-brand-dark);
+  --zap-action-contrast: var(--zap-brand-50);
+  --zap-card-bg: var(--color-base-0);
+  --zap-card-tint: var(--zap-brand-100);
+  --zap-card-border: var(--zap-brand-200);
+
+  --zap-logo-front: #bc9a92;
+  --zap-logo-back: #8e6b64;
+
+  --accessibility-outline: 2px solid var(--zap-action);
+}
+
+/* -----------------------------------------------------------------------------
+   3. Dark theme — warm near-black ground, brand browns as accents
+   -------------------------------------------------------------------------- */
+
+html[data-theme='dark'] {
+  /* Payload's own dark mapping already inverts the ramp above:
+       elevation-0  = base-900  #150E0D  (ground)
+       elevation-50 = base-850  #1C1312  (inputs, cards)
+       elevation-100= base-800  #241917
+       elevation-150= base-750  #46332F  (borders)
+       elevation-300= base-600  #755650  (brand)
+       elevation-600= base-300  #BC9A92  (brand accent)
+       elevation-800= base-100  #F2E9E5  (text)
+     Only the handful of vars declared unlayered in §2 need restating here. */
+  --theme-bg: var(--theme-elevation-0);
+  --theme-overlay: rgba(10, 7, 6, 0.78);
+
+  /* Cream rather than Payload's pure-white default (elevation-1000). */
+  --theme-text: var(--theme-elevation-800);
+
+  /* On a near-black ground the 600/700 browns are too dark to act as the CTA,
+     so the action colour steps up to brand-400/300 with ink text. */
+  --zap-action: var(--zap-brand-400);
+  --zap-action-hover: var(--zap-brand-300);
+  --zap-action-contrast: var(--zap-ink);
+  --zap-card-bg: var(--theme-elevation-50);
+  --zap-card-tint: var(--theme-elevation-100);
+  --zap-card-border: var(--theme-elevation-150);
+
+  --zap-logo-front: #d3b7ae;
+  --zap-logo-back: #a67f76;
+
+  --accessibility-outline: 2px solid var(--zap-action);
+}
+
+/* -----------------------------------------------------------------------------
+   4. Element-level branding
+   -------------------------------------------------------------------------- */
+
+/* Primary button = brand, not the raw ink elevation Payload defaults to.
+   `:not(.btn--disabled)` matters: these rules are unlayered and would otherwise
+   also win over Payload's `.btn--style-primary.btn--disabled` block. */
+.btn--style-primary:not(.btn--disabled) {
+  --bg-color: var(--zap-action);
+  --color: var(--zap-action-contrast);
+  --hover-bg: var(--zap-action-hover);
+  --hover-color: var(--zap-action-contrast);
+}
+
+/* Warm text selection instead of Payload's blue/green tint. */
+::selection {
+  background: var(--zap-brand-200);
+  color: var(--zap-ink);
+}
+
+::-moz-selection {
+  background: var(--zap-brand-200);
+  color: var(--zap-ink);
+}
+
+html[data-theme='dark'] {
+  ::selection {
+    background: var(--zap-brand);
+    color: var(--zap-brand-50);
+  }
+
+  ::-moz-selection {
+    background: var(--zap-brand);
+    color: var(--zap-brand-50);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   5. Unbounded — deliberately restrained.
+   Only the three "title" slots a user reads as a heading: the collection list
+   title, the document title, and the dashboard welcome card (styled in
+   src/components/BeforeDashboard/index.scss). Everything else stays DM Sans;
+   this is a tool, not a landing page.
+   -------------------------------------------------------------------------- */
+
+.list-header__title,
+.doc-header__title {
+  font-family: var(--zap-font-display);
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: -0.02em;
+}
+
+/* -----------------------------------------------------------------------------
+   6. ZAPLETANE logo (login screen) and icon (nav / step-nav home link)
+   Markup lives in src/components/admin/Logo and src/components/admin/Icon.
+   -------------------------------------------------------------------------- */
+
+.zap-logo {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* ink in light, cream in dark — see --theme-text in §2/§3 */
+  color: var(--theme-text);
+}
+
+.zap-logo__mark {
+  height: 42px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.zap-logo__word {
+  font-family: var(--zap-font-display);
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.zap-logo__dot {
+  color: var(--zap-action);
+}
+
+/* mix-blend-mode makes the two links read as woven on a light ground; on the
+   dark theme it would just punch the overlap to black, so it is light-only. */
+html[data-theme='light'] .zap-logo__back,
+html[data-theme='light'] .zap-icon__back {
+  mix-blend-mode: multiply;
+}
+
+.zap-icon {
+  display: block;
+}
+
+/* Strokes live here rather than on the SVG elements so both marks re-theme with
+   a variable swap. */
+.zap-logo__front,
+.zap-icon__front {
+  stroke: var(--zap-logo-front);
+}
+
+.zap-logo__back,
+.zap-icon__back {
+  stroke: var(--zap-logo-back);
+}
+
+/* -----------------------------------------------------------------------------
+   7. Template leftovers
+   -------------------------------------------------------------------------- */
+
 .visually-hidden {
   position: absolute;
   width: 1px;

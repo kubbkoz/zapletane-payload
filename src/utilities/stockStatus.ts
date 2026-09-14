@@ -20,18 +20,22 @@ export const stockLabel: Record<StockState, string> = {
   soldOut: 'Vypredané',
 }
 
-/** Chip border/background + pulse glow, matching ProductCard.vue's stock pill. */
-export const stockChipClass: Record<StockState, string> = {
-  inStock: 'border-success bg-white stock-pulse-green',
-  onOrder: 'border-accent-400 bg-white stock-pulse-accent',
-  soldOut: 'border-gray-200 bg-gray-50 opacity-60',
+/**
+ * Soft tinted status chip (2026-09 redesign, replaces the outlined pulse
+ * pill): quiet solid tint + status dot, sentence case. Same recipe on the
+ * card and the PDP so the signal reads identically everywhere.
+ */
+export const stockBadgeClass: Record<StockState, string> = {
+  inStock: 'bg-success-light text-success',
+  onOrder: 'bg-brand-100 text-brand-800',
+  soldOut: 'bg-gray-100 text-gray-500',
 }
 
 /** Small inline dot used on cart line items and the PDP info rows. */
 export const stockDotClass: Record<StockState, string> = {
   inStock: 'bg-success',
-  onOrder: 'bg-accent-400',
-  soldOut: 'bg-error',
+  onOrder: 'bg-accent-500',
+  soldOut: 'bg-gray-400',
 }
 
 export const stockTextClass: Record<StockState, string> = {

@@ -7,9 +7,7 @@ import { ArrowRight } from 'lucide-react'
 import { Price } from '@/components/Price'
 import { CardMedia } from './CardMedia'
 import { cn } from '@/utilities/cn'
-import { getStockState, stockChipClass, stockLabel } from '@/utilities/stockStatus'
-
-import '@/components/product/stock-pulse.css'
+import { getStockState, stockBadgeClass, stockDotClass, stockLabel } from '@/utilities/stockStatus'
 
 type Props = {
   product: Partial<Product>
@@ -27,9 +25,9 @@ type Props = {
  *                       stock pill → price row + action button
  */
 export const ProductGridItem: React.FC<Props> = ({ product }) => {
-  const { gallery, inventory, priceInUSD, title } = product
+  const { gallery, inventory, priceInEUR, title } = product
 
-  let price = priceInUSD
+  let price = priceInEUR
 
   const variants = product.variants?.docs
   const hasVariants = Boolean(product.enableVariants && variants && variants.length > 0)
@@ -39,10 +37,10 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
     if (
       variant &&
       typeof variant === 'object' &&
-      variant?.priceInUSD &&
-      typeof variant.priceInUSD === 'number'
+      variant?.priceInEUR &&
+      typeof variant.priceInEUR === 'number'
     ) {
-      price = variant.priceInUSD
+      price = variant.priceInEUR
     }
   }
 
@@ -73,20 +71,14 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
             <div className="mb-5 flex flex-wrap gap-1.5">
               <div
                 className={cn(
-                  'relative flex h-7 min-w-[38px] items-center justify-center rounded-sm border px-2 text-center font-tech',
-                  stockChipClass[stockState],
+                  'inline-flex h-6 items-center gap-1.5 rounded-sm px-2.5',
+                  stockBadgeClass[stockState],
                 )}
               >
-                <span className="whitespace-nowrap text-[11px] font-bold uppercase leading-none tracking-tight text-black">
+                <span className={cn('h-1.5 w-1.5 rounded-full', stockDotClass[stockState])} />
+                <span className="whitespace-nowrap font-sans text-[11px] font-semibold leading-none">
                   {stockLabel[stockState]}
                 </span>
-                {stockState === 'soldOut' && (
-                  <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                    <svg className="h-full w-full" preserveAspectRatio="none">
-                      <line x1="0" y1="100%" x2="100%" y2="0" stroke="#E4D2CB" strokeWidth="1" />
-                    </svg>
-                  </div>
-                )}
               </div>
             </div>
           )}

@@ -55,8 +55,8 @@ export function OpenCartButton({
       >
         <ShoppingCart className="h-5 w-5" strokeWidth={1.75} />
         {quantity ? (
-          <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-accent text-[10px] font-bold leading-none text-white">
-            {quantity}
+          <span className="absolute -right-2.5 -top-2.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-brand px-[3px] text-[9px] font-bold leading-none text-white ring-2 ring-brand-50">
+            {quantity > 99 ? '99+' : quantity}
           </span>
         ) : null}
       </span>

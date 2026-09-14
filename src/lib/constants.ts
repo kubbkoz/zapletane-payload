@@ -14,6 +14,6 @@ export const defaultSort: SortFilterItem = {
 export const sorting: SortFilterItem[] = [
   defaultSort,
   { slug: '-createdAt', reverse: true, title: 'Najnovšie' },
-  { slug: 'priceInUSD', reverse: false, title: 'Cena: od najnižšej' }, // asc
-  { slug: '-priceInUSD', reverse: true, title: 'Cena: od najvyššej' },
+  { slug: 'priceInEUR', reverse: false, title: 'Cena: od najnižšej' }, // asc
+  { slug: '-priceInEUR', reverse: true, title: 'Cena: od najvyššej' },
 ]

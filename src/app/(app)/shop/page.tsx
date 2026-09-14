@@ -36,7 +36,7 @@ export default async function ShopPage({ searchParams }: Props) {
       slug: true,
       gallery: true,
       categories: true,
-      priceInUSD: true,
+      priceInEUR: true,
       inventory: true,
       enableVariants: true,
     },

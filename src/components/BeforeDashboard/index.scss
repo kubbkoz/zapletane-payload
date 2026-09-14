@@ -1,24 +1,163 @@
-@import '@payloadcms/ui/scss';
+/* ZAPLETANE welcome card — dashboard.
+   Uses only the theme variables defined in src/app/(payload)/custom.scss, so
+   both the light and the black theme are handled by the same rules.
+   `--base` is Payload's own spacing unit (≈20px), exposed as a CSS variable in
+   @payloadcms/ui/dist/scss/app.scss — no Sass helpers needed here. */
 
 .dashboard .before-dashboard {
-  margin-bottom: base(1.5);
+  margin-bottom: calc(var(--base) * 1.5);
 
-  &__banner {
-    & h4 {
-      margin: 0;
+  &__card {
+    background: var(--zap-card-bg);
+    border: 1px solid var(--zap-card-border);
+    border-radius: var(--style-radius-m);
+    padding: calc(var(--base) * 1.2);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--base) * 0.9);
+    /* Warm brand wash across the top edge, subtle in both themes. */
+    background-image: linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--zap-action) 8%, transparent) 0%,
+      transparent 55%
+    );
+  }
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__eyebrow {
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--zap-action);
+  }
+
+  &__title {
+    font-family: var(--zap-font-display);
+    font-weight: 500;
+    font-style: normal;
+    letter-spacing: -0.02em;
+    font-size: 22px;
+    line-height: 1.25;
+    margin: 0;
+    color: var(--theme-elevation-1000);
+  }
+
+  &__lead {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--theme-elevation-600);
+  }
+
+  &__links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: calc(var(--base) * 0.5);
+
+    @media (max-width: 1024px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 768px) {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  &__instructions {
-    list-style: decimal;
-    margin-bottom: base(0.5);
+  &__link {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    text-decoration: none;
+    border: 1px solid var(--theme-border-color);
+    border-radius: var(--style-radius-m);
+    /* One step off the card so the tiles read as distinct in both themes:
+       cream on a white card in light, ground on a raised card in dark. */
+    background: var(--theme-bg);
+    color: var(--theme-text);
+    transition:
+      border-color 0.1s cubic-bezier(0, 0.2, 0.2, 1),
+      background 0.1s cubic-bezier(0, 0.2, 0.2, 1);
 
-    & li {
-      width: 100%;
+    &:hover,
+    &:focus-visible {
+      border-color: var(--zap-action);
+      background: var(--zap-card-tint);
+      opacity: 1;
+      text-decoration: none;
+    }
+
+    &:hover .before-dashboard__link-arrow,
+    &:focus-visible .before-dashboard__link-arrow {
+      opacity: 1;
+      transform: translate(1px, -1px);
     }
   }
 
-  & a:hover {
-    opacity: 0.85;
+  &__link-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--style-radius-s);
+    background: var(--zap-card-tint);
+    color: var(--zap-action);
+  }
+
+  &__link-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex-grow: 1;
+  }
+
+  &__link-label {
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  &__link-description {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--theme-elevation-500);
+  }
+
+  &__link-arrow {
+    flex-shrink: 0;
+    margin-top: 6px;
+    color: var(--theme-elevation-400);
+    opacity: 0.6;
+    transition:
+      opacity 0.1s cubic-bezier(0, 0.2, 0.2, 1),
+      transform 0.1s cubic-bezier(0, 0.2, 0.2, 1);
+  }
+
+  &__footnote {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--theme-elevation-500);
+
+    a {
+      color: var(--zap-action);
+      text-decoration: none;
+
+      &:hover,
+      &:focus-visible {
+        text-decoration: underline;
+      }
+    }
   }
 }

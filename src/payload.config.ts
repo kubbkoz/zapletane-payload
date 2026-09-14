@@ -74,13 +74,34 @@ const databaseAdapter = postgresURL
 export default buildConfig({
   admin: {
     components: {
-      // The `BeforeLogin` component renders a message that you see while logging into your admin panel.
-      // Feel free to delete this at any time. Simply remove the line below and the import `BeforeLogin` statement on line 15.
+      // Slovak intro above the login form.
       beforeLogin: ['@/components/BeforeLogin#BeforeLogin'],
-      // The `BeforeDashboard` component renders the 'welcome' block that you see after logging into your admin panel.
-      // Feel free to delete this at any time. Simply remove the line below and the import `BeforeDashboard` statement on line 15.
+      // ZAPLETANE welcome card with quick links, above the dashboard.
       beforeDashboard: ['@/components/BeforeDashboard#BeforeDashboard'],
+      graphics: {
+        // ZAPLETANE mark in the nav / step-nav "home" link (18×18 box).
+        Icon: '@/components/admin/Icon#Icon',
+        // ZAPLETANE wordmark on the login screen, replacing the Payload logo.
+        Logo: '@/components/admin/Logo#Logo',
+      },
+      // Pulls the self-hosted @fontsource CSS (DM Sans + Unbounded) into the
+      // admin bundle. RootLayout renders providers around every admin view,
+      // login included — the `(payload)` route group never loads the
+      // storefront's globals.css, so this is the only place the admin gets the
+      // brand webfonts. See src/components/admin/BrandFonts.
+      providers: ['@/components/admin/BrandFonts#BrandFonts'],
     },
+    meta: {
+      icons: [{ rel: 'icon', type: 'image/svg+xml', url: '/favicon.svg' }],
+      // Payload joins title + suffix with a space (`${title} ${suffix}`), so no
+      // leading space here — renders as e.g. "Dashboard · ZAPLETANE admin".
+      titleSuffix: '· ZAPLETANE admin',
+    },
+    // Both themes are branded in src/app/(payload)/custom.scss, so leave the
+    // built-in light/dark switch in the account settings available to users.
+    // ('all' is also the Payload default — stated explicitly so it is not
+    // narrowed by accident.)
+    theme: 'all',
     user: Users.slug,
   },
   collections: [Users, Pages, Categories, Media],

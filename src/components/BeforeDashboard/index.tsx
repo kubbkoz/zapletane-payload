@@ -1,84 +1,93 @@
-import { Banner } from '@payloadcms/ui'
+import { ArrowUpRight, ExternalLink, Package, Settings2, ShoppingBag } from 'lucide-react'
 import React from 'react'
 
-import { SeedButton } from './SeedButton'
 import './index.scss'
 
 const baseClass = 'before-dashboard'
 
+/**
+ * ZAPLETANE welcome card, rendered above the dashboard
+ * (`admin.components.beforeDashboard`).
+ *
+ * Replaces the Payload ecommerce-template banner (seed button + English
+ * getting-started links). Styling is driven entirely by the theme variables set
+ * in src/app/(payload)/custom.scss, so it follows the light/black theme switch
+ * without any per-theme markup.
+ *
+ * Note: src/components/BeforeDashboard/SeedButton is intentionally left on disk
+ * but no longer rendered — the template's demo seed is not ZAPLETANE content.
+ * The POST /next/seed route it called still exists if it is ever needed.
+ */
+
+type QuickLink = {
+  description: string
+  href: string
+  Icon: typeof Package
+  label: string
+}
+
+const quickLinks: QuickLink[] = [
+  {
+    description: 'Katalóg, ceny, varianty a fotografie',
+    href: '/admin/collections/products',
+    Icon: Package,
+    label: 'Produkty',
+  },
+  {
+    description: 'Prehľad objednávok a ich stav',
+    href: '/admin/collections/orders',
+    Icon: ShoppingBag,
+    label: 'Objednávky',
+  },
+  {
+    description: 'Doprava, kontakty a texty webu',
+    href: '/admin/globals/site-settings',
+    Icon: Settings2,
+    label: 'Nastavenia webu',
+  },
+]
+
 export const BeforeDashboard: React.FC = () => {
   return (
     <div className={baseClass}>
-      <Banner className={`${baseClass}__banner`} type="success">
-        <h4>Welcome to your dashboard!</h4>
-      </Banner>
-      Here&apos;s what to do next:
-      <ul className={`${baseClass}__instructions`}>
-        <li>
-          <SeedButton />
-          {' with a few products and pages to jump-start your new project, then '}
+      <div className={`${baseClass}__card`}>
+        <div className={`${baseClass}__intro`}>
+          <span className={`${baseClass}__eyebrow`}>Administrácia</span>
+          <h2 className={`${baseClass}__title`}>Vitajte v administrácii ZAPLETANE</h2>
+          <p className={`${baseClass}__lead`}>
+            Spravujte katalóg, objednávky a obsah webu na jednom mieste. Začnite jedným z rýchlych
+            odkazov nižšie.
+          </p>
+        </div>
+
+        <nav aria-label="Rýchle odkazy" className={`${baseClass}__links`}>
+          {quickLinks.map(({ description, href, Icon, label }) => (
+            <a className={`${baseClass}__link`} href={href} key={href}>
+              <span className={`${baseClass}__link-icon`}>
+                <Icon aria-hidden="true" size={18} strokeWidth={1.75} />
+              </span>
+              <span className={`${baseClass}__link-body`}>
+                <span className={`${baseClass}__link-label`}>{label}</span>
+                <span className={`${baseClass}__link-description`}>{description}</span>
+              </span>
+              <ArrowUpRight
+                aria-hidden="true"
+                className={`${baseClass}__link-arrow`}
+                size={16}
+                strokeWidth={1.75}
+              />
+            </a>
+          ))}
+        </nav>
+
+        <p className={`${baseClass}__footnote`}>
+          <ExternalLink aria-hidden="true" size={14} strokeWidth={1.75} />
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/">visit your website</a>
-          {' to see the results.'}
-        </li>
-        <li>
-          {'Head over to '}
-          <a
-            href="https://dashboard.stripe.com/test/apikeys"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Stripe to obtain your API Keys
+          <a href="/" rel="noopener noreferrer" target="_blank">
+            Otvoriť web v novom okne
           </a>
-          {
-            '. Create a new account if needed, then copy them into your environment variables and restart your server. See the '
-          }
-          <a
-            href="https://github.com/payloadcms/payload/blob/3.x/templates/ecommerce/README.md#stripe"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            README
-          </a>
-          {' for more details.'}
-        </li>
-        <li>
-          {'Modify your '}
-          <a
-            href="https://payloadcms.com/docs/configuration/collections"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            collections
-          </a>
-          {' and add more '}
-          <a
-            href="https://payloadcms.com/docs/fields/overview"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            fields
-          </a>
-          {' as needed. If you are new to Payload, we also recommend you check out the '}
-          <a
-            href="https://payloadcms.com/docs/getting-started/what-is-payload"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Getting Started
-          </a>
-          {' docs.'}
-        </li>
-      </ul>
-      {'Pro Tip: This block is a '}
-      <a
-        href="https://payloadcms.com/docs/admin/components#base-component-overrides"
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        custom component
-      </a>
-      , you can remove it at any time by updating your <strong>payload.config</strong>.
+        </p>
+      </div>
     </div>
   )
 }

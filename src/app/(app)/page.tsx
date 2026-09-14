@@ -30,7 +30,7 @@ const CARD_SELECT = {
   title: true,
   slug: true,
   gallery: true,
-  priceInUSD: true,
+  priceInEUR: true,
   inventory: true,
   enableVariants: true,
 } as const
@@ -38,7 +38,7 @@ const CARD_SELECT = {
 const TABS: { key: string; label: string; sort: string }[] = [
   { key: 'new', label: 'Nové', sort: '-createdAt' },
   { key: 'all', label: 'Celá ponuka', sort: 'title' },
-  { key: 'value', label: 'Najvýhodnejšie', sort: 'priceInUSD' },
+  { key: 'value', label: 'Najvýhodnejšie', sort: 'priceInEUR' },
 ]
 
 async function queryProducts(sort: string): Promise<Partial<Product>[]> {

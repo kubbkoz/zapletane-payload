@@ -3,6 +3,11 @@ import { EcommerceProvider } from '@payloadcms/plugin-ecommerce/client/react'
 import { stripeAdapterClient } from '@payloadcms/plugin-ecommerce/payments/stripe'
 import React from 'react'
 
+// Mirror of the plugin's EUR currency constant (src/plugins/index.ts). Inlined
+// rather than imported from '@payloadcms/plugin-ecommerce' — that is the server
+// entry and must not be pulled into the client bundle.
+const EUR = { code: 'EUR', decimals: 2, label: 'Euro', symbol: '€' }
+
 import { HeaderThemeProvider } from './HeaderTheme'
 import { ThemeProvider } from './Theme'
 import { SonnerProvider } from '@/providers/Sonner'
@@ -17,6 +22,10 @@ export const Providers: React.FC<{
           <SonnerProvider />
           <EcommerceProvider
             enableVariants={true}
+            currenciesConfig={{
+              defaultCurrency: 'EUR',
+              supportedCurrencies: [EUR],
+            }}
             api={{
               cartsFetchQuery: {
                 depth: 2,
