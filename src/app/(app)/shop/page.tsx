@@ -1,4 +1,7 @@
 import { ProductGridItem } from '@/components/ProductGridItem'
+import { ActiveFilterChips } from '@/components/shop-filters/ActiveFilterChips'
+import { getCategoryOptions } from '@/components/shop-filters/data'
+import { hasActiveFilters, parseShopFilters, shopFiltersToWhere } from '@/components/shop-filters/filterParams'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import Link from 'next/link'
@@ -24,69 +27,70 @@ function productCountLabel(count: number): string {
 }
 
 export default async function ShopPage({ searchParams }: Props) {
-  const { q: searchValue, sort, category } = await searchParams
+  const rawSearchParams = await searchParams
+  const { q: searchValue, sort } = rawSearchParams
+  const filters = parseShopFilters(rawSearchParams)
+  const hasCustomFilters = hasActiveFilters(filters)
+
   const payload = await getPayload({ config: configPromise })
 
-  const products = await payload.find({
-    collection: 'products',
-    draft: false,
-    overrideAccess: false,
-    select: {
-      title: true,
-      slug: true,
-      gallery: true,
-      categories: true,
-      priceInEUR: true,
-      inventory: true,
-      enableVariants: true,
-    },
-    ...(sort ? { sort } : { sort: 'title' }),
-    ...(searchValue || category
-      ? {
-          where: {
-            and: [
-              {
-                _status: {
-                  equals: 'published',
+  const [products, categoryOptions] = await Promise.all([
+    payload.find({
+      collection: 'products',
+      draft: false,
+      overrideAccess: false,
+      select: {
+        title: true,
+        slug: true,
+        gallery: true,
+        categories: true,
+        priceInEUR: true,
+        inventory: true,
+        enableVariants: true,
+      },
+      ...(sort ? { sort } : { sort: 'title' }),
+      ...(searchValue || hasCustomFilters
+        ? {
+            where: {
+              and: [
+                {
+                  _status: {
+                    equals: 'published',
+                  },
                 },
-              },
-              ...(searchValue
-                ? [
-                    {
-                      or: [
-                        {
-                          title: {
-                            like: searchValue,
+                ...(searchValue
+                  ? [
+                      {
+                        or: [
+                          {
+                            title: {
+                              like: searchValue,
+                            },
                           },
-                        },
-                        {
-                          description: {
-                            like: searchValue,
+                          {
+                            description: {
+                              like: searchValue,
+                            },
                           },
-                        },
-                      ],
-                    },
-                  ]
-                : []),
-              ...(category
-                ? [
-                    {
-                      categories: {
-                        contains: category,
+                        ],
                       },
-                    },
-                  ]
-                : []),
-            ],
-          },
-        }
-      : {}),
-  })
+                    ]
+                  : []),
+                ...shopFiltersToWhere(filters),
+              ],
+            },
+          }
+        : {}),
+    }),
+    getCategoryOptions(),
+  ])
 
   const hasResults = products?.docs.length > 0
 
   return (
     <div>
+      <ActiveFilterChips categories={categoryOptions} />
+
       {searchValue ? (
         <p className="mb-8 font-sans text-[13px] text-gray-600">
           {hasResults
@@ -116,11 +120,11 @@ export default async function ShopPage({ searchParams }: Props) {
             Zatiaľ tu nič nie je
           </h2>
           <p className="mt-3 max-w-[420px] text-[13.5px] leading-[1.7] text-gray-700">
-            {searchValue || category
+            {searchValue || hasCustomFilters
               ? 'Skúste iné hľadanie alebo zrušte filtre — ponuku neustále dopĺňame o nové ručne pletené a prútené kúsky.'
               : 'Ponuku práve pripravujeme. Onedlho tu nájdete ručne pletené deky, hračky aj prútené dekorácie.'}
           </p>
-          {(searchValue || category) && (
+          {(searchValue || hasCustomFilters) && (
             <Link className="btn-primary mt-8" href="/shop">
               Zobraziť všetko
             </Link>

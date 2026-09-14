@@ -14,6 +14,7 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { OrderStatus } from '@/components/OrderStatus'
 import { AddressItem } from '@/components/addresses/AddressItem'
+import { OrderPaymentInstructions } from '@/components/checkout/OrderPaymentInstructions'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,6 +84,12 @@ export default async function Order({ params, searchParams }: PageProps) {
         createdAt: true,
         updatedAt: true,
         shippingAddress: true,
+        // W1 — doprava a platba: the fee breakdown behind `amount`, plus the
+        // payment type that decides which instructions the shopper gets.
+        shippingMethod: true,
+        paymentType: true,
+        shippingFee: true,
+        codFee: true,
       },
     })
 
@@ -133,6 +140,10 @@ export default async function Order({ params, searchParams }: PageProps) {
         <h1 className="rounded-default bg-brand-100 px-3 py-1.5 font-sans text-xs font-bold uppercase tracking-[0.15em] text-brand">
           {`Objednávka #${order.id}`}
         </h1>
+      </div>
+
+      <div className="mb-6">
+        <OrderPaymentInstructions order={order} />
       </div>
 
       <div className="flex flex-col gap-10 rounded-default border border-gray-100 bg-white p-6 shadow-sm md:p-8">
@@ -204,6 +215,44 @@ export default async function Order({ params, searchParams }: PageProps) {
                 )
               })}
             </ul>
+          </div>
+        )}
+
+        {(order.shippingFee || order.codFee || order.shippingMethod) && (
+          <div className="border-t border-gray-100 pt-8">
+            <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Doprava a platba
+            </h2>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <span className="font-sans text-[13px] text-gray-600">
+                  {typeof order.shippingMethod === 'object' && order.shippingMethod
+                    ? `Doprava — ${order.shippingMethod.title}`
+                    : 'Doprava'}
+                </span>
+                <Price
+                  amount={order.shippingFee ?? 0}
+                  as="span"
+                  currencyCode={order.currency ?? undefined}
+                  className="font-sans text-sm font-bold text-black"
+                />
+              </div>
+
+              {Boolean(order.codFee) && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-sans text-[13px] text-gray-600">
+                    {order.paymentType === 'cod' ? 'Dobierka' : 'Poplatok za platbu'}
+                  </span>
+                  <Price
+                    amount={order.codFee ?? 0}
+                    as="span"
+                    currencyCode={order.currency ?? undefined}
+                    className="font-sans text-sm font-bold text-black"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
 

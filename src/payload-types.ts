@@ -77,6 +77,8 @@ export interface Config {
     pages: Page;
     categories: Category;
     media: Media;
+    'shipping-methods': ShippingMethod;
+    'payment-methods': PaymentMethod;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -111,6 +113,8 @@ export interface Config {
     pages: PagesSelect<false> | PagesSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'shipping-methods': ShippingMethodsSelect<false> | ShippingMethodsSelect<true>;
+    'payment-methods': PaymentMethodsSelect<false> | PaymentMethodsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -279,6 +283,22 @@ export interface Order {
   amount?: number | null;
   currency?: 'EUR' | null;
   accessToken?: string | null;
+  /**
+   * Spôsob doručenia zvolený v pokladni.
+   */
+  shippingMethod?: (number | null) | ShippingMethod;
+  /**
+   * Určuje, aké pokyny sa zákazníkovi zobrazia po objednaní.
+   */
+  paymentType?: ('cod' | 'bankTransfer' | 'card') | null;
+  /**
+   * V eurocentoch. Je už započítaný v celkovej sume.
+   */
+  shippingFee?: number | null;
+  /**
+   * V eurocentoch. Je už započítaný v celkovej sume.
+   */
+  codFee?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -922,7 +942,39 @@ export interface Transaction {
         id?: string | null;
       }[]
     | null;
-  paymentMethod?: 'stripe' | null;
+  paymentMethod?: ('manual' | 'comgate' | 'stripe') | null;
+  manual?: {
+    paymentType?: string | null;
+    shippingMethodID?: string | null;
+    shippingFee?: number | null;
+    codFee?: number | null;
+    shippingAddressSnapshot?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+  };
+  comgate?: {
+    transId?: string | null;
+    refId?: string | null;
+    paymentType?: string | null;
+    shippingMethodID?: string | null;
+    shippingFee?: number | null;
+    codFee?: number | null;
+    shippingAddressSnapshot?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+  };
   stripe?: {
     customerID?: string | null;
     paymentIntentID?: string | null;
@@ -970,6 +1022,42 @@ export interface Cart {
   status?: ('active' | 'purchased' | 'abandoned') | null;
   subtotal?: number | null;
   currency?: 'EUR' | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Spôsoby doručenia ponúkané v pokladni. Cena je v eurocentoch (4.90 € = 490). Vypnutý spôsob sa v pokladni nezobrazí.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "shipping-methods".
+ */
+export interface ShippingMethod {
+  id: number;
+  /**
+   * Napr. „Kuriér“ alebo „Osobný odber“.
+   */
+  title: string;
+  /**
+   * Krátky doplňujúci text pod názvom v pokladni.
+   */
+  description?: string | null;
+  /**
+   * 490 = 4,90 €. Nula = doprava zadarmo.
+   */
+  price: number;
+  type: 'courier' | 'pickupPoint' | 'personal';
+  /**
+   * Napr. „2–4 dni“. Zobrazí sa pri výbere dopravy.
+   */
+  deliveryEstimate?: string | null;
+  /**
+   * Vypnutý spôsob dopravy sa zákazníkom v pokladni nezobrazí.
+   */
+  enabled?: boolean | null;
+  /**
+   * Nižšie číslo = vyššie v zozname.
+   */
+  sortOrder?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1031,6 +1119,63 @@ export interface Address {
     | 'SE'
     | 'CH';
   phone?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Spôsoby platby ponúkané v pokladni. Príplatok je v eurocentoch (1.50 € = 150). Vypnutý spôsob sa v pokladni nezobrazí.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payment-methods".
+ */
+export interface PaymentMethod {
+  id: number;
+  /**
+   * Napr. „Dobierka“ alebo „Bankový prevod“.
+   */
+  title: string;
+  /**
+   * Dobierka a prevod vytvoria objednávku bez online platby. Karta presmeruje na platobnú bránu.
+   */
+  type: 'cod' | 'bankTransfer' | 'card';
+  /**
+   * 150 = 1,50 €. Typicky poplatok za dobierku.
+   */
+  surcharge: number;
+  /**
+   * Použije sa len pri type „Platba kartou“. Comgate vyžaduje COMGATE_MERCHANT/COMGATE_SECRET, Stripe svoje STRIPE_* premenné.
+   */
+  gateway?: ('comgate' | 'stripe') | null;
+  /**
+   * Krátky doplňujúci text pod názvom v pokladni.
+   */
+  description?: string | null;
+  /**
+   * Zobrazí sa zákazníkovi na potvrdení objednávky — pri bankovom prevode sem patria platobné pokyny (IBAN a variabilný symbol sa doplnia automaticky z Nastavení webu).
+   */
+  instructions?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Vypnutý spôsob platby sa zákazníkom v pokladni nezobrazí.
+   */
+  enabled?: boolean | null;
+  /**
+   * Nižšie číslo = vyššie v zozname.
+   */
+  sortOrder?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1197,6 +1342,42 @@ export interface PayloadMcpApiKey {
      */
     delete?: boolean | null;
   };
+  shippingMethods?: {
+    /**
+     * Allow clients to find shipping-methods.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create shipping-methods.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update shipping-methods.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete shipping-methods.
+     */
+    delete?: boolean | null;
+  };
+  paymentMethods?: {
+    /**
+     * Allow clients to find payment-methods.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create payment-methods.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update payment-methods.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete payment-methods.
+     */
+    delete?: boolean | null;
+  };
   orders?: {
     /**
      * Allow clients to find orders.
@@ -1319,6 +1500,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'shipping-methods';
+        value: number | ShippingMethod;
+      } | null)
+    | ({
+        relationTo: 'payment-methods';
+        value: number | PaymentMethod;
       } | null)
     | ({
         relationTo: 'forms';
@@ -1647,6 +1836,37 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "shipping-methods_select".
+ */
+export interface ShippingMethodsSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  price?: T;
+  type?: T;
+  deliveryEstimate?: T;
+  enabled?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payment-methods_select".
+ */
+export interface PaymentMethodsSelect<T extends boolean = true> {
+  title?: T;
+  type?: T;
+  surcharge?: T;
+  gateway?: T;
+  description?: T;
+  instructions?: T;
+  enabled?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "forms_select".
  */
 export interface FormsSelect<T extends boolean = true> {
@@ -1955,6 +2175,10 @@ export interface OrdersSelect<T extends boolean = true> {
   amount?: T;
   currency?: T;
   accessToken?: T;
+  shippingMethod?: T;
+  paymentType?: T;
+  shippingFee?: T;
+  codFee?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1972,6 +2196,26 @@ export interface TransactionsSelect<T extends boolean = true> {
         id?: T;
       };
   paymentMethod?: T;
+  manual?:
+    | T
+    | {
+        paymentType?: T;
+        shippingMethodID?: T;
+        shippingFee?: T;
+        codFee?: T;
+        shippingAddressSnapshot?: T;
+      };
+  comgate?:
+    | T
+    | {
+        transId?: T;
+        refId?: T;
+        paymentType?: T;
+        shippingMethodID?: T;
+        shippingFee?: T;
+        codFee?: T;
+        shippingAddressSnapshot?: T;
+      };
   stripe?:
     | T
     | {
@@ -2060,6 +2304,22 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         delete?: T;
       };
   variantTypes?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  shippingMethods?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  paymentMethods?:
     | T
     | {
         find?: T;
@@ -2234,6 +2494,22 @@ export interface SiteSetting {
     phone?: string | null;
     email?: string | null;
   };
+  /**
+   * Bankové spojenie pre platbu prevodom. Zobrazí sa zákazníkovi na potvrdení objednávky spolu so sumou a variabilným symbolom.
+   */
+  payments?: {
+    bankAccountHolder?: string | null;
+    /**
+     * Napr. SK00 0000 0000 0000 0000 0000. Prázdne = pokyny sa nezobrazia.
+     */
+    iban?: string | null;
+    swift?: string | null;
+    bankName?: string | null;
+    /**
+     * Vysvetlivka pod platobnými údajmi. Samotný variabilný symbol = číslo objednávky, dopĺňa sa automaticky.
+     */
+    variableSymbolNote?: string | null;
+  };
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -2298,6 +2574,15 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         note?: T;
         phone?: T;
         email?: T;
+      };
+  payments?:
+    | T
+    | {
+        bankAccountHolder?: T;
+        iban?: T;
+        swift?: T;
+        bankName?: T;
+        variableSymbolNote?: T;
       };
   updatedAt?: T;
   createdAt?: T;

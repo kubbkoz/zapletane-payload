@@ -19,6 +19,8 @@ import { fileURLToPath } from 'url'
 import { Categories } from '@/collections/Categories'
 import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
+import { PaymentMethods } from '@/collections/PaymentMethods'
+import { ShippingMethods } from '@/collections/ShippingMethods'
 import { Users } from '@/collections/Users'
 import { globalConfigs } from '@/globals'
 import { plugins } from './plugins'
@@ -104,7 +106,7 @@ export default buildConfig({
     theme: 'all',
     user: Users.slug,
   },
-  collections: [Users, Pages, Categories, Media],
+  collections: [Users, Pages, Categories, Media, ShippingMethods, PaymentMethods],
   db: databaseAdapter,
   editor: lexicalEditor({
     features: () => {

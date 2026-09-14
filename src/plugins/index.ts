@@ -9,6 +9,9 @@ import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 
 import { stripeAdapter } from '@payloadcms/plugin-ecommerce/payments/stripe'
 
+import { manualAdapter } from '@/payments/manual'
+import { comgateAdapter } from '@/payments/comgate'
+
 import { Page, Product } from '@/payload-types'
 import { getServerSideURL } from '@/utilities/getURL'
 import { ProductsCollection } from '@/collections/Products'
@@ -150,11 +153,69 @@ export const plugins: Plugin[] = [
               ],
             },
           },
+          // --- Doprava a platba (W1) --------------------------------------
+          // The plugin's order schema knows only about `amount` (the grand
+          // total). These four fields record *how* that total was reached, so
+          // the confirmation page, the admin and any future invoice can break
+          // it down without recomputing anything from the cart.
+          {
+            name: 'shippingMethod',
+            type: 'relationship',
+            relationTo: 'shipping-methods',
+            admin: {
+              position: 'sidebar',
+              description: 'Spôsob doručenia zvolený v pokladni.',
+            },
+            label: 'Spôsob dopravy',
+          },
+          {
+            name: 'paymentType',
+            type: 'select',
+            options: [
+              { label: 'Dobierka', value: 'cod' },
+              { label: 'Bankový prevod', value: 'bankTransfer' },
+              { label: 'Platba kartou', value: 'card' },
+            ],
+            admin: {
+              position: 'sidebar',
+              description: 'Určuje, aké pokyny sa zákazníkovi zobrazia po objednaní.',
+            },
+            label: 'Typ platby',
+          },
+          {
+            name: 'shippingFee',
+            type: 'number',
+            defaultValue: 0,
+            admin: {
+              position: 'sidebar',
+              description: 'V eurocentoch. Je už započítaný v celkovej sume.',
+            },
+            label: 'Poplatok za dopravu',
+          },
+          {
+            name: 'codFee',
+            type: 'number',
+            defaultValue: 0,
+            admin: {
+              position: 'sidebar',
+              description: 'V eurocentoch. Je už započítaný v celkovej sume.',
+            },
+            label: 'Poplatok za dobierku',
+          },
         ],
       }),
     },
     payments: {
       paymentMethods: [
+        // Offline payments (dobierka + bankový prevod). No gateway, no
+        // credentials — the order is created straight from the cart snapshot.
+        // See src/payments/manual.
+        manualAdapter(),
+        // Card payments via Comgate. Always registered so the endpoints exist
+        // and the config type-checks; refuses to initiate without
+        // COMGATE_MERCHANT/COMGATE_SECRET, and the storefront only offers it
+        // when an *enabled* `payment-methods` row of type `card` exists.
+        comgateAdapter(),
         // Dummy fallbacks keep the config importable during `next build` and in
         // environments without real credentials. Real keys are required only to
         // actually process a payment.
@@ -173,7 +234,8 @@ export const plugins: Plugin[] = [
   // Approved scope (project owner sign-off, do not widen without new
   // sign-off — see MCP-PLAN.md):
   //   - full CRUD  : products, categories, pages, media, variants,
-  //                  variantOptions, and every registered global.
+  //                  variantOptions, shipping-methods, payment-methods, and
+  //                  every registered global.
   //   - find+update: orders, transactions, carts, addresses (no create/delete
   //                  — these are financial/checkout records, not
   //                  agent-authored content).
@@ -211,6 +273,16 @@ export const plugins: Plugin[] = [
       },
       variantTypes: {
         description: 'Variant type definitions (e.g. "Color", "Size") that group variant options.',
+        enabled: mcpFullCrud,
+      },
+      'shipping-methods': {
+        description:
+          'Shipping options offered at checkout (title, price in eurocents, type, delivery estimate, enabled, sort order). Shop configuration, agent-editable.',
+        enabled: mcpFullCrud,
+      },
+      'payment-methods': {
+        description:
+          'Payment options offered at checkout (title, type cod/bankTransfer/card, surcharge in eurocents, instructions, enabled, sort order). Shop configuration, agent-editable.',
         enabled: mcpFullCrud,
       },
       orders: {

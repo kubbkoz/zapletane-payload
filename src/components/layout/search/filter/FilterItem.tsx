@@ -41,14 +41,18 @@ function SortFilterItem({ item }: { item: SortFilterItemType }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const active = searchParams.get('sort') === item.slug
-  const q = searchParams.get('q')
-  const href = createUrl(
-    pathname,
-    new URLSearchParams({
-      ...(q && { q }),
-      ...(item.slug && item.slug.length && { sort: item.slug }),
-    }),
-  )
+  // Preserve every other active param (q, category, priceMin/Max,
+  // availability, ...) — only "sort" itself is rewritten, so changing sort
+  // order never drops the filters currently applied.
+  const newParams = new URLSearchParams(searchParams.toString())
+
+  if (item.slug && item.slug.length) {
+    newParams.set('sort', item.slug)
+  } else {
+    newParams.delete('sort')
+  }
+
+  const href = createUrl(pathname, newParams)
   const DynamicTag = active ? 'p' : Link
 
   return (

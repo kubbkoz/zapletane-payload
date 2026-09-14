@@ -1,5 +1,5 @@
-import { Categories } from '@/components/layout/search/Categories'
 import { FilterList } from '@/components/layout/search/filter'
+import { ShopFilters } from '@/components/shop-filters/ShopFilters'
 import { sorting } from '@/lib/constants'
 import { Search } from '@/components/Search'
 import React, { Suspense } from 'react'
@@ -29,7 +29,7 @@ export default function ShopLayout({ children }: { children: React.ReactNode }) 
 
           <div className="mt-12 flex flex-col items-start gap-10 md:flex-row md:gap-12">
             <aside className="flex w-full flex-none flex-col gap-8 md:w-[220px]">
-              <Categories />
+              <ShopFilters />
               <FilterList list={sorting} title="Zoradiť podľa" />
             </aside>
 

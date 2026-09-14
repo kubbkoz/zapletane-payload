@@ -120,5 +120,51 @@ export const SiteSettings: GlobalConfig = {
         },
       ],
     },
+    {
+      name: 'payments',
+      type: 'group',
+      label: 'Platobné údaje',
+      admin: {
+        description:
+          'Bankové spojenie pre platbu prevodom. Zobrazí sa zákazníkovi na potvrdení objednávky spolu so sumou a variabilným symbolom.',
+      },
+      fields: [
+        {
+          name: 'bankAccountHolder',
+          type: 'text',
+          defaultValue: 'ZAPLETANE',
+          label: 'Majiteľ účtu',
+        },
+        {
+          name: 'iban',
+          type: 'text',
+          label: 'IBAN',
+          admin: {
+            description: 'Napr. SK00 0000 0000 0000 0000 0000. Prázdne = pokyny sa nezobrazia.',
+          },
+        },
+        {
+          name: 'swift',
+          type: 'text',
+          label: 'SWIFT / BIC',
+        },
+        {
+          name: 'bankName',
+          type: 'text',
+          label: 'Názov banky',
+        },
+        {
+          name: 'variableSymbolNote',
+          type: 'textarea',
+          defaultValue:
+            'Ako variabilný symbol uveďte číslo objednávky. Tovar expedujeme po pripísaní platby na účet.',
+          label: 'Poznámka k variabilnému symbolu',
+          admin: {
+            description:
+              'Vysvetlivka pod platobnými údajmi. Samotný variabilný symbol = číslo objednávky, dopĺňa sa automaticky.',
+          },
+        },
+      ],
+    },
   ],
 }

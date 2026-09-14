@@ -1,34 +1,29 @@
-import configPromise from '@payload-config'
-import { getPayload } from 'payload'
 import clsx from 'clsx'
 import React, { Suspense } from 'react'
 
-import { CategoryItem } from './Categories.client'
+import { getCategoryOptions } from '@/components/shop-filters/data'
+
+import { CategoryFilterCheckbox } from './Categories.client'
 
 async function CategoryList() {
-  const payload = await getPayload({ config: configPromise })
+  const categories = await getCategoryOptions()
 
-  const categories = await payload.find({
-    collection: 'categories',
-    sort: 'title',
-  })
-
-  if (!categories.docs.length) return null
+  if (!categories.length) return null
 
   return (
-    <nav>
+    <div>
       <h3 className="form-label">Kategórie</h3>
 
-      <ul className="flex flex-col">
-        {categories.docs.map((category) => {
+      <ul className="flex flex-col gap-2.5">
+        {categories.map((category) => {
           return (
             <li key={category.id}>
-              <CategoryItem category={category} />
+              <CategoryFilterCheckbox category={category} />
             </li>
           )
         })}
       </ul>
-    </nav>
+    </div>
   )
 }
 

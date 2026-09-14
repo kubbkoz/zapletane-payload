@@ -6,8 +6,9 @@ import { Logo } from '@/components/Logo'
 import { CONTACT } from '@/lib/contact'
 import { useAuth } from '@/providers/Auth'
 import { cn } from '@/utilities/cn'
-import { BookOpen, ChevronRight, Info, Mail, Phone, User, X } from 'lucide-react'
+import { BookOpen, Facebook, Instagram, Mail, Phone, User, X, Youtube } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -21,19 +22,32 @@ type Props = {
 }
 
 /**
- * Full-screen mobile menu — port of
- * `app/components/layout/navbar/MobileMenu.vue` (DESIGN-SPEC.md §2.1): light
- * theme, slides in from the right, sticky white header with the wordmark and a
- * close button, then quick actions, the nav entries, the blog CTA and the
- * contact block.
+ * Full-screen mobile menu — REDESIGNED presentation (visible refresh, per the
+ * owner's request). Data contract, trigger and portal mechanics are
+ * unchanged from the previous version; only what gets rendered inside the
+ * portal changed:
  *
- * Rendered through a portal for the same reason the original used
- * `<Teleport to="body">`: the <nav> above it carries `gpu-boost`
- * (`transform: translateZ(0)`), which would otherwise make this overlay's
- * `fixed inset-0` resolve against the navbar instead of the viewport.
+ *   1. Top row       Logo + 40×40 bordered close chip
+ *   2. Search        compact SearchBar (mobile's only search entry point —
+ *                     NavIcons hides its own search button below `lg`)
+ *   3. Main nav       large display-type list, numbered, staggered entrance,
+ *                     active route in `text-brand`
+ *   4. Secondary      TopBar's quick links (blog / kontakty / všetko o
+ *                     nákupe / o nás) + account link (mobile's only account
+ *                     entry point — NavIcons hides it below `md`), small
+ *                     uppercase font-tech
+ *   5. Contact        phone + email + social icon-ring row
+ *
+ * Still rendered through a portal for the same reason as before: the <nav>
+ * above it carries `gpu-boost` (`transform: translateZ(0)`), which would
+ * otherwise make this overlay's `fixed inset-0` resolve against the navbar
+ * instead of the viewport. Body scroll-lock is handled by the parent
+ * (`HeaderClient`), which toggles `document.body.style.overflow` whenever
+ * `isMobileMenuOpen` changes.
  */
 export function MobileMenu({ isOpen, navItems, onClose }: Props) {
   const { user } = useAuth()
+  const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -53,141 +67,221 @@ export function MobileMenu({ isOpen, navItems, onClose }: Props) {
 
   if (!mounted) return null
 
+  const items = navItems ?? []
+  // Stagger index shared across the whole content column: nav items get
+  // 0..n-1 (also doubles as their visible "01/02/…" number), the secondary
+  // links row and the contact block each get one slot right after.
+  const secondaryDelayIndex = items.length
+  const contactDelayIndex = items.length + 1
+
   return createPortal(
     <div
       aria-hidden={!isOpen}
-      // Keeps the links out of the tab order while the panel is parked
-      // off-screen (it stays mounted so the slide-in transition can run).
+      // Keeps focus out of the panel while it's parked invisible (it stays
+      // mounted so the fade/stagger transition can run on open + close).
       inert={!isOpen}
       className={cn(
-        'fixed inset-0 z-[120] flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 lg:hidden gpu-boost',
-        isOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full',
+        'fixed inset-0 z-[120] flex h-[100dvh] w-full flex-col overflow-hidden bg-brand-50 lg:hidden',
+        'transition-opacity ease-[var(--ease-out)] motion-reduce:transition-none',
+        isOpen
+          ? 'pointer-events-auto opacity-100 duration-300'
+          : 'pointer-events-none opacity-0 duration-150',
       )}
     >
-      <div className="sticky top-0 z-10 flex h-[var(--navbar-height-unscrolled,72px)] w-full shrink-0 items-center justify-between border-b border-gray-100 bg-white p-6">
+      {/* 1. Top row — wordmark + close chip */}
+      <div className="flex h-[var(--navbar-height-unscrolled,72px)] w-full shrink-0 items-center justify-between border-b border-gray-200 px-6">
         <Logo />
 
         <button
           aria-label="Zatvoriť menu"
-          className="group flex h-10 w-10 items-center justify-center rounded-default bg-gray-100 text-black transition-transform active:scale-95"
+          className="flex h-10 w-10 items-center justify-center rounded-default border border-gray-300 text-black transition-colors duration-200 hover:border-brand hover:text-brand active:scale-95"
           onClick={onClose}
           type="button"
         >
-          <X className="h-6 w-6 transform transition-transform duration-300 group-hover:rotate-90" />
+          <X className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="scrollbar-hide w-full flex-1 overflow-y-auto bg-white p-6 pb-32">
-        <div className="mb-8">
-          <SearchBar className="relative flex w-full" />
-        </div>
+      <div className="scrollbar-hide w-full flex-1 overflow-y-auto px-6 pb-safe pt-8">
+        {/* 2. Search — the only search entry point on mobile widths */}
+        <SearchBar className="relative mb-10 flex w-full" />
 
-        <div className="mb-8 grid grid-cols-2 gap-4">
-          <Link
-            className="group flex shrink-0 flex-col items-center justify-center rounded-default border border-gray-100 bg-gray-50 p-4 transition-transform active:scale-95 gpu-boost"
-            href={user ? '/account' : '/login'}
-            onClick={onClose}
-          >
-            <User
-              className={cn(
-                'mb-2 h-6 w-6 transition-colors group-hover:text-brand',
-                user ? 'text-brand' : 'text-zinc-400',
-              )}
-            />
-            <span className="text-xs font-bold uppercase tracking-wider text-black">
-              {user?.name?.trim().split(/\s+/)[0] || 'Prihlásiť sa'}
-            </span>
-          </Link>
-        </div>
+        {/* 3. Main nav — large display type, numbered, staggered entrance */}
+        {items.length ? (
+          <nav aria-label="Hlavná navigácia" className="mb-10">
+            <div className="flex flex-col">
+              {items.map((item, index) => {
+                const href = navHref(item.link)
+                const isActive = pathname === href || pathname.startsWith(`${href}/`)
 
-        {navItems?.length ? (
-          <div className="mb-8">
-            <h3 className="mb-4 border-b border-zinc-100 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-              Prechádzať kategórie
-            </h3>
-            <div className="space-y-0.5">
-              {navItems.map((item) => (
-                <div
-                  className="border-b border-zinc-50 transition-colors last:border-0 hover:bg-zinc-50/50"
-                  key={item.id}
-                >
-                  <div className="flex items-center justify-between py-4">
+                return (
+                  <RevealItem
+                    className="border-b border-gray-200 last:border-0"
+                    delayIndex={index}
+                    isOpen={isOpen}
+                    key={item.id}
+                  >
                     <Link
-                      className="flex-1 text-left font-tech text-lg font-black uppercase leading-none tracking-wide text-black transition-colors hover:text-brand"
-                      href={navHref(item.link)}
+                      className="group flex w-full items-center gap-4 py-3.5"
+                      href={href}
                       onClick={onClose}
                     >
-                      {item.link?.label}
+                      <span
+                        className={cn(
+                          'font-tech text-xs tabular-nums transition-colors',
+                          isActive ? 'text-brand' : 'text-gray-400 group-hover:text-brand',
+                        )}
+                      >
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <span
+                        className={cn(
+                          'flex-1 font-display text-[clamp(28px,8vw,40px)] font-medium normal-case leading-[1.05] tracking-tight transition-colors',
+                          isActive ? 'text-brand' : 'text-black group-hover:text-brand',
+                        )}
+                      >
+                        {item.link?.label}
+                      </span>
+                      {isActive ? (
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 shrink-0 rounded-full bg-brand"
+                        />
+                      ) : null}
                     </Link>
-                    <ChevronRight className="h-5 w-5 text-zinc-300" />
-                  </div>
-                </div>
-              ))}
+                  </RevealItem>
+                )
+              })}
             </div>
-          </div>
+          </nav>
         ) : null}
 
-        <Link
-          className="group mb-8 flex w-full items-center justify-between rounded-default border border-zinc-100 bg-gray-50 p-4 transition-all active:scale-[0.98] gpu-boost"
-          href="/blog"
-          onClick={onClose}
+        {/* 4. Secondary links — TopBar's quick links + account (mobile-only entry point) */}
+        <RevealItem
+          className="mb-10 border-t border-gray-200 pt-8"
+          delayIndex={secondaryDelayIndex}
+          isOpen={isOpen}
         >
-          <div className="flex items-center">
-            <div className="mr-4 flex h-10 w-10 items-center justify-center bg-brand">
-              <BookOpen className="h-5 w-5 text-white" />
-            </div>
-            <div className="text-left">
-              <span className="mb-1 block font-tech text-lg font-black uppercase leading-none text-black transition-colors group-hover:text-brand">
-                Zapletane Blog
-              </span>
-              <span className="block text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                Novinky, tipy a inšpirácia
-              </span>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 font-tech text-xs font-bold uppercase tracking-widest text-gray-600">
+            <Link
+              className="flex items-center gap-2 transition-colors hover:text-brand"
+              href="/blog"
+              onClick={onClose}
+            >
+              <BookOpen className="h-3.5 w-3.5 text-brand" /> Zapletane Blog
+            </Link>
+            <Link
+              className="transition-colors hover:text-brand"
+              href="/kontakty"
+              onClick={onClose}
+            >
+              Kontakty
+            </Link>
+            <Link
+              className="transition-colors hover:text-brand"
+              href="/vsetko-o-nakupe"
+              onClick={onClose}
+            >
+              Všetko o nákupe
+            </Link>
+            <Link className="transition-colors hover:text-brand" href="/o-nas" onClick={onClose}>
+              O nás
+            </Link>
+            <Link
+              className="flex items-center gap-2 transition-colors hover:text-brand"
+              href={user ? '/account' : '/login'}
+              onClick={onClose}
+            >
+              <User className="h-3.5 w-3.5 text-brand" />
+              {user?.name?.trim().split(/\s+/)[0] || 'Prihlásiť sa'}
+            </Link>
           </div>
-          <ChevronRight className="h-5 w-5 text-zinc-300 transition-all group-hover:translate-x-1 group-hover:text-brand" />
-        </Link>
+        </RevealItem>
 
-        <div className="space-y-4 font-sans text-sm font-bold uppercase tracking-widest text-black">
-          <Link
-            className="flex items-center py-2 transition-colors hover:text-brand"
-            href="/kontakty"
-            onClick={onClose}
-          >
-            <Phone className="mr-3 h-4 w-4 text-brand" /> Kontakty
-          </Link>
-          <Link
-            className="flex items-center py-2 transition-colors hover:text-brand"
-            href="/vsetko-o-nakupe"
-            onClick={onClose}
-          >
-            <Info className="mr-3 h-4 w-4 text-brand" /> Všetko o nákupe
-          </Link>
-          <Link
-            className="flex items-center py-2 transition-colors hover:text-brand"
-            href="/o-nas"
-            onClick={onClose}
-          >
-            <User className="mr-3 h-4 w-4 text-brand" /> O nás
-          </Link>
-
-          <div className="mt-6 space-y-6 border-t border-zinc-100 pt-8">
+        {/* 5. Contact block — phone / email + social icon-ring row */}
+        <RevealItem
+          className="border-t border-gray-200 pb-10 pt-8"
+          delayIndex={contactDelayIndex}
+          isOpen={isOpen}
+        >
+          <div className="mb-6 flex flex-col gap-3">
             <a
-              className="flex items-center py-1 font-tech text-base font-black tracking-wider text-black transition-colors hover:text-brand"
+              className="flex items-center gap-3 font-tech text-lg font-bold text-black transition-colors hover:text-brand"
               href={CONTACT.phone.href}
             >
-              <Phone className="mr-4 h-5 w-5 text-brand" /> {CONTACT.phone.display}
+              <Phone className="h-5 w-5 text-brand" /> {CONTACT.phone.display}
             </a>
             <a
-              className="flex items-center py-1 font-bold text-zinc-600 transition-colors hover:text-brand"
+              className="flex items-center gap-3 text-sm font-medium text-gray-600 transition-colors hover:text-brand"
               href={CONTACT.email.href}
             >
-              <Mail className="mr-4 h-5 w-5 text-brand" /> {CONTACT.email.info}
+              <Mail className="h-5 w-5 text-brand" /> {CONTACT.email.info}
             </a>
           </div>
-        </div>
+
+          <div className="flex items-center gap-3">
+            <a
+              aria-label="Sledujte nás na Facebooku"
+              className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
+              href={CONTACT.social.facebook}
+            >
+              <Facebook className="h-4 w-4" />
+            </a>
+            <a
+              aria-label="Sledujte nás na Instagrame"
+              className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
+              href={CONTACT.social.instagram}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <Instagram className="h-4 w-4" />
+            </a>
+            <a
+              aria-label="Sledujte nás na Youtube"
+              className="icon-ring h-10 w-10 border border-gray-300 text-gray-600 hover:border-brand hover:bg-brand hover:text-white"
+              href={CONTACT.social.youtube}
+            >
+              <Youtube className="h-4 w-4" />
+            </a>
+          </div>
+        </RevealItem>
       </div>
     </div>,
     document.body,
+  )
+}
+
+/**
+ * One stop of the panel's stagger sequence: fades + translates up into place
+ * on open (delay = `delayIndex * 60ms`, per design.md's no-bounce rule —
+ * reuses the `--ease-out` token, the same `cubic-bezier(0.22, 1, 0.36, 1)`
+ * already defined in globals.css), and collapses uniformly (no stagger, no
+ * transform) in a quick 150ms on close. `prefers-reduced-motion` drops the
+ * transform entirely and makes the fade instant.
+ */
+function RevealItem({
+  children,
+  className,
+  delayIndex,
+  isOpen,
+}: {
+  children: React.ReactNode
+  className?: string
+  delayIndex: number
+  isOpen: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'transition-[opacity,transform] ease-[var(--ease-out)] motion-reduce:transition-none motion-reduce:translate-y-0',
+        isOpen
+          ? 'translate-y-0 opacity-100 duration-500'
+          : 'translate-y-4 opacity-0 duration-150',
+        className,
+      )}
+      style={{ transitionDelay: isOpen ? `${delayIndex * 60}ms` : '0ms' }}
+    >
+      {children}
+    </div>
   )
 }
