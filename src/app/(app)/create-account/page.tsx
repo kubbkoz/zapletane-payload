@@ -8,11 +8,18 @@ import React from 'react'
 import { headers as getHeaders } from 'next/headers'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
+import { getSafeRedirect } from 'payload/shared'
 
 import { CreateAccountForm } from '@/components/forms/CreateAccountForm'
+import { OAuthButtons } from '@/components/auth/OAuthButtons'
+import { configuredOAuthProviders } from '@/auth/oauth/providers'
 import { redirect } from 'next/navigation'
 
-export default async function CreateAccount() {
+export default async function CreateAccount({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>
+}) {
   const headers = await getHeaders()
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers })
@@ -20,6 +27,12 @@ export default async function CreateAccount() {
   if (user) {
     redirect(`/account?warning=${encodeURIComponent('Už ste prihlásený.')}`)
   }
+
+  // Registering with a provider and signing in with one are the same flow —
+  // the callback creates the account when the identity is new.
+  const providers = configuredOAuthProviders()
+  const { redirect: redirectParam } = await searchParams
+  const safeRedirect = getSafeRedirect({ fallbackTo: '/account', redirectTo: redirectParam ?? '' })
 
   return (
     <div className="relative overflow-hidden bg-brand-50 py-16 md:py-24">
@@ -45,7 +58,9 @@ export default async function CreateAccount() {
 
         <div className="mx-auto max-w-2xl rounded-default border border-gray-100 bg-white p-8 shadow-panel md:p-12">
           <RenderParams className="mb-6" />
-          <CreateAccountForm />
+          <CreateAccountForm>
+            <OAuthButtons providers={providers} redirect={safeRedirect} />
+          </CreateAccountForm>
         </div>
       </div>
     </div>

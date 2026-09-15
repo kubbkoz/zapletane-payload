@@ -221,6 +221,14 @@ export interface User {
   id: number;
   name?: string | null;
   roles?: ('admin' | 'customer')[] | null;
+  /**
+   * Externý poskytovateľ prihlásenia prepojený s účtom. Prázdne = klasické prihlásenie e-mailom a heslom.
+   */
+  oauthProvider?: ('google' | 'facebook') | null;
+  /**
+   * Stabilný identifikátor účtu u poskytovateľa (Google `sub`, Facebook `id`).
+   */
+  oauthSub?: string | null;
   orders?: {
     docs?: (number | Order)[];
     hasNextPage?: boolean;
@@ -1799,6 +1807,8 @@ export interface PayloadMigration {
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
   roles?: T;
+  oauthProvider?: T;
+  oauthSub?: T;
   orders?: T;
   cart?: T;
   addresses?: T;

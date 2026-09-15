@@ -8,10 +8,17 @@ import React from 'react'
 import { headers as getHeaders } from 'next/headers'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
+import { getSafeRedirect } from 'payload/shared'
 import { LoginForm } from '@/components/forms/LoginForm'
+import { OAuthButtons } from '@/components/auth/OAuthButtons'
+import { configuredOAuthProviders } from '@/auth/oauth/providers'
 import { redirect } from 'next/navigation'
 
-export default async function Login() {
+export default async function Login({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>
+}) {
   const headers = await getHeaders()
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers })
@@ -19,6 +26,12 @@ export default async function Login() {
   if (user) {
     redirect(`/account?warning=${encodeURIComponent('Už ste prihlásený.')}`)
   }
+
+  // Server-side gating: the env vars are read here and only the resulting
+  // booleans reach the component, so no credential can leak into the HTML.
+  const providers = configuredOAuthProviders()
+  const { redirect: redirectParam } = await searchParams
+  const safeRedirect = getSafeRedirect({ fallbackTo: '/account', redirectTo: redirectParam ?? '' })
 
   return (
     <div className="relative overflow-hidden bg-brand-50 py-16 md:py-24">
@@ -49,6 +62,7 @@ export default async function Login() {
 
           <div className="mt-10 rounded-default border border-gray-100 bg-white p-8 shadow-panel md:p-10">
             <RenderParams className="mb-6" />
+            <OAuthButtons providers={providers} redirect={safeRedirect} />
             <LoginForm />
           </div>
         </div>

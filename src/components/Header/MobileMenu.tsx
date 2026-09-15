@@ -20,6 +20,7 @@ import { navHref } from './navHref'
 import { SearchBar } from './SearchBar'
 
 type Props = {
+  searchPlaceholder?: string
   contact?: ResolvedContact
   isOpen: boolean
   navItems: Header['navItems']
@@ -68,8 +69,7 @@ export function MobileMenu({
   navItems,
   onClose,
   secondaryLinks = TOP_BAR_LINKS,
-  socialLinks = SOCIAL_LINKS,
-}: Props) {
+  socialLinks = SOCIAL_LINKS, searchPlaceholder }: Props) {
   const { user } = useAuth()
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
@@ -128,7 +128,7 @@ export function MobileMenu({
 
       <div className="scrollbar-hide w-full flex-1 overflow-y-auto px-6 pb-safe pt-8">
         {/* 2. Search — the only search entry point on mobile widths */}
-        <SearchBar className="relative mb-10 flex w-full" />
+        <SearchBar className="relative mb-10 flex w-full" placeholder={searchPlaceholder} />
 
         {/* 3. Main nav — large display type, numbered, staggered entrance */}
         {items.length ? (

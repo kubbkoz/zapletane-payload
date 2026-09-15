@@ -2,6 +2,7 @@ import { FilterList } from '@/components/layout/search/filter'
 import { ShopFilters } from '@/components/shop-filters/ShopFilters'
 import { sorting } from '@/lib/constants'
 import { Search } from '@/components/Search'
+import { getSiteSettings } from '@/utilities/getSiteSettings'
 import React, { Suspense } from 'react'
 
 /**
@@ -10,7 +11,10 @@ import React, { Suspense } from 'react'
  * search field, then a quiet left filter rail beside the card grid, all on the
  * warm cream page ground.
  */
-export default function ShopLayout({ children }: { children: React.ReactNode }) {
+export default async function ShopLayout({ children }: { children: React.ReactNode }) {
+  const siteSettings = await getSiteSettings()
+  const searchPlaceholder = siteSettings?.search?.placeholder || undefined
+
   return (
     <Suspense fallback={null}>
       <div className="bg-brand-50">
@@ -25,7 +29,7 @@ export default function ShopLayout({ children }: { children: React.ReactNode }) 
             sériách.
           </p>
 
-          <Search className="mt-9 max-w-2xl" />
+          <Search className="mt-9 max-w-2xl" placeholder={searchPlaceholder} />
 
           <div className="mt-12 flex flex-col items-start gap-10 md:flex-row md:gap-12">
             <aside className="flex w-full flex-none flex-col gap-8 md:w-[220px]">

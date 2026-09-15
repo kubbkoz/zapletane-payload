@@ -18,6 +18,7 @@ import { TopBar } from './TopBar'
 type Props = {
   contact: ResolvedContact
   header: Header
+  searchPlaceholder?: string
   socialLinks: SocialLink[]
   topBarLinks: TopBarLink[]
 }
@@ -38,7 +39,7 @@ type Props = {
  * reserves its own space without CLS (169px desktop fallback, as in the
  * original's critical CSS).
  */
-export function HeaderClient({ contact, header, socialLinks, topBarLinks }: Props) {
+export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, topBarLinks }: Props) {
   const navItems = header?.navItems || []
   const pathname = usePathname()
 
@@ -144,7 +145,7 @@ export function HeaderClient({ contact, header, socialLinks, topBarLinks }: Prop
               <div className="flex items-center justify-between gap-8">
                 <Logo />
 
-                <SearchBar inputRef={searchInputRef} />
+                <SearchBar inputRef={searchInputRef} placeholder={searchPlaceholder} />
 
                 <NavIcons
                   isMobileMenuOpen={isMobileMenuOpen}
@@ -161,6 +162,7 @@ export function HeaderClient({ contact, header, socialLinks, topBarLinks }: Prop
         <MobileMenu
           contact={contact}
           isOpen={isMobileMenuOpen}
+          searchPlaceholder={searchPlaceholder}
           navItems={navItems}
           onClose={() => setIsMobileMenuOpen(false)}
           secondaryLinks={topBarLinks}

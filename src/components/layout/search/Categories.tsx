@@ -5,8 +5,16 @@ import { getCategoryOptions } from '@/components/shop-filters/data'
 
 import { CategoryFilterCheckbox } from './Categories.client'
 
-async function CategoryList() {
-  const categories = await getCategoryOptions()
+type Props = {
+  /** Restricts the checkbox list to this subset of category ids — set by
+   * the dynamic filter panel (X4) when a `product-filters` doc of type
+   * "categories" names its own `categories` relationship. Omitted = every
+   * category, the original/default behaviour. */
+  categoryIds?: number[]
+}
+
+async function CategoryList({ categoryIds }: Props) {
+  const categories = await getCategoryOptions(categoryIds)
 
   if (!categories.length) return null
 
@@ -31,7 +39,7 @@ const skeleton = 'mb-3 h-3 w-5/6 animate-pulse rounded-sm'
 const activeAndTitles = 'bg-gray-300'
 const items = 'bg-gray-200'
 
-export function Categories() {
+export function Categories({ categoryIds }: Props) {
   return (
     <Suspense
       fallback={
@@ -44,7 +52,7 @@ export function Categories() {
         </div>
       }
     >
-      <CategoryList />
+      <CategoryList categoryIds={categoryIds} />
     </Suspense>
   )
 }

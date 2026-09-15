@@ -26,7 +26,16 @@ type FormData = {
   passwordConfirm: string
 }
 
-export const CreateAccountForm: React.FC = () => {
+type Props = {
+  /**
+   * Server-rendered slot shown between the heading and the form — the
+   * „Pokračovať cez Google / Facebook" buttons plus their „alebo" divider.
+   * Passed in from the page so the env check stays on the server.
+   */
+  children?: React.ReactNode
+}
+
+export const CreateAccountForm: React.FC<Props> = ({ children }) => {
   const searchParams = useSearchParams()
   const allParams = searchParams.toString() ? `?${searchParams.toString()}` : ''
   const { login } = useAuth()
@@ -88,7 +97,9 @@ export const CreateAccountForm: React.FC = () => {
         </h1>
       </div>
 
-      <form className="mt-8" onSubmit={handleSubmit(onSubmit)} noValidate>
+      {children ? <div className="mt-8">{children}</div> : null}
+
+      <form className={children ? '' : 'mt-8'} onSubmit={handleSubmit(onSubmit)} noValidate>
         {error && (
           <div className={`${errorBannerClassName} mb-6`}>
             <AlertCircle className="mt-0.5 size-4 shrink-0" />

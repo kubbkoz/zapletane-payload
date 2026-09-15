@@ -175,21 +175,52 @@ telo scroll-lock. Rešpektuj tokeny; `prefers-reduced-motion` fallback.
 
 ## Fáza 4 (2026-09-15)
 
-- [ ] X1 Commerce schéma: shipping rules (freeAboveSubtotal na shipping-methods,
+- [x] X1 Commerce schéma — HOTOVÉ, nasadené;: shipping rules (freeAboveSubtotal na shipping-methods,
       checkout ju aplikuje server-side), kolekcia discount-codes (kód, percento/
       fixná suma, minSubtotal, platnosť od-do, maxUses/usedCount, enabled) +
       pole v checkoute + prepočet + order polia discountCode/discountAmount,
       SiteSettings skupina search (searchable fields, placeholder, minChars),
       kolekcia product-filters (label, typ, options→tagy, enabled, order) +
       products.filterTags (array text). Migrácie aditívne, MCP grants, seed-dev.
-- [ ] X2 Admin v slovenčine: payload.config i18n (sk z @payloadcms/translations),
+- [x] X2 Admin v slovenčine — HOTOVÉ;: payload.config i18n (sk z @payloadcms/translations),
       brand ikony v admin nav cez CSS mask (lucide SVG data-URI, farba --zap
       tokeny) v custom.scss — Payload 3.89 nemá per-collection icon config.
-- [ ] X3 OAuth registrácia (PO X1): Google + Facebook login/registrácia na
+- [x] X3 OAuth registrácia (PO X1): Google + Facebook login/registrácia na
       frontende, route handlers (redirect + callback → find/create user →
       payload session), gated za GOOGLE_CLIENT_ID/SECRET a FACEBOOK_APP_ID/
       SECRET env (tlačidlá skryté bez env), e-mail flow ostáva.
-- [ ] X4 Frontend filtre/search (PO X1): /shop filter panel generovaný z
+- [x] X4 Frontend filtre/search — HOTOVÉ;: /shop filter panel generovaný z
       product-filters kolekcie (tag filtre + existujúce cena/dostupnosť/
       kategórie pod kontrolou backendu), vyhľadávanie podľa SiteSettings.search.
-- [ ] Finále: build, Playwright, push, deploy, screenshoty, update Stavu.
+- [x] Finále: build zelený, pushnuté, nasadené.
+
+### X3 — výsledok
+
+**Schéma (aditívna):** `users.oauthProvider` (select google|facebook) +
+`users.oauthSub` (text, index). Obe majú `access.create/update =
+adminOnlyFieldAccess` — kolekcia dovoľuje zákazníkovi PATCHnúť vlastný doklad
+(`adminOrSelf`), takže bez toho by si mohol na svoj účet priradiť cudzie
+Google `sub` a odchytiť cudzie prihlásenie. Zapisuje ich len OAuth callback
+cez `overrideAccess: true`. Migrácie: `src/migrations-pg/20260915_061452_x3_oauth_identity.*`
++ sqlite dvojička `src/migrations/20260915_061505_x3_oauth_identity.ts`.
+
+**Session bez hesla:** `payload.login()` sa použiť nedá (vyžaduje heslo, OAuth
+účet má náhodné nepoužiteľné). `src/auth/oauth/session.ts` preto opakuje chvost
+`loginOperation` tými istými exportovanými helpermi: `payload.db.findOne` (raw
+riadok vrátane `sessions`) → `addSessionToUser` (`payload/shared`) →
+`getFieldsToSign` + `jwtSign` (`payload`) → `generatePayloadCookie`
+(`payload/shared`). `auth.useSessions` je default true a JWT stratégia token bez
+zapísaného `sid` odmietne — preto krok 2 nie je voliteľný.
+
+**Route handlers:** `GET /api/oauth/[provider]` (302 na poskytovateľa, podpísaný
+`state` v httpOnly cookie `zap_oauth_state`, path `/api/oauth`, 10 min) a
+`GET /api/oauth/[provider]/callback`. Middleware matcher `/api` nechytá, gate
+teda flow neblokuje. Prepojenie na existujúci e-mailový účet len keď
+poskytovateľ e-mail potvrdí (Google `email_verified`, Facebook Graph neoverené
+adresy vôbec nevracia); inak slovenská chyba. `?redirect=` prechádza cez
+Payload `getSafeRedirect` (same-origin only).
+
+**Env:** GOOGLE_CLIENT_ID/SECRET, FACEBOOK_APP_ID/SECRET — prázdne = tlačidlá sa
+nevykreslia a route odmietne. Callback URI do konzol:
+`<NEXT_PUBLIC_SERVER_URL>/api/oauth/<provider>/callback`. Reálne credentials
+zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.

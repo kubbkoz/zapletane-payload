@@ -1,6 +1,47 @@
-import type { CollectionConfig } from 'payload'
+import type {
+  CollectionAfterChangeHook,
+  CollectionAfterDeleteHook,
+  CollectionConfig,
+} from 'payload'
+
+import { revalidateTag } from 'next/cache'
 
 import { adminOnly } from '@/access/adminOnly'
+
+/**
+ * Flush the shop's cached filter config (`getShopFilterConfig` in
+ * src/components/shop-filters/data.ts caches under the 'product-filters' tag
+ * with a 60s ceiling) the moment a filter is saved or deleted, so admin edits
+ * show up on /shop immediately instead of after the ceiling. Mirrors the
+ * globals' revalidateGlobalHook pattern; the try/catch covers non-request
+ * scopes (seed scripts, migrations) where revalidateTag throws.
+ */
+const revalidateProductFilters: CollectionAfterChangeHook = ({ doc, req: { context, payload } }) => {
+  if (!context.disableRevalidate) {
+    try {
+      revalidateTag('product-filters', 'max')
+      payload.logger.info('Revalidated product filters')
+    } catch (err) {
+      payload.logger.warn({ err }, 'Could not revalidate the product-filters cache tag')
+    }
+  }
+  return doc
+}
+
+const revalidateProductFiltersOnDelete: CollectionAfterDeleteHook = ({
+  doc,
+  req: { context, payload },
+}) => {
+  if (!context.disableRevalidate) {
+    try {
+      revalidateTag('product-filters', 'max')
+      payload.logger.info('Revalidated product filters (delete)')
+    } catch (err) {
+      payload.logger.warn({ err }, 'Could not revalidate the product-filters cache tag')
+    }
+  }
+  return doc
+}
 
 /**
  * Filtre v obchode — admin-defined filter panels for /shop (X1).
@@ -26,6 +67,10 @@ export const ProductFilters: CollectionConfig = {
     delete: adminOnly,
     read: () => true,
     update: adminOnly,
+  },
+  hooks: {
+    afterChange: [revalidateProductFilters],
+    afterDelete: [revalidateProductFiltersOnDelete],
   },
   admin: {
     defaultColumns: ['label', 'slug', 'type', 'enabled', 'sortOrder'],

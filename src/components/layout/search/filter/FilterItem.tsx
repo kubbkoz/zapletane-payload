@@ -24,6 +24,7 @@ function PathFilterItem({ item }: { item: PathFilterItemType }) {
   const DynamicTag = active ? 'p' : Link
 
   newParams.delete('q')
+  newParams.delete('page')
 
   return (
     <li className="flex" key={item.title}>
@@ -51,6 +52,7 @@ function SortFilterItem({ item }: { item: SortFilterItemType }) {
   } else {
     newParams.delete('sort')
   }
+  newParams.delete('page')
 
   const href = createUrl(pathname, newParams)
   const DynamicTag = active ? 'p' : Link

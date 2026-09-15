@@ -8,7 +8,15 @@ import React, { useState } from 'react'
 type Props = {
   className?: string
   inputRef?: React.RefObject<HTMLInputElement | null>
+  /** SiteSettings.search.placeholder (X4). Optional and currently unused by
+   * any caller — `HeaderClient`/`Header` (out of this component's ownership)
+   * don't fetch or thread it through yet, see the handoff report's follow-up
+   * note. Falls back to the original hard-coded copy either way, so this is
+   * a no-op today and just leaves the prop ready for that wiring. */
+  placeholder?: string
 }
+
+const DEFAULT_PLACEHOLDER = 'Hľadať produkt, kategóriu...'
 
 /**
  * Header search — the input half of the Nuxt `SearchBar.vue` /
@@ -23,7 +31,7 @@ type Props = {
  * layout on every route, and reading search params there would force every
  * otherwise-static page into client-side rendering.
  */
-export function SearchBar({ className, inputRef }: Props) {
+export function SearchBar({ className, inputRef, placeholder }: Props) {
   const router = useRouter()
   const [value, setValue] = useState('')
 
@@ -48,7 +56,7 @@ export function SearchBar({ className, inputRef }: Props) {
           className="w-full rounded-default border border-gray-200 bg-gray-50 py-3.5 pl-5 pr-16 font-sans text-sm tracking-wide text-black shadow-[inset_0_1px_3px_rgba(36,25,23,0.08)] transition-all duration-200 placeholder:text-gray-400 focus:border-brand focus:bg-white focus:shadow-[0_0_0_2px_rgba(117,86,80,1)] focus:outline-none hover:shadow-[0_0_0_1px_rgba(117,86,80,0.4)]"
           name="search"
           onChange={(event) => setValue(event.target.value)}
-          placeholder="Hľadať produkt, kategóriu..."
+          placeholder={placeholder || DEFAULT_PLACEHOLDER}
           ref={inputRef}
           spellCheck={false}
           type="text"

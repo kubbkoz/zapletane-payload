@@ -1,6 +1,7 @@
 import { resolveSocialLinks, resolveTopBarLinks } from '@/lib/navigation'
 import { getContact } from '@/utilities/getContact'
 import { getCachedGlobal } from '@/utilities/getGlobals'
+import { getSiteSettings } from '@/utilities/getSiteSettings'
 
 import './index.css'
 import { HeaderClient } from './index.client'
@@ -19,16 +20,18 @@ import { HeaderClient } from './index.client'
  *                            a single place to change them
  */
 export async function Header() {
-  const [header, footer, contact] = await Promise.all([
+  const [header, footer, contact, siteSettings] = await Promise.all([
     getCachedGlobal('header', 1)(),
     getCachedGlobal('footer', 0)(),
     getContact(),
+    getSiteSettings(),
   ])
 
   return (
     <HeaderClient
       contact={contact}
       header={header}
+      searchPlaceholder={siteSettings?.search?.placeholder ?? undefined}
       socialLinks={resolveSocialLinks(footer)}
       topBarLinks={resolveTopBarLinks(header)}
     />

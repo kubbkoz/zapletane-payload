@@ -1,7 +1,16 @@
+import type { Where } from 'payload'
+
 import { ProductGridItem } from '@/components/ProductGridItem'
 import { ActiveFilterChips } from '@/components/shop-filters/ActiveFilterChips'
-import { getCategoryOptions } from '@/components/shop-filters/data'
-import { hasActiveFilters, parseShopFilters, shopFiltersToWhere } from '@/components/shop-filters/filterParams'
+import { getCategoryOptions, getShopFilterConfig } from '@/components/shop-filters/data'
+import {
+  hasActiveFilters,
+  parsePage,
+  parseShopFilters,
+  shopFiltersToWhere,
+} from '@/components/shop-filters/filterParams'
+import { Pagination } from '@/components/shop-filters/Pagination'
+import { getSiteSettings } from '@/utilities/getSiteSettings'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import Link from 'next/link'
@@ -19,6 +28,10 @@ type Props = {
   searchParams: Promise<SearchParams>
 }
 
+const DEFAULT_MIN_CHARS = 2
+const DEFAULT_RESULTS_PER_PAGE = 12
+const DEFAULT_SEARCH_FIELDS: Array<'title' | 'description' | 'categories'> = ['title', 'description']
+
 /** "1 produkt" / "2–4 produkty" / "5+ produktov" — Slovak plural rules. */
 function productCountLabel(count: number): string {
   if (count === 1) return '1 produkt'
@@ -26,77 +39,123 @@ function productCountLabel(count: number): string {
   return `${count} produktov`
 }
 
+/** "1 znak" / "2–4 znaky" / "5+ znakov" — same Slovak plural shape, for the
+ * minChars hint. */
+function charsLabel(count: number): string {
+  if (count === 1) return '1 znak'
+  if (count >= 2 && count <= 4) return `${count} znaky`
+  return `${count} znakov`
+}
+
 export default async function ShopPage({ searchParams }: Props) {
   const rawSearchParams = await searchParams
   const { q: searchValue, sort } = rawSearchParams
   const filters = parseShopFilters(rawSearchParams)
   const hasCustomFilters = hasActiveFilters(filters)
+  const page = parsePage(rawSearchParams.page)
 
   const payload = await getPayload({ config: configPromise })
 
-  const [products, categoryOptions] = await Promise.all([
-    payload.find({
-      collection: 'products',
-      draft: false,
-      overrideAccess: false,
-      select: {
-        title: true,
-        slug: true,
-        gallery: true,
-        categories: true,
-        priceInEUR: true,
-        inventory: true,
-        enableVariants: true,
-      },
-      ...(sort ? { sort } : { sort: 'title' }),
-      ...(searchValue || hasCustomFilters
-        ? {
-            where: {
-              and: [
-                {
-                  _status: {
-                    equals: 'published',
-                  },
-                },
-                ...(searchValue
-                  ? [
-                      {
-                        or: [
-                          {
-                            title: {
-                              like: searchValue,
-                            },
-                          },
-                          {
-                            description: {
-                              like: searchValue,
-                            },
-                          },
-                        ],
-                      },
-                    ]
-                  : []),
-                ...shopFiltersToWhere(filters),
-              ],
-            },
-          }
-        : {}),
-    }),
+  const [siteSettings, categoryOptions, filterConfig] = await Promise.all([
+    getSiteSettings(),
     getCategoryOptions(),
+    getShopFilterConfig(),
   ])
 
+  // SiteSettings.search (X4) — falls back to the pre-existing behaviour
+  // (2-char minimum, title+description, 12/page) whenever the global has no
+  // explicit value, so an unsaved/failed read never breaks the page.
+  const searchConfig = siteSettings?.search
+  const minChars = searchConfig?.minChars ?? DEFAULT_MIN_CHARS
+  const resultsPerPage = searchConfig?.resultsPerPage ?? DEFAULT_RESULTS_PER_PAGE
+  const searchFields =
+    searchConfig?.searchFields && searchConfig.searchFields.length > 0
+      ? searchConfig.searchFields
+      : DEFAULT_SEARCH_FIELDS
+
+  const rawSearch = Array.isArray(searchValue) ? searchValue[0] : searchValue
+  const trimmedSearch = (rawSearch ?? '').trim()
+  const searchTooShort = trimmedSearch.length > 0 && trimmedSearch.length < minChars
+  // Below minChars: gently ignored server-side — same as no search at all —
+  // rather than run a query that's almost certainly not what the visitor meant.
+  const effectiveSearch = trimmedSearch.length > 0 && !searchTooShort ? trimmedSearch : undefined
+
+  const searchOrClauses: Where[] = []
+  if (effectiveSearch) {
+    if (searchFields.includes('title')) {
+      searchOrClauses.push({ title: { like: effectiveSearch } })
+    }
+    if (searchFields.includes('description')) {
+      searchOrClauses.push({ description: { like: effectiveSearch } })
+    }
+    if (searchFields.includes('categories')) {
+      // Products don't store a category *name* to `like` against — resolve
+      // matching category ids first (cheap, title-only select), then match
+      // products whose `categories` relationship includes one of them.
+      const matchingCategories = await payload.find({
+        collection: 'categories',
+        limit: 50,
+        overrideAccess: false,
+        select: { title: true },
+        where: { title: { like: effectiveSearch } },
+      })
+      const matchingCategoryIds = matchingCategories.docs.map((doc) => doc.id)
+      if (matchingCategoryIds.length > 0) {
+        searchOrClauses.push({ categories: { in: matchingCategoryIds } })
+      }
+    }
+  }
+
+  const products = await payload.find({
+    collection: 'products',
+    draft: false,
+    limit: resultsPerPage,
+    overrideAccess: false,
+    page,
+    select: {
+      title: true,
+      slug: true,
+      gallery: true,
+      categories: true,
+      priceInEUR: true,
+      inventory: true,
+      enableVariants: true,
+    },
+    ...(sort ? { sort } : { sort: 'title' }),
+    ...(searchOrClauses.length > 0 || hasCustomFilters
+      ? {
+          where: {
+            and: [
+              {
+                _status: {
+                  equals: 'published',
+                },
+              },
+              ...(searchOrClauses.length > 0 ? [{ or: searchOrClauses }] : []),
+              ...shopFiltersToWhere(filters),
+            ],
+          },
+        }
+      : {}),
+  })
+
   const hasResults = products?.docs.length > 0
+  const tagFilters = filterConfig.filter((filter) => filter.type === 'tags')
 
   return (
     <div>
-      <ActiveFilterChips categories={categoryOptions} />
+      <ActiveFilterChips categories={categoryOptions} tagFilters={tagFilters} />
 
-      {searchValue ? (
+      {searchTooShort ? (
+        <p className="mb-8 font-sans text-[13px] text-gray-600">
+          Napíšte aspoň {charsLabel(minChars)} na vyhľadávanie.
+        </p>
+      ) : effectiveSearch ? (
         <p className="mb-8 font-sans text-[13px] text-gray-600">
           {hasResults
             ? `Našli sme ${productCountLabel(products.docs.length)} pre `
             : 'Nenašli sme žiadny produkt pre '}
-          <span className="font-bold text-black">&bdquo;{searchValue}&ldquo;</span>
+          <span className="font-bold text-black">&bdquo;{effectiveSearch}&ldquo;</span>
         </p>
       ) : hasResults ? (
         <p className="mb-8 font-sans text-[13px] text-gray-600">
@@ -105,11 +164,15 @@ export default async function ShopPage({ searchParams }: Props) {
       ) : null}
 
       {hasResults ? (
-        <div className="grid grid-cols-2 gap-x-1 gap-y-8 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
-          {products.docs.map((product) => {
-            return <ProductGridItem key={product.id} product={product} />
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-x-1 gap-y-8 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+            {products.docs.map((product) => {
+              return <ProductGridItem key={product.id} product={product} />
+            })}
+          </div>
+
+          <Pagination currentPage={page} searchParams={rawSearchParams} totalPages={products.totalPages} />
+        </>
       ) : (
         /* Empty-DB / no-match state — the storefront still has to read as a shop. */
         <div className="card-editorial flex flex-col items-center px-8 py-16 text-center">

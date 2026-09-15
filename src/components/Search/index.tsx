@@ -8,15 +8,20 @@ import React from 'react'
 
 type Props = {
   className?: string
+  /** SiteSettings.search.placeholder (X4), passed down by `shop/layout.tsx`.
+   * Falls back to the original hard-coded copy when unset — e.g. the global
+   * has never been saved, or its `search` group is empty. */
+  placeholder?: string
 }
+
+const DEFAULT_PLACEHOLDER = 'Hľadať produkt, kategóriu...'
 
 /**
  * Storefront search field — the `form-input-with-icon` shortcut (DESIGN-SPEC
  * §1.4): cream fill, transparent border that turns brand-brown and the fill
  * white on focus, near-square corners, with the glyph riding in the left gutter.
- * Placeholder is the locale's own string ("Hľadať produkt, kategóriu...").
  */
-export const Search: React.FC<Props> = ({ className }) => {
+export const Search: React.FC<Props> = ({ className, placeholder }) => {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -32,6 +37,8 @@ export const Search: React.FC<Props> = ({ className }) => {
     } else {
       newParams.delete('q')
     }
+    // A new search always starts back at page 1.
+    newParams.delete('page')
 
     router.push(createUrl('/shop', newParams))
   }
@@ -48,7 +55,7 @@ export const Search: React.FC<Props> = ({ className }) => {
         id="storefront-search"
         key={searchParams?.get('q')}
         name="search"
-        placeholder="Hľadať produkt, kategóriu..."
+        placeholder={placeholder || DEFAULT_PLACEHOLDER}
         type="text"
       />
       <div className="pointer-events-none absolute left-0 top-0 ml-4 flex h-full items-center text-gray-400">

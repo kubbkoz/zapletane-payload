@@ -9,9 +9,13 @@ import type { AvailabilityValue, ShopFilters } from './filterParams'
 import {
   AVAILABILITY_PARAM,
   CATEGORY_PARAM,
+  PAGE_PARAM,
   PRICE_MAX_PARAM,
   PRICE_MIN_PARAM,
+  TAG_FILTER_PARAM_PREFIX,
   parseShopFilters,
+  searchParamsToInput,
+  tagFilterParamName,
 } from './filterParams'
 
 /**
@@ -29,19 +33,21 @@ export function useShopFilterUrl() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // Parsed from the *whole* query string (not a cherry-picked subset of known
+  // param names) — this is what lets `f_<slug>` tag-filter params parse here
+  // without this hook needing to know which filters the `product-filters`
+  // collection currently defines.
   const filters = useMemo<ShopFilters>(() => {
-    return parseShopFilters({
-      [CATEGORY_PARAM]: searchParams.getAll(CATEGORY_PARAM),
-      [PRICE_MIN_PARAM]: searchParams.get(PRICE_MIN_PARAM) ?? undefined,
-      [PRICE_MAX_PARAM]: searchParams.get(PRICE_MAX_PARAM) ?? undefined,
-      [AVAILABILITY_PARAM]: searchParams.getAll(AVAILABILITY_PARAM),
-    })
+    return parseShopFilters(searchParamsToInput(searchParams))
   }, [searchParams])
 
   const navigate = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
       const params = new URLSearchParams(searchParams.toString())
       mutate(params)
+      // Any facet change can shrink the result set — never leave the visitor
+      // stranded on a page number that no longer exists.
+      params.delete(PAGE_PARAM)
       router.push(createUrl(pathname, params), { scroll: false })
     },
     [pathname, router, searchParams],
@@ -129,15 +135,52 @@ export function useShopFilterUrl() {
     navigate((params) => params.delete(PRICE_MAX_PARAM))
   }, [navigate])
 
-  /** Clears only the custom filters (category/price/availability) — search
-   * text and sort order are deliberately left alone, they have their own
-   * dedicated controls with their own "back to default" affordance. */
+  const writeTagOptions = useCallback((params: URLSearchParams, slug: string, values: string[]) => {
+    const paramName = tagFilterParamName(slug)
+    params.delete(paramName)
+    if (values.length > 0) params.set(paramName, values.join(','))
+  }, [])
+
+  const toggleTagOption = useCallback(
+    (slug: string, value: string) => {
+      const current = filters.tags[slug] ?? []
+      const next = current.includes(value)
+        ? current.filter((existing) => existing !== value)
+        : [...current, value]
+      navigate((params) => writeTagOptions(params, slug, next))
+    },
+    [filters.tags, navigate, writeTagOptions],
+  )
+
+  const removeTagOption = useCallback(
+    (slug: string, value: string) => {
+      const current = filters.tags[slug] ?? []
+      navigate((params) =>
+        writeTagOptions(
+          params,
+          slug,
+          current.filter((existing) => existing !== value),
+        ),
+      )
+    },
+    [filters.tags, navigate, writeTagOptions],
+  )
+
+  /** Clears only the custom filters (category/price/availability/tags) —
+   * search text and sort order are deliberately left alone, they have their
+   * own dedicated controls with their own "back to default" affordance. */
   const clearAllFilters = useCallback(() => {
     navigate((params) => {
       params.delete(CATEGORY_PARAM)
       params.delete(PRICE_MIN_PARAM)
       params.delete(PRICE_MAX_PARAM)
       params.delete(AVAILABILITY_PARAM)
+      // Tag-filter params are dynamically slugged (`f_<slug>`) — collect the
+      // keys first, deleting mid-iteration over a live URLSearchParams can
+      // skip entries.
+      for (const key of Array.from(params.keys())) {
+        if (key.startsWith(TAG_FILTER_PARAM_PREFIX)) params.delete(key)
+      }
     })
   }, [navigate])
 
@@ -145,9 +188,11 @@ export function useShopFilterUrl() {
     filters,
     toggleCategory,
     toggleAvailability,
+    toggleTagOption,
     setPriceRange,
     removeCategory,
     removeAvailability,
+    removeTagOption,
     removePriceMin,
     removePriceMax,
     clearAllFilters,
