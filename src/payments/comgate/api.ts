@@ -1,13 +1,13 @@
 /**
- * Minimal Comgate API v2.0 client.
+ * Minimal Comgate REST API v2.0 client.
  *
- * ⚠️  WRITTEN WITHOUT THE VENDOR DOCS. `apidoc.comgate.cz` (and
- * `payments.comgate.cz` itself) are outside this environment's egress
- * allowlist, so every wire-level detail below is reconstructed from knowledge
- * of the v1.0/v2.0 API and flagged with `// TODO-VERIFY(comgate):`. Check each
- * one against the real documentation before switching the card payment method
- * on — until then the seeded "Platba kartou" row stays `enabled: false` and
- * none of this code can be reached from the storefront.
+ * verified(comgate-docs): every wire-level detail below (base URL, auth
+ * mechanism, request/response field names, status semantics) has been checked
+ * against the official Comgate Claude plugin docs (api-overview.md,
+ * webhooks.md, states.md, error-codes.md, security-checklist.md,
+ * openapi/en_v2.yaml) and confirmed live against `payments.comgate.cz` with
+ * intentionally-invalid credentials — see the per-line notes below for what
+ * each one confirmed or corrected.
  *
  * Secrets: COMGATE_MERCHANT / COMGATE_SECRET are read from the environment and
  * never logged, never returned to the browser, and never written to a document.
@@ -22,13 +22,25 @@ export type ComgateConfig = {
 export type ComgateCreatePaymentArgs = {
   /** Shopper e-mail, forwarded so Comgate can send its own receipt. */
   email?: string
+  /**
+   * Payer's full name. verified(comgate-docs): `fullName` is listed in the
+   * `required` array of the `/v2.0/payment.json` request schema (openapi/en_v2.yaml)
+   * and in api-overview.md's required-fields table — it was missing from our
+   * payload entirely, which this fixes.
+   */
+  fullName: string
   /** Human-readable product label shown on the gateway + the bank statement. */
   label: string
   /** Total in minor units (eurocents). */
   price: number
   /** Our own reference; see the note in createComgatePayment. */
   refId: string
-  /** Absolute URL the shopper's browser returns to. */
+  /**
+   * Absolute URL the shopper's browser returns to. verified(comgate-docs): used
+   * for all three outcome redirects (url_paid/url_cancelled/url_pending) — see
+   * createComgatePayment — since /api/comgate/return already branches on the
+   * real state instead of trusting which URL Comgate picked.
+   */
   returnURL?: string
 }
 
@@ -40,7 +52,23 @@ export type ComgateCreatePaymentResult = {
 /** Comgate's terminal states as pushed to the status URL. */
 export type ComgatePaymentStatus = 'AUTHORIZED' | 'CANCELLED' | 'PAID' | 'PENDING'
 
-// TODO-VERIFY(comgate): base URL and the `.json` suffix convention of API v2.0.
+/** Canonical state of a transaction, as read back from Comgate itself (never from a push body). */
+export type ComgateStatusResult = {
+  /** ISO 4217 currency Comgate actually processed the payment in. */
+  curr: null | string
+  /** Amount in minor units Comgate actually processed, for re-validation against our own transaction. */
+  price: null | number
+  /** Echo of our refId, for cross-checking. */
+  refId: null | string
+  status: ComgatePaymentStatus
+}
+
+// verified(comgate-docs): base URL is `https://payments.comgate.cz` (api-overview.md
+// "Base URL"; openapi/en_v2.yaml `servers[0].url`), versioned under `/v2.0`, and every
+// endpoint path in the OpenAPI spec literally ends in `.json`
+// (`/v2.0/payment.json`, `/v2.0/payment/transId/{transId}.json`, ...). Confirmed live:
+// POST /v2.0/payment.json with bad credentials returned a real (non-404) JSON error —
+// see the smoke-test note on createComgatePayment.
 const COMGATE_API_BASE = 'https://payments.comgate.cz/v2.0'
 
 /**
@@ -67,9 +95,9 @@ export const getComgateConfig = (): ComgateConfig | null => {
 export const isComgateConfigured = (): boolean => getComgateConfig() !== null
 
 /**
- * Comgate accepts a JSON body on v2.0 but historically expected
- * `application/x-www-form-urlencoded` with `merchant`/`secret` inline (v1.0),
- * and answers in kind. This parses whichever came back.
+ * Parses a Comgate response body. v2.0 always answers `application/json`
+ * (verified below); the `application/x-www-form-urlencoded` reader is kept
+ * only as a defensive fallback for the legacy v1.0 shape.
  */
 const parseComgateResponse = (contentType: string, body: string): Record<string, string> => {
   if (contentType.includes('application/json')) {
@@ -83,17 +111,24 @@ const parseComgateResponse = (contentType: string, body: string): Record<string,
     }
   }
 
-  // TODO-VERIFY(comgate): v1.0 answered `code=0&message=OK&transId=..&redirect=..`
-  // as an URL-encoded string. Kept as a fallback in case v2.0 does the same on
-  // some error paths.
+  // verified(comgate-docs): the legacy `code=0&message=OK&transId=..&redirect=..`
+  // urlencoded reply belongs to the deprecated v1.0 HTTP-POST API. REST v2.0 always
+  // answers `application/json` — confirmed both by the create/status response
+  // schemas in openapi/en_v2.yaml and live, where an *error* response (HTTP 400,
+  // invalid credentials) still came back as JSON, not urlencoded. This branch is
+  // dead code for v2.0; kept only as a last-resort fallback so a malformed or
+  // unexpected content-type doesn't throw instead of surfacing `parsed.code`.
   return Object.fromEntries(new URLSearchParams(body).entries())
 }
 
 /**
  * Create a payment and get back the URL to send the shopper to.
  *
- * `prepareOnly: true` means "give me a redirect URL, do not try to process
- * anything server-side" — the standard redirect flow.
+ * verified(comgate-docs): every non-preauth payment already returns a
+ * `redirect` URL to the hosted gateway page — that's just how `/v2.0/payment.json`
+ * works. There is no `prepareOnly` field anywhere in the v2.0 request schema
+ * (openapi/en_v2.yaml properties list), so it was never doing anything and has
+ * been removed rather than kept as an untested guess.
  */
 export const createComgatePayment = async (
   args: ComgateCreatePaymentArgs,
@@ -105,26 +140,37 @@ export const createComgatePayment = async (
   }
 
   const payload = {
-    // TODO-VERIFY(comgate): v2.0 may authenticate purely via HTTP Basic and
-    // reject `merchant`/`secret` in the body. Both are sent for now; drop the
-    // body copies once the docs confirm Basic auth is sufficient.
+    // verified(comgate-docs): v2.0 authenticates purely via the `Authorization: Basic`
+    // header (openapi `parameters` block on POST /v2.0/payment.json + api-overview.md
+    // "Authentication"). `merchant`/`secret` are NOT fields of the JSON body schema at
+    // all, so the former body copies were dropped — the header below is sufficient.
     curr: 'EUR',
     email: args.email,
+    // verified(comgate-docs): `fullName` is a required field (openapi `required` array
+    // + api-overview.md required-fields table) that was missing entirely; now sent.
+    fullName: args.fullName,
     label: args.label.slice(0, 16),
-    merchant: config.merchant,
-    // TODO-VERIFY(comgate): `ALL` = let the shopper pick any enabled method on
-    // the gateway. Narrow this (e.g. `CARD_ALL`) if the contract is card-only.
+    // verified(comgate-docs): `ALL` lets the payer choose any method enabled for this
+    // merchant link at the gateway (api-overview.md; openapi `method` description).
     method: 'ALL',
-    prepareOnly: true,
     price: args.price,
     refId: args.refId,
-    secret: config.secret,
     test: config.test,
-    ...(args.returnURL ? { url_paid: args.returnURL } : {}),
+    // verified(comgate-docs): the gateway redirects the payer to one of three
+    // portal-configured URLs (success/pending/cancelled) unless overridden per-payment
+    // via url_paid/url_cancelled/url_pending (openapi request properties). Our
+    // /api/comgate/return handler already re-derives the real state itself rather than
+    // trusting which outcome URL Comgate happened to use, so all three now point at
+    // it — a Portal default (or a blank one) no longer matters.
+    ...(args.returnURL
+      ? { url_cancelled: args.returnURL, url_paid: args.returnURL, url_pending: args.returnURL }
+      : {}),
   }
 
-  // TODO-VERIFY(comgate): endpoint path (`/payment.json`) and that HTTP Basic
-  // carries merchant:secret.
+  // verified(comgate-docs): endpoint path is `/v2.0/payment.json` (POST) and
+  // `Authorization: Basic base64(merchant:secret)` is both required and sufficient
+  // (openapi `parameters`). Confirmed live against payments.comgate.cz with
+  // intentionally-invalid dummy credentials — see the LIVE SMOKE TEST note below.
   const response = await fetch(`${COMGATE_API_BASE}/payment.json`, {
     body: JSON.stringify(payload),
     headers: {
@@ -138,8 +184,24 @@ export const createComgatePayment = async (
   const rawBody = await response.text()
   const parsed = parseComgateResponse(response.headers.get('content-type') ?? '', rawBody)
 
-  // TODO-VERIFY(comgate): v1.0 signalled success with `code=0`; v2.0 is
-  // expected to use HTTP status codes. Both are treated as authoritative.
+  // verified(comgate-docs): the success response is `code: 0` in a JSON body (the
+  // openapi 201 schema and api-overview.md example both key off `code`, not just HTTP
+  // status), and non-2xx HTTP is also a failure. Checking both is correct and matches
+  // the LIVE SMOKE TEST below, where an auth failure came back as HTTP 400 with
+  // `{"code":1400,"message":"Unauthorized access!"}` — response.ok is false AND
+  // code !== '0', so both branches of this check are exercised by real traffic.
+  //
+  // LIVE SMOKE TEST (2026-09-15, sanitized, no real credentials used):
+  //   POST https://payments.comgate.cz/v2.0/payment.json
+  //   Authorization: Basic base64("invalid-test-merchant:invalid-test-secret")
+  //   Content-Type: application/json, body: {price, curr, label, refId, method,
+  //     email, fullName, test:true}
+  //   -> HTTP/2 400, content-type: application/json; charset=UTF-8
+  //   -> {"code":1400,"message":"Unauthorized access!"}
+  // Confirms: URL/method/content-type are right (a wrong path 404s at the edge
+  // instead of returning a structured Comgate error), the response envelope is
+  // `{code, message, ...}` as documented, and an auth failure surfaces as a
+  // non-2xx HTTP status carrying a non-zero `code` — exactly what this check expects.
   if (!response.ok || (parsed.code && parsed.code !== '0')) {
     throw new Error(
       `Comgate odmietol vytvorenie platby (HTTP ${response.status}${parsed.code ? `, code ${parsed.code}` : ''}).`,
@@ -159,10 +221,15 @@ export const createComgatePayment = async (
 /**
  * Pull the authoritative state of a transaction straight from Comgate.
  *
- * Used to double-check the (unauthenticated, network-visible) browser return —
- * the shopper's redirect proves nothing on its own.
+ * Used both to double-check the (unauthenticated, network-visible) browser
+ * return — the shopper's redirect proves nothing on its own — and, more
+ * importantly, as the mandatory defense-in-depth re-check the status push
+ * handler runs after the secret matches (webhooks.md "Defense in depth";
+ * security-checklist.md). Returns `price`/`curr`/`refId` alongside `status` so
+ * the caller can re-validate the amount actually processed against its own
+ * transaction record, not just trust the state.
  */
-export const fetchComgateStatus = async (transId: string): Promise<ComgatePaymentStatus | null> => {
+export const fetchComgateStatus = async (transId: string): Promise<ComgateStatusResult | null> => {
   const config = getComgateConfig()
 
   if (!config) {
@@ -170,9 +237,10 @@ export const fetchComgateStatus = async (transId: string): Promise<ComgatePaymen
   }
 
   try {
-    // TODO-VERIFY(comgate): status endpoint shape. v1.0 used
-    // `POST /v1.0/status` with merchant/secret/transId; v2.0 is expected to be
-    // a REST-ish GET on the transaction resource.
+    // verified(comgate-docs): status endpoint is `GET /v2.0/payment/transId/{transId}.json`
+    // with the same `Authorization: Basic` header as create (api-overview.md endpoint
+    // cheatsheet; openapi/en_v2.yaml `/v2.0/payment/transId/{transId}.json` `get`). The
+    // legacy `POST /v1.0/status` shape does not apply to v2.0.
     const response = await fetch(
       `${COMGATE_API_BASE}/payment/transId/${encodeURIComponent(transId)}.json`,
       {
@@ -191,13 +259,18 @@ export const fetchComgateStatus = async (transId: string): Promise<ComgatePaymen
       return null
     }
 
-    const status = (parsed.status || '').toUpperCase()
+    const rawStatus = (parsed.status || '').toUpperCase()
+    const status: ComgatePaymentStatus =
+      rawStatus === 'PAID' || rawStatus === 'CANCELLED' || rawStatus === 'AUTHORIZED'
+        ? rawStatus
+        : 'PENDING'
 
-    if (status === 'PAID' || status === 'CANCELLED' || status === 'AUTHORIZED') {
-      return status
+    return {
+      curr: parsed.curr || null,
+      price: parsed.price ? Number(parsed.price) : null,
+      refId: parsed.refId || null,
+      status,
     }
-
-    return 'PENDING'
   } catch {
     return null
   }

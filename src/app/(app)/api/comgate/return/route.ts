@@ -20,10 +20,16 @@ export const dynamic = 'force-dynamic'
  * status push) so the shopper is not left staring at "pending" when the push is
  * merely slow.
  *
- * TODO-VERIFY(comgate): the query parameters Comgate appends on return
- * (`id`/`transId`, `refId`) and whether separate URLs are configured per
- * outcome (paid / pending / cancelled) in the merchant portal rather than one
- * shared return URL.
+ * verified(comgate-docs): the redirect-back URLs receive `transId` and `refId`
+ * as GET params (api-overview.md "Redirect after payment (browser-facing)");
+ * `id` is not a documented param name and is kept only as defensive extra
+ * leniency, never relied on alone. Comgate does support three separate
+ * per-outcome URLs (success/pending/cancelled), configurable either as Portal
+ * defaults or per-payment via url_paid/url_cancelled/url_pending — this
+ * adapter now sends all three as this same route (see createComgatePayment in
+ * src/payments/comgate/api.ts) so every outcome lands here regardless of
+ * Portal configuration, and the branching below (not the URL picked) decides
+ * what the shopper sees.
  */
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
@@ -66,16 +72,16 @@ export async function GET(request: Request): Promise<Response> {
   // The push may not have landed yet. Ask Comgate directly rather than trusting
   // whatever the browser carried back.
   if (!orderID && transId) {
-    const status = await fetchComgateStatus(transId)
+    const canonical = await fetchComgateStatus(transId)
 
-    if (status === 'PAID') {
+    if (canonical?.status === 'PAID') {
       try {
         const { order } = await completeComgateTransaction({ req, transaction })
         orderID = order.id
       } catch (error) {
         payload.logger.error({ err: error }, `[comgate] Return-path completion failed for ${transId}`)
       }
-    } else if (status === 'CANCELLED') {
+    } else if (canonical?.status === 'CANCELLED') {
       return redirect('/checkout?platba=zrusena')
     }
   }

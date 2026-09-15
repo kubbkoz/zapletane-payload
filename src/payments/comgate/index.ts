@@ -34,8 +34,8 @@ import { getServerSideURL } from '@/utilities/getURL'
  * *makes* a payment succeed — it only reports the order the status push already
  * created, so a forged browser request cannot conjure a paid order.
  *
- * Every Comgate wire detail is reconstructed without the vendor docs; see
- * src/payments/comgate/api.ts and the `TODO-VERIFY(comgate)` markers.
+ * Every Comgate wire detail has been checked against the official docs; see
+ * src/payments/comgate/api.ts and the `verified(comgate-docs)` notes there.
  */
 
 export const comgateAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter => {
@@ -189,19 +189,33 @@ export const comgateAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =
         req,
       })
 
-      // TODO-VERIFY(comgate): the brief specifies `refId = orderId`, but with
-      // this plugin the order only exists *after* the payment is confirmed —
-      // creating one up front would leave an abandoned order behind for every
-      // dropped card payment. The transaction ID is our stable reference
-      // instead, and the status push resolves it back. Comgate's refId is also
-      // documented as max 16 chars, which a numeric transaction ID satisfies.
+      // verified(comgate-docs): `refId` is documented as "suitable for entering a
+      // variable symbol or order number... it does not have to be unique"
+      // (api-overview.md / openapi `refId` description) — there's no length limit or
+      // uniqueness requirement on it. (The 1–16 char limit is on `label`, not `refId`;
+      // the earlier version of this comment conflated the two.) With this plugin the
+      // order only exists *after* the payment is confirmed — creating one up front
+      // would leave an abandoned order behind for every dropped card payment — so the
+      // transaction ID is used as our stable reference instead, and the status push
+      // resolves it back to a transaction.
       const refId = String(transaction.id)
+
+      // verified(comgate-docs): `fullName` is a required create-payment field
+      // (openapi `required` array; api-overview.md required-fields table). Built from
+      // the billing address the shopper already typed in, falling back to the email
+      // local part so the field is never empty.
+      const fullName =
+        [billingAddress?.firstName, billingAddress?.lastName]
+          .filter((part): part is string => Boolean(part && part.trim()))
+          .join(' ')
+          .trim() || customerEmail
 
       let created: { redirect: string; transId: string }
 
       try {
         created = await createComgatePayment({
           email: customerEmail,
+          fullName,
           label: `Objednavka ${refId}`,
           price: amount,
           refId,
