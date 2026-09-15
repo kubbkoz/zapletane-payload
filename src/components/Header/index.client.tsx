@@ -162,7 +162,6 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
         <MobileMenu
           contact={contact}
           isOpen={isMobileMenuOpen}
-          searchPlaceholder={searchPlaceholder}
           navItems={navItems}
           onClose={() => setIsMobileMenuOpen(false)}
           secondaryLinks={topBarLinks}

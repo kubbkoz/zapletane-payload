@@ -16,10 +16,8 @@ import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { navHref } from './navHref'
-import { SearchBar } from './SearchBar'
 
 type Props = {
-  searchPlaceholder?: string
   contact?: ResolvedContact
   isOpen: boolean
   navItems: Header['navItems']
@@ -39,16 +37,18 @@ const SECONDARY_ICONS: Record<string, React.ElementType> = { BookOpen, Mail, Pho
  * actually watchable (`z-30` keeps the panel below the `z-50` <nav>, and
  * `--navbar-height-current` pads the panel's content out from under it).
  *
- *   1. Search        compact SearchBar (the menu's search entry point; the
- *                     bottom bar's Hľadať tab opens the fullscreen overlay)
- *   2. Main nav       large display-type list, numbered, staggered entrance,
+ * Search deliberately lives outside this panel (Z1): the bottom bar's „Hľadať"
+ * tab opens the fullscreen `MobileSearchOverlay`, which is the single mobile
+ * search entry point — the menu is navigation only.
+ *
+ *   1. Main nav       large display-type list, numbered, staggered entrance,
  *                     active route in `text-brand`; an item's optional
  *                     `children` (Header global, one level) render indented
  *                     under it in the small uppercase font-tech face
- *   3. Secondary      the TopBar's quick links — the `header` global's
+ *   2. Secondary      the TopBar's quick links — the `header` global's
  *                     `topBar.links` array — + the account link, small
  *                     uppercase font-tech
- *   4. Contact        phone + email + social icon-ring row, from the
+ *   3. Contact        phone + email + social icon-ring row, from the
  *                     `site-settings` and `footer` globals
  *
  * Every CMS value arrives as a prop (this is a client component); each prop
@@ -68,7 +68,8 @@ export function MobileMenu({
   navItems,
   onClose,
   secondaryLinks = TOP_BAR_LINKS,
-  socialLinks = SOCIAL_LINKS, searchPlaceholder }: Props) {
+  socialLinks = SOCIAL_LINKS,
+}: Props) {
   const { user } = useAuth()
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
@@ -117,10 +118,7 @@ export function MobileMenu({
       style={{ paddingTop: 'var(--navbar-height-current, 106px)' }}
     >
       <div className="scrollbar-hide mobile-nav-offset w-full flex-1 overflow-y-auto px-6 pb-safe pt-8">
-        {/* 1. Search — the menu's search entry point */}
-        <SearchBar className="relative mb-10 flex w-full" placeholder={searchPlaceholder} />
-
-        {/* 2. Main nav — large display type, numbered, staggered entrance */}
+        {/* 1. Main nav — large display type, numbered, staggered entrance */}
         {items.length ? (
           <nav aria-label="Hlavná navigácia" className="mb-10">
             <div className="flex flex-col">
@@ -197,7 +195,7 @@ export function MobileMenu({
           </nav>
         ) : null}
 
-        {/* 3. Secondary links — TopBar's quick links + account */}
+        {/* 2. Secondary links — TopBar's quick links + account */}
         <RevealItem
           className="mb-10 border-t border-gray-200 pt-8"
           delayIndex={secondaryDelayIndex}
@@ -233,7 +231,7 @@ export function MobileMenu({
           </div>
         </RevealItem>
 
-        {/* 4. Contact block — phone / email + social icon-ring row */}
+        {/* 3. Contact block — phone / email + social icon-ring row */}
         <RevealItem
           className="border-t border-gray-200 pb-10 pt-8"
           delayIndex={contactDelayIndex}

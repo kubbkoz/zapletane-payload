@@ -1,5 +1,3 @@
-import type { Where } from 'payload'
-
 import { ProductGridItem } from '@/components/ProductGridItem'
 import { ActiveFilterChips } from '@/components/shop-filters/ActiveFilterChips'
 import { getCategoryOptions, getShopFilterConfig } from '@/components/shop-filters/data'
@@ -10,6 +8,7 @@ import {
   shopFiltersToWhere,
 } from '@/components/shop-filters/filterParams'
 import { Pagination } from '@/components/shop-filters/Pagination'
+import { buildProductSearchClauses, resolveSearchConfig } from '@/lib/search'
 import { getSiteSettings } from '@/utilities/getSiteSettings'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
@@ -27,10 +26,6 @@ type SearchParams = { [key: string]: string | string[] | undefined }
 type Props = {
   searchParams: Promise<SearchParams>
 }
-
-const DEFAULT_MIN_CHARS = 2
-const DEFAULT_RESULTS_PER_PAGE = 12
-const DEFAULT_SEARCH_FIELDS: Array<'title' | 'description' | 'categories'> = ['title', 'description']
 
 /** "1 produkt" / "2–4 produkty" / "5+ produktov" — Slovak plural rules. */
 function productCountLabel(count: number): string {
@@ -64,14 +59,10 @@ export default async function ShopPage({ searchParams }: Props) {
 
   // SiteSettings.search (X4) — falls back to the pre-existing behaviour
   // (2-char minimum, title+description, 12/page) whenever the global has no
-  // explicit value, so an unsaved/failed read never breaks the page.
-  const searchConfig = siteSettings?.search
-  const minChars = searchConfig?.minChars ?? DEFAULT_MIN_CHARS
-  const resultsPerPage = searchConfig?.resultsPerPage ?? DEFAULT_RESULTS_PER_PAGE
-  const searchFields =
-    searchConfig?.searchFields && searchConfig.searchFields.length > 0
-      ? searchConfig.searchFields
-      : DEFAULT_SEARCH_FIELDS
+  // explicit value, so an unsaved/failed read never breaks the page. Shared
+  // with /api/search-suggest (Z1) so the overlay's live results and this page
+  // always agree on what "a match" means.
+  const { minChars, resultsPerPage, searchFields } = resolveSearchConfig(siteSettings)
 
   const rawSearch = Array.isArray(searchValue) ? searchValue[0] : searchValue
   const trimmedSearch = (rawSearch ?? '').trim()
@@ -80,31 +71,9 @@ export default async function ShopPage({ searchParams }: Props) {
   // rather than run a query that's almost certainly not what the visitor meant.
   const effectiveSearch = trimmedSearch.length > 0 && !searchTooShort ? trimmedSearch : undefined
 
-  const searchOrClauses: Where[] = []
-  if (effectiveSearch) {
-    if (searchFields.includes('title')) {
-      searchOrClauses.push({ title: { like: effectiveSearch } })
-    }
-    if (searchFields.includes('description')) {
-      searchOrClauses.push({ description: { like: effectiveSearch } })
-    }
-    if (searchFields.includes('categories')) {
-      // Products don't store a category *name* to `like` against — resolve
-      // matching category ids first (cheap, title-only select), then match
-      // products whose `categories` relationship includes one of them.
-      const matchingCategories = await payload.find({
-        collection: 'categories',
-        limit: 50,
-        overrideAccess: false,
-        select: { title: true },
-        where: { title: { like: effectiveSearch } },
-      })
-      const matchingCategoryIds = matchingCategories.docs.map((doc) => doc.id)
-      if (matchingCategoryIds.length > 0) {
-        searchOrClauses.push({ categories: { in: matchingCategoryIds } })
-      }
-    }
-  }
+  const searchOrClauses = effectiveSearch
+    ? await buildProductSearchClauses(payload, effectiveSearch, searchFields)
+    : []
 
   const products = await payload.find({
     collection: 'products',

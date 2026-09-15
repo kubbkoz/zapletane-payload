@@ -15,6 +15,7 @@ import * as migration_20260915_070141_y1_product_data from './20260915_070141_y1
 import * as migration_20260915_071500_y1_mcp_property_grants from './20260915_071500_y1_mcp_property_grants';
 import * as migration_20260915_072320_y2_feeds_tracking from './20260915_072320_y2_feeds_tracking';
 import * as migration_20260915_072600_y2_feed_grants from './20260915_072600_y2_feed_grants';
+import * as migration_20260915_090322_z1_search_recommended from './20260915_090322_z1_search_recommended';
 
 export const migrations = [
   {
@@ -95,11 +96,16 @@ export const migrations = [
   {
     up: migration_20260915_072320_y2_feeds_tracking.up,
     down: migration_20260915_072320_y2_feeds_tracking.down,
-    name: '20260915_072320_y2_feeds_tracking'
+    name: '20260915_072320_y2_feeds_tracking',
   },
   {
     up: migration_20260915_072600_y2_feed_grants.up,
     down: migration_20260915_072600_y2_feed_grants.down,
     name: '20260915_072600_y2_feed_grants',
+  },
+  {
+    up: migration_20260915_090322_z1_search_recommended.up,
+    down: migration_20260915_090322_z1_search_recommended.down,
+    name: '20260915_090322_z1_search_recommended'
   },
 ];

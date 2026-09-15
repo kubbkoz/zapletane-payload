@@ -48,7 +48,10 @@ export function SearchBar({ className, inputRef, placeholder }: Props) {
   }
 
   return (
-    <div className={className ?? 'relative hidden max-w-2xl flex-1 lg:flex'}>
+    // md, not lg: the 768–1023 band lost its only other search entry when the
+    // hamburger menu dropped its SearchBar (the bottom bar + overlay are
+    // md:hidden), so the header bar covers that band now.
+    <div className={className ?? 'relative hidden max-w-2xl flex-1 md:flex'}>
       <form className="group relative flex w-full" onSubmit={onSubmit} role="search">
         <input
           aria-label="Hľadať produkt"

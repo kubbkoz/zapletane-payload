@@ -82,6 +82,7 @@ export interface Config {
     'discount-codes': DiscountCode;
     'product-filters': ProductFilter;
     'product-properties': ProductProperty;
+    'push-subscriptions': PushSubscription;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -121,6 +122,7 @@ export interface Config {
     'discount-codes': DiscountCodesSelect<false> | DiscountCodesSelect<true>;
     'product-filters': ProductFiltersSelect<false> | ProductFiltersSelect<true>;
     'product-properties': ProductPropertiesSelect<false> | ProductPropertiesSelect<true>;
+    'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -1240,6 +1242,10 @@ export interface Address {
     | 'SE'
     | 'CH';
   phone?: string | null;
+  /**
+   * Slot, do ktorého adresa patrí v zákazníckom účte. Prázdne = adresa uložená pred zavedením slotov.
+   */
+  kind?: ('billing' | 'shipping') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1393,6 +1399,40 @@ export interface ProductFilter {
    * Nižšie číslo = vyššie v paneli filtrov.
    */
   sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Prehliadače, ktoré si zapli notifikácie o stave objednávky. Zapisuje ich storefront (Povoliť notifikácie), nie admin — ručne sa tu dá odber nanajvýš zmazať.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions".
+ */
+export interface PushSubscription {
+  id: number;
+  /**
+   * Účet, ktorému tento prehliadač patrí. Vypĺňa sa automaticky z prihlásenia.
+   */
+  customer: number | User;
+  /**
+   * URL push služby prehliadača (FCM, Mozilla, WNS…). Jednoznačne identifikuje jednu inštaláciu prehliadača.
+   */
+  endpoint: string;
+  /**
+   * Z PushManager.subscribe(). Bez nich sa správa nedá zašifrovať a push služba ju odmietne.
+   */
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  /**
+   * User-Agent pri registrácii — len na orientáciu, ktoré zariadenie to je.
+   */
+  userAgent?: string | null;
+  /**
+   * Kedy prehliadač naposledy potvrdil, že odber ešte platí (pri každom otvorení stránky so zapnutými notifikáciami).
+   */
+  lastSeenAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1813,6 +1853,10 @@ export interface PayloadLockedDocument {
         value: number | ProductProperty;
       } | null)
     | ({
+        relationTo: 'push-subscriptions';
+        value: number | PushSubscription;
+      } | null)
+    | ({
         relationTo: 'forms';
         value: number | Form;
       } | null)
@@ -2231,6 +2275,24 @@ export interface ProductPropertiesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions_select".
+ */
+export interface PushSubscriptionsSelect<T extends boolean = true> {
+  customer?: T;
+  endpoint?: T;
+  keys?:
+    | T
+    | {
+        p256dh?: T;
+        auth?: T;
+      };
+  userAgent?: T;
+  lastSeenAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "forms_select".
  */
 export interface FormsSelect<T extends boolean = true> {
@@ -2395,6 +2457,7 @@ export interface AddressesSelect<T extends boolean = true> {
   postalCode?: T;
   country?: T;
   phone?: T;
+  kind?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3135,6 +3198,14 @@ export interface SiteSetting {
      * Ktoré časti produktu sa prehľadávajú. Aspoň jedno pole musí byť zvolené.
      */
     searchFields?: ('title' | 'description' | 'categories')[] | null;
+    /**
+     * Produkty zobrazené vo vyhľadávacom okne ešte pred tým, než návštevník začne písať. Prázdne = sekcia „Odporúčané produkty" sa nezobrazí.
+     */
+    recommendedProducts?: (number | Product)[] | null;
+    /**
+     * Kategórie zobrazené ako rýchle odkazy vo vyhľadávacom okne ešte pred tým, než návštevník začne písať. Prázdne = sekcia „Odporúčané kategórie" sa nezobrazí.
+     */
+    recommendedCategories?: (number | Category)[] | null;
   };
   /**
    * Bankové spojenie pre platbu prevodom. Zobrazí sa zákazníkovi na potvrdení objednávky spolu so sumou a variabilným symbolom.
@@ -3500,6 +3571,8 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         minChars?: T;
         resultsPerPage?: T;
         searchFields?: T;
+        recommendedProducts?: T;
+        recommendedCategories?: T;
       };
   payments?:
     | T

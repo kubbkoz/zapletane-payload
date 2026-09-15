@@ -1,6 +1,7 @@
 'use client'
 
 import type { ResolvedContact } from '@/lib/contact'
+import type { SearchSuggestCategory, SearchSuggestProduct } from '@/lib/search'
 
 import { useCartDrawer } from '@/components/Cart/CartDrawerProvider'
 import { MobileSearchOverlay } from '@/components/Header/MobileSearchOverlay'
@@ -14,6 +15,13 @@ import React, { useMemo, useState } from 'react'
 
 type Props = {
   contact: ResolvedContact
+  /** Search-overlay empty state (Z1) — resolved server-side from
+   * `SiteSettings.search`; empty arrays simply hide their section. */
+  recommendedCategories?: SearchSuggestCategory[]
+  recommendedProducts?: SearchSuggestProduct[]
+  /** `SiteSettings.search.minChars` — the overlay's live results honour the
+   * same minimum as `/shop?q=`. */
+  searchMinChars?: number
   searchPlaceholder?: string
 }
 
@@ -29,7 +37,7 @@ type Props = {
  * very same badge recipe as the header's `OpenCartButton`.
  *
  * Two deliberate departures from §2.4, both the owner's call:
- *   - six tabs, not five: Domov · Telefón · E-mail · Hľadať · Účet · Košík.
+ *   - six tabs, not five: Domov · Zavolať · E-mail · Hľadať · Účet · Košík.
  *     Phone and e-mail replace the original's Obľúbené (there is no wishlist
  *     in this port) and become one-tap `tel:`/`mailto:` actions off the same
  *     contact facts the header already renders.
@@ -41,7 +49,13 @@ type Props = {
  * server HTML, exactly as the original did (it was pointedly not wrapped in
  * `<ClientOnly>`).
  */
-export function MobileBottomNavClient({ contact, searchPlaceholder }: Props) {
+export function MobileBottomNavClient({
+  contact,
+  recommendedCategories,
+  recommendedProducts,
+  searchMinChars,
+  searchPlaceholder,
+}: Props) {
   const pathname = usePathname()
   const { user } = useAuth()
   const { cart } = useCart()
@@ -78,7 +92,7 @@ export function MobileBottomNavClient({ contact, searchPlaceholder }: Props) {
           <li>
             <a aria-label="Zavolať nám" className={tabClass(false)} href={contact.phone.href}>
               <Phone className="h-5 w-5" strokeWidth={1.75} />
-              <span className={LABEL}>Telefón</span>
+              <span className={LABEL}>Zavolať</span>
             </a>
           </li>
 
@@ -139,8 +153,11 @@ export function MobileBottomNavClient({ contact, searchPlaceholder }: Props) {
 
       <MobileSearchOverlay
         isOpen={isSearchOpen}
+        minChars={searchMinChars}
         onClose={() => setIsSearchOpen(false)}
         placeholder={searchPlaceholder}
+        recommendedCategories={recommendedCategories}
+        recommendedProducts={recommendedProducts}
       />
     </React.Fragment>
   )

@@ -243,6 +243,31 @@ export const SiteSettings: GlobalConfig = {
             description: 'Ktoré časti produktu sa prehľadávajú. Aspoň jedno pole musí byť zvolené.',
           },
         },
+        // Z1 — obsah mobilného vyhľadávacieho okna PRED zadaním hľadaného
+        // výrazu. Obe polia sú nepovinné: prázdne pole = sekcia sa vôbec
+        // nezobrazí a okno ukáže pôvodnú nápovedu.
+        {
+          name: 'recommendedProducts',
+          type: 'relationship',
+          relationTo: 'products',
+          hasMany: true,
+          label: 'Odporúčané produkty',
+          admin: {
+            description:
+              'Produkty zobrazené vo vyhľadávacom okne ešte pred tým, než návštevník začne písať. Prázdne = sekcia „Odporúčané produkty" sa nezobrazí.',
+          },
+        },
+        {
+          name: 'recommendedCategories',
+          type: 'relationship',
+          relationTo: 'categories',
+          hasMany: true,
+          label: 'Odporúčané kategórie',
+          admin: {
+            description:
+              'Kategórie zobrazené ako rýchle odkazy vo vyhľadávacom okne ešte pred tým, než návštevník začne písať. Prázdne = sekcia „Odporúčané kategórie" sa nezobrazí.',
+          },
+        },
       ],
     },
     {
