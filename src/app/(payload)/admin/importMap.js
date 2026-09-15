@@ -19,11 +19,14 @@ import { MetaTitleComponent as MetaTitleComponent_a8a977ebc872c5d5ea7ee689724c08
 import { MetaImageComponent as MetaImageComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
 import { MetaDescriptionComponent as MetaDescriptionComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
 import { PreviewComponent as PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
+import { GenerateArticleButton as GenerateArticleButton_e6d4dadec655c9986798da4569523591 } from '@/components/admin/GenerateArticleButton'
 import { BlocksFeatureClient as BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { HorizontalRuleFeatureClient as HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ScraperJobControls as ScraperJobControls_54c2152edd141df45ff6246d637d64e0 } from '@/components/admin/ScraperJobControls'
+import { ScraperJobCategories as ScraperJobCategories_94b6c833d548b2586430bc92ae85424d } from '@/components/admin/ScraperJobCategories'
 import { ScraperJobPreviews as ScraperJobPreviews_1c84b06a05c8a26ced6d29b226b0c933 } from '@/components/admin/ScraperJobPreviews'
 import { VariantOptionsSelector as VariantOptionsSelector_b91672ccd6e8b071c11142ab941fedfb } from '@payloadcms/plugin-ecommerce/rsc'
+import { PurgeCacheButton as PurgeCacheButton_967dc17052d37888c9ed04fb08af2bb7 } from '@/components/admin/PurgeCacheButton'
 import { StatsView as StatsView_019064b858e8ae6d080010e39be16092 } from '@/components/admin/StatsView'
 import { Icon as Icon_534076e2c753ea5d539a54b05f456b1b } from '@/components/admin/Icon'
 import { Logo as Logo_a44df17d0fc3dcd873dae43dc3bf66bd } from '@/components/admin/Logo'
@@ -58,11 +61,14 @@ export const importMap = {
   "@payloadcms/plugin-seo/client#MetaImageComponent": MetaImageComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/plugin-seo/client#MetaDescriptionComponent": MetaDescriptionComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/plugin-seo/client#PreviewComponent": PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860,
+  "@/components/admin/GenerateArticleButton#GenerateArticleButton": GenerateArticleButton_e6d4dadec655c9986798da4569523591,
   "@payloadcms/richtext-lexical/client#BlocksFeatureClient": BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#HorizontalRuleFeatureClient": HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@/components/admin/ScraperJobControls#ScraperJobControls": ScraperJobControls_54c2152edd141df45ff6246d637d64e0,
+  "@/components/admin/ScraperJobCategories#ScraperJobCategories": ScraperJobCategories_94b6c833d548b2586430bc92ae85424d,
   "@/components/admin/ScraperJobPreviews#ScraperJobPreviews": ScraperJobPreviews_1c84b06a05c8a26ced6d29b226b0c933,
   "@payloadcms/plugin-ecommerce/rsc#VariantOptionsSelector": VariantOptionsSelector_b91672ccd6e8b071c11142ab941fedfb,
+  "@/components/admin/PurgeCacheButton#PurgeCacheButton": PurgeCacheButton_967dc17052d37888c9ed04fb08af2bb7,
   "@/components/admin/StatsView#StatsView": StatsView_019064b858e8ae6d080010e39be16092,
   "@/components/admin/Icon#Icon": Icon_534076e2c753ea5d539a54b05f456b1b,
   "@/components/admin/Logo#Logo": Logo_a44df17d0fc3dcd873dae43dc3bf66bd,

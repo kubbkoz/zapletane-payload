@@ -1,4 +1,4 @@
-import type { GlobalConfig } from 'payload'
+import type { GlobalAfterChangeHook, GlobalConfig } from 'payload'
 
 import { adminOnly } from '@/access/adminOnly'
 import { COMING_SOON_COPY } from '@/components/ComingSoon/copy'
@@ -26,6 +26,26 @@ const revalidateSiteSettings = revalidateGlobalHook(
 )
 
 /**
+ * Tag revalidation alone is not enough for the pre-launch gate: pages
+ * prerendered while the gate was OFF live in the FULL ROUTE CACHE and are
+ * served from the CDN without ever re-running the layout — the stale HTML
+ * survives any data-cache purge (this bit the production toggle on
+ * 2026-09-15). Nuking the route cache for the whole (app) tree forces the
+ * next request to re-render through the layout, which then reads the fresh
+ * value.
+ */
+const revalidateStorefrontRoutes: GlobalAfterChangeHook = async ({ doc }) => {
+  try {
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath('/', 'layout')
+  } catch {
+    // Outside a Next request scope (seed, CLI) this throws — the 30s data
+    // TTL plus the next deploy cover that case.
+  }
+  return doc
+}
+
+/**
  * Site-wide switches that are not part of any single page's content.
  *
  * Today that is the pre-launch ("coming soon") gate, which replaces the Nuxt
@@ -47,7 +67,7 @@ export const SiteSettings: GlobalConfig = {
       'Prepínač režimu webu a obsah predspúšťacej stránky. Administrácia (/admin) funguje v každom režime.',
   },
   hooks: {
-    afterChange: [revalidateSiteSettings],
+    afterChange: [revalidateSiteSettings, revalidateStorefrontRoutes],
   },
   fields: [
     {
@@ -58,6 +78,16 @@ export const SiteSettings: GlobalConfig = {
       admin: {
         description:
           'ZAPNUTÉ = Coming soon: návštevníci vidia predspúšťaciu stránku „Čoskoro spúšťame". VYPNUTÉ = Produkcia: plný e-shop. Náhľad produkcie počas Coming soon: ?preview=<COMING_SOON_BYPASS>. Zmena sa prejaví do minúty.',
+      },
+    },
+    {
+      name: 'purgeCache',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@/components/admin/PurgeCacheButton#PurgeCacheButton',
+        },
+        position: 'sidebar',
       },
     },
     {
