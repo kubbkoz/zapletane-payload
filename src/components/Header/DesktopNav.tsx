@@ -59,7 +59,14 @@ export function DesktopNav({ isHidden, navItems }: Props) {
 
                 return (
                   <div
-                    className={cn('static px-2 py-4', children.length > 0 && 'group relative')}
+                    className={cn(
+                      // `small-desktop:py-3` (Z10) — the strip's height is
+                      // entirely this padding plus one line of text, so one
+                      // step smaller on a 1280–1599px laptop takes 8px off the
+                      // navbar. Unchanged below 1024 and from 1600 up.
+                      'static px-2 py-4 small-desktop:py-3',
+                      children.length > 0 && 'group relative',
+                    )}
                     key={item.id}
                   >
                     {/* No children → exactly the markup this strip always had. */}

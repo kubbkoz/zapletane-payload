@@ -685,3 +685,27 @@ button {
     }
   }
 }
+
+/* ============================================================================
+   Appended by the Z10 pass — small-desktop navbar compaction. New variant
+   only; nothing above is modified.
+   ============================================================================ */
+
+/* 13–14" laptops report 1280 / 1440 / 1512 logical px, and on those the navbar
+   ate a visibly larger slice of the viewport than on a real desktop. This
+   variant is the ONE place that range is written down:
+   1024px (where the desktop navbar starts) up to 1599.98px — 1600px and wider
+   is a large desktop and stays byte-identical to what it rendered before, as
+   does everything below 1024 (phones and tablets).
+
+   Applied as ordinary Tailwind utilities on the three rows that own vertical
+   padding (`small-desktop:py-*` in TopBar / the main row / DesktopNav) rather
+   than as an @layer components block: the rows already carry `py-4` / `py-2`
+   utilities, and a components-layer rule loses to a utility-layer one in
+   Tailwind v4's cascade, so a `.navbar-compact-*` class would have needed
+   !important to land. A variant-ful utility simply sorts after the plain one.
+
+   Nothing here touches the navbar's height *variables* — `--navbar-height-*`
+   is measured by the ResizeObserver in Header/index.client.tsx, so the spacer
+   under the fixed header follows the compaction on its own. */
+@custom-variant small-desktop (@media (width >= 1024px) and (width <= 1599.98px));

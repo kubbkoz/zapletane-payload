@@ -7,7 +7,7 @@ import type { SocialLink, TopBarLink, TopBarSettings } from '@/lib/navigation'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/utilities/cn'
 import { usePathname } from 'next/navigation'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 import { DesktopNav } from './DesktopNav'
 import { MobileMenu } from './MobileMenu'
@@ -120,10 +120,6 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
     }
   }, [isMobileMenuOpen])
 
-  const focusSearch = useCallback(() => {
-    searchInputRef.current?.focus()
-  }, [])
-
   return (
     <div>
       <nav
@@ -145,8 +141,13 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
 
           {/* Owner's call: the bar is always fully opaque — no translucent
               scrolled state, no blur (content must never shimmer through). */}
+          {/* `small-desktop:py-3` (Z10) — on a 1280–1599px laptop the row gives
+              back 8px of the 32px it spends on padding. Below 1024 and from
+              1600 up the variant does not match, so the row renders exactly as
+              before. The row's content height is set by the search field
+              (50px), not the logo (27px), so nothing is scaled. */}
           <div
-            className="relative z-40 border-b border-gray-200 bg-brand-50 py-4 transition-all duration-300 ease-linear"
+            className="relative z-40 border-b border-gray-200 bg-brand-50 py-4 transition-all duration-300 ease-linear small-desktop:py-3"
             id="navbar-main-row"
           >
             <div className="container-page">
@@ -157,7 +158,6 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
 
                 <NavIcons
                   isMobileMenuOpen={isMobileMenuOpen}
-                  onSearchClick={focusSearch}
                   onToggleMobileMenu={() => setIsMobileMenuOpen((open) => !open)}
                 />
               </div>

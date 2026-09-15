@@ -3,6 +3,7 @@
 import { cn } from '@/utilities/cn'
 import {
   ChevronRight,
+  Heart,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -21,6 +22,9 @@ const navItems = [
   { exact: true, href: '/account', icon: LayoutDashboard, label: 'Prehľad' },
   { href: '/account/settings', icon: UserRound, label: 'Moje údaje' },
   { href: '/account/addresses', icon: MapPin, label: 'Adresy' },
+  // Z10 — `/wishlist` lives outside the (account) route group but is an
+  // account screen in every other sense: customers only, per-user data.
+  { href: '/wishlist', icon: Heart, label: 'Obľúbené' },
   { href: '/orders', icon: Package, label: 'Objednávky' },
   { href: '/account/returns', icon: RotateCcw, label: 'Reklamácia' },
 ]

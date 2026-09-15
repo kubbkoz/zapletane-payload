@@ -99,6 +99,46 @@ export const Users: CollectionConfig = {
       index: true,
       label: 'ID u poskytovateľa',
     },
+    // --- Obľúbené / wishlist (Z10) ----------------------------------------
+    // Deliberately carries NO field-level access. The collection already says
+    // `update: adminOrSelf`, which resolves to `{ id: { equals: user.id } }`
+    // for a customer — so `PATCH /api/users/:id` can only ever reach the
+    // caller's own document, and this field has to be customer-writable for
+    // the storefront heart to persist. (Contrast `oauthProvider`/`oauthSub`
+    // above, which are admin-only precisely because a customer writing them
+    // on their *own* row would be an account-takeover vector; a wishlist is
+    // not.) Payload cannot express "own document only" at field level anyway
+    // — the collection-level constraint is the right and sufficient control.
+    {
+      name: 'wishlist',
+      type: 'relationship',
+      admin: {
+        description:
+          'Produkty, ktoré si zákazník uložil medzi obľúbené (srdiečko na karte produktu).',
+      },
+      hasMany: true,
+      label: 'Obľúbené produkty',
+      relationTo: 'products',
+    },
+    // Capability URL for "Zdieľať zoznam". Minted on first use from the
+    // storefront and never shown to anyone but its owner; whoever holds the
+    // token can read that one wishlist, so it is a secret, not an id. The
+    // public page reads `wishlist` and nothing else — no name, no e-mail.
+    // Same access reasoning as `wishlist` above: `users.update` is already
+    // self-or-admin, so a plain field is exactly right.
+    {
+      name: 'wishlistShareToken',
+      type: 'text',
+      admin: {
+        description:
+          'Tajný token pre verejný odkaz na zdieľaný zoznam obľúbených (/wishlist/zdielane/<token>). Vzniká automaticky pri prvom zdieľaní.',
+        position: 'sidebar',
+        readOnly: true,
+      },
+      index: true,
+      label: 'Token zdieľaného zoznamu',
+      unique: true,
+    },
     {
       name: 'orders',
       type: 'join',

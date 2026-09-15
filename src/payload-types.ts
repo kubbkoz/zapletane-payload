@@ -1025,6 +1025,14 @@ export interface User {
    * Stabilný identifikátor účtu u poskytovateľa (Google `sub`, Facebook `id`).
    */
   oauthSub?: string | null;
+  /**
+   * Produkty, ktoré si zákazník uložil medzi obľúbené (srdiečko na karte produktu).
+   */
+  wishlist?: (number | Product)[] | null;
+  /**
+   * Tajný token pre verejný odkaz na zdieľaný zoznam obľúbených (/wishlist/zdielane/<token>). Vzniká automaticky pri prvom zdieľaní.
+   */
+  wishlistShareToken?: string | null;
   orders?: {
     docs?: (number | Order)[];
     hasNextPage?: boolean;
@@ -2172,6 +2180,8 @@ export interface UsersSelect<T extends boolean = true> {
   roles?: T;
   oauthProvider?: T;
   oauthSub?: T;
+  wishlist?: T;
+  wishlistShareToken?: T;
   orders?: T;
   cart?: T;
   addresses?: T;

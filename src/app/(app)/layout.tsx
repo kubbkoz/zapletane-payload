@@ -13,6 +13,7 @@ import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { MobileBottomNav } from '@/components/MobileBottomNav'
 import { PwaProvider } from '@/components/Pwa/PwaProvider'
 import { TrackingScriptsBodyStart } from '@/components/TrackingScripts/BodyStart'
+import { WishlistProvider } from '@/wishlist/WishlistProvider'
 import { TrackingScriptsHead } from '@/components/TrackingScripts/Head'
 import { COMING_SOON_BYPASS_COOKIE } from '@/lib/comingSoon'
 import { ensureStartsWith } from '@/utilities/ensureStartsWith'
@@ -157,14 +158,19 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               the coming-soon page returns above, before any of it — so the
               bottom bar can never appear on the pre-launch page. */}
           <CartDrawerProvider>
-            <Header />
-            {/* `.mobile-nav-offset` gives back the fixed bar's 60px + safe area
-                below `md` (0 from `md` up), so nothing is ever covered. */}
-            <div className="mobile-nav-offset">
-              <main>{children}</main>
-              <Footer />
-            </div>
-            <MobileBottomNav />
+            {/* Wishlist sits inside CartDrawerProvider so hearts, the navbar
+                badge and the login dialog see both auth and cart context. */}
+            <WishlistProvider>
+              <Header />
+              {/* `.mobile-nav-offset` gives back the fixed bar's 60px + safe
+                  area below `md` (0 from `md` up), so nothing is ever
+                  covered. */}
+              <div className="mobile-nav-offset">
+                <main>{children}</main>
+                <Footer />
+              </div>
+              <MobileBottomNav />
+            </WishlistProvider>
           </CartDrawerProvider>
         </Providers>
       </body>

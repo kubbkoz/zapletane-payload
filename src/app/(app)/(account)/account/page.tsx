@@ -8,7 +8,7 @@ import { getAccountAddresses, getAccountOrders } from '@/components/account/quer
 import { addressForKind, addressKinds } from '@/components/addresses/slots'
 import { mergeOpenGraph } from '@/utilities/mergeOpenGraph'
 import configPromise from '@payload-config'
-import { LogOut, MapPin, PackageSearch, RotateCcw, ShoppingBag, UserRound } from 'lucide-react'
+import { Heart, LogOut, MapPin, PackageSearch, RotateCcw, ShoppingBag, UserRound } from 'lucide-react'
 import { headers as getHeaders } from 'next/headers.js'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -31,6 +31,28 @@ export default async function AccountPage() {
     getAccountAddresses(user),
     getAccountOrders({ limit: 3, user }),
   ])
+
+  // Z10 — how many products this customer has hearted. Read straight off the
+  // user document (ids only, no population): the hub only needs a number, and
+  // `payload.auth` does not guarantee the relationship is loaded.
+  const wishlistCount = await (async () => {
+    if (user.collection !== 'users') return 0
+
+    try {
+      const doc = await payload.findByID({
+        collection: 'users',
+        id: user.id,
+        depth: 0,
+        overrideAccess: false,
+        select: { wishlist: true },
+        user,
+      })
+
+      return Array.isArray(doc?.wishlist) ? doc.wishlist.length : 0
+    } catch {
+      return 0
+    }
+  })()
 
   // `user` is a union of every auth-enabled collection (the MCP plugin adds its
   // own API-key collection, which has no email), so both fields are narrowed.
@@ -93,6 +115,36 @@ export default async function AccountPage() {
           </div>
         </AccountCard>
       </div>
+
+      {/* Z10 — Obľúbené, medzi Adresami a Objednávkami. */}
+      <AccountCard
+        cta="Zobraziť obľúbené"
+        description="Kúsky, ktoré ste si uložili srdiečkom."
+        href="/wishlist"
+        icon={Heart}
+        title="Obľúbené"
+      >
+        {wishlistCount === 0 ? (
+          <AccountEmptyState icon={Heart} text="Zatiaľ nemáte uložený žiadny produkt.">
+            <Link
+              className="mt-1 inline-flex items-center gap-2 font-sans text-[11px] font-bold uppercase tracking-widest text-black transition-colors hover:text-brand"
+              href="/shop"
+            >
+              <ShoppingBag className="size-3.5" />
+              Prejsť do obchodu
+            </Link>
+          </AccountEmptyState>
+        ) : (
+          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-default border border-gray-100 bg-gray-50/60 px-4 py-3">
+            <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              Uložené kúsky
+            </span>
+            <span className="font-tech text-lg font-bold leading-none text-black">
+              {wishlistCount}
+            </span>
+          </div>
+        )}
+      </AccountCard>
 
       <AccountCard
         cta={orders.length > 0 ? 'Všetky objednávky' : undefined}

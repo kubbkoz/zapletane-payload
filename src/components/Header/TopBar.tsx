@@ -79,9 +79,12 @@ export function TopBar({
 }: Props) {
   if (!enabled) return null
 
+  // `small-desktop:py-1.5` (Z10) trims the visible bar by 4px on a 1280–1599px
+  // laptop. Only on the visible branch: the collapsed branch is `py-0` and must
+  // stay exactly 0 at every width, so the variant would fight it there.
   const collapseClasses = isHidden
     ? 'pointer-events-none max-h-0 overflow-hidden py-0 opacity-0'
-    : 'pointer-events-auto max-h-[44px] overflow-visible py-2 opacity-100'
+    : 'pointer-events-auto max-h-[44px] overflow-visible py-2 opacity-100 small-desktop:py-1.5'
 
   if (mode === 'marquee') {
     const text = marqueeText?.trim() || FALLBACK_MARQUEE_TEXT
@@ -168,8 +171,10 @@ export function TopBar({
         </div>
       </div>
 
-      {/* Mobile contact strip — shown wherever the full TopBar is hidden. */}
-      <div className="flex items-center justify-center bg-brand-100 px-4 py-2 text-[10px] uppercase tracking-wider text-black/70 xl:hidden">
+      {/* Mobile contact strip — shown wherever the full TopBar is hidden. It
+          also covers the 1024–1279px slice of the small-desktop range, so it
+          takes the same 4px trim there (below 1024 it is untouched). */}
+      <div className="flex items-center justify-center bg-brand-100 px-4 py-2 text-[10px] uppercase tracking-wider text-black/70 small-desktop:py-1.5 xl:hidden">
         <a
           className="flex items-center gap-1.5 transition-colors hover:text-black"
           href={contact.phone.href}

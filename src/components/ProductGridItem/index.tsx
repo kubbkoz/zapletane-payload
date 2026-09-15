@@ -5,6 +5,8 @@ import React from 'react'
 import { ArrowRight } from 'lucide-react'
 
 import { Price } from '@/components/Price'
+import { CardAddToCartButton, CardWishlistButton } from './CardActions'
+import { cardActionClass } from './cardActionClass'
 import { CardMedia } from './CardMedia'
 import { cn } from '@/utilities/cn'
 import { getStockState, stockBadgeClass, stockDotClass, stockLabel } from '@/utilities/stockStatus'
@@ -31,6 +33,15 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
 
   const variants = product.variants?.docs
   const hasVariants = Boolean(product.enableVariants && variants && variants.length > 0)
+
+  // The CTA's question is different from the stock pill's. Listing queries
+  // `select` a narrow field set and never load the `variants` join, so
+  // `hasVariants` above is false on a listing even for a product that *does*
+  // have variants — good enough for "should the simple-product stock pill
+  // show", fatal for "may this card add straight to the cart". A variable
+  // product must be configured on its detail page first, so the flag alone
+  // decides the CTA.
+  const isVariableProduct = Boolean(product.enableVariants)
 
   if (variants && variants.length > 0) {
     const variant = variants[0]
@@ -60,7 +71,14 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
       href={`/products/${product.slug}`}
     >
       <div className="flex flex-1 flex-col overflow-hidden rounded-default border border-gray-100 bg-white transition-colors duration-200 ease-in-out group-hover:border-black">
-        <CardMedia images={images} title={title || ''} />
+        {/* Z10 — the heart is pinned to the image zone, so the slider keeps its
+            own `relative` box and this wrapper owns the overlay coordinates. */}
+        <div className="relative">
+          <CardMedia images={images} title={title || ''} />
+          {typeof product.id === 'number' ? (
+            <CardWishlistButton productID={product.id} title={title || undefined} />
+          ) : null}
+        </div>
 
         <div className="flex flex-1 flex-col p-2 md:p-4">
           <h3 className="mb-1.5 line-clamp-2 h-[2.5em] font-sans text-[13px] font-medium leading-tight text-gray-900 transition-colors duration-200 group-hover:text-brand md:text-sm">
@@ -94,10 +112,24 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
               )}
             </div>
 
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-default bg-gray-100 text-black transition-colors group-hover:bg-gray-200 md:h-10 md:w-auto md:gap-1.5 md:whitespace-nowrap md:px-3 md:font-tech md:text-[11px] md:font-bold md:uppercase md:tracking-widest">
-              <span className="hidden md:inline">Zobraziť produkt</span>
-              <ArrowRight className="h-4 w-4 md:h-3.5 md:w-3.5" />
-            </span>
+            {/* Z10 card CTA. A variable product cannot be added blind — it
+                needs a size/colour picked first — so it keeps an arrow that
+                rides the card's own link to the detail page. It is a <span>,
+                not a second <Link>: the whole card already links to exactly
+                this href, and nesting an <a> inside an <a> is invalid markup.
+                A simple product gets the real add-to-cart button. Same chip,
+                same brown, same size either way. */}
+            {isVariableProduct || typeof product.id !== 'number' ? (
+              <span aria-hidden="true" className={cardActionClass}>
+                <ArrowRight className="h-5 w-5" strokeWidth={1.75} />
+              </span>
+            ) : (
+              <CardAddToCartButton
+                inventory={inventory}
+                productID={product.id}
+                title={title || undefined}
+              />
+            )}
           </div>
         </div>
       </div>
