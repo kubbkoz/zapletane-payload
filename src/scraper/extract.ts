@@ -271,24 +271,70 @@ const readPrice = (
  * odvodenie je odhad (prípona originálu môže byť iná), vracia sa *zoznam*
  * a sťahovanie skúša položky po rade, kým jedna neuspeje.
  */
+/**
+ * Shoper má DVA tvary ciest k fotke — obidva sú v divočine živé:
+ *
+ *   starší:  /environment/cache/images/productGfx_<hash>_<š>_<v>.<ext>
+ *            originál: /userdata/public/gfx/<hash>.<ext>
+ *   novší:   /environment/cache/images/productGfx_<id>_<š>_<v>/<súbor>.<ext>
+ *            originál: /userdata/public/gfx/<id>/<súbor>.<ext>
+ *
+ * Vracia `{ id, file }`, kde `file` je `null` pri staršom tvare. To je zároveň
+ * to, čo jednoznačne identifikuje fotku naprieč veľkosťami.
+ */
+const shoperImageParts = (url: string): null | { file: null | string; id: string; origin: string } => {
+  const cacheNew = url.match(
+    /^(https?:\/\/[^/]+)\/environment\/cache\/images\/productGfx_(\w+)_\d+_\d+\/([^/?#]+)\.\w+$/i,
+  )
+
+  if (cacheNew) return { file: cacheNew[3]!, id: cacheNew[2]!, origin: cacheNew[1]! }
+
+  const cacheOld = url.match(
+    /^(https?:\/\/[^/]+)\/environment\/cache\/images\/productGfx_(\w+)_\d+_\d+\.\w+$/i,
+  )
+
+  if (cacheOld) return { file: null, id: cacheOld[2]!, origin: cacheOld[1]! }
+
+  const originalNew = url.match(
+    /^(https?:\/\/[^/]+)\/userdata\/public\/gfx\/(\w+)\/([^/?#]+)\.\w+$/i,
+  )
+
+  if (originalNew) return { file: originalNew[3]!, id: originalNew[2]!, origin: originalNew[1]! }
+
+  const originalOld = url.match(/^(https?:\/\/[^/]+)\/userdata\/public\/gfx\/(\w+)\.\w+$/i)
+
+  if (originalOld) return { file: null, id: originalOld[2]!, origin: originalOld[1]! }
+
+  return null
+}
+
 export const imageCandidates = (url: string): string[] => {
   const out: string[] = []
   const push = (value: string) => {
     if (!out.includes(value)) out.push(value)
   }
 
-  const shoper = url.match(
-    /^(https?:\/\/[^/]+)\/environment\/cache\/images\/productGfx_([a-f0-9]+)_(\d+)_(\d+)\.(\w+)$/i,
-  )
+  const extension = url.match(/\.(\w+)(?:[?#]|$)/)?.[1]?.toLowerCase() ?? 'jpg'
+  const shoper = shoperImageParts(url)
 
   if (shoper) {
-    const [, origin, hash, , , ext] = shoper
+    const { file, id, origin } = shoper
+    const stem = file ? `${id}/${file}` : id
 
-    push(`${origin}/userdata/public/gfx/${hash}.jpg`)
-    push(`${origin}/userdata/public/gfx/${hash}.png`)
-    push(`${origin}/userdata/public/gfx/${hash}.${ext}`)
-    push(`${origin}/environment/cache/images/productGfx_${hash}_1200_1200.${ext}`)
-    push(`${origin}/environment/cache/images/productGfx_${hash}_800_800.${ext}`)
+    // Originál (`/userdata/`) je vždy najlepší zdroj; príponu treba uhádnuť,
+    // lebo cache verzia je prekódovaná na webp a pôvodnú príponu zahodila.
+    for (const ext of ['jpg', 'png', 'jpeg', 'webp', extension]) {
+      push(`${origin}/userdata/public/gfx/${stem}.${ext}`)
+    }
+
+    // Keby originál nebol verejný, aspoň najväčšia zmenšenina.
+    for (const size of ['1200_1200', '800_800']) {
+      push(
+        file
+          ? `${origin}/environment/cache/images/productGfx_${id}_${size}/${file}.${extension}`
+          : `${origin}/environment/cache/images/productGfx_${id}_${size}.${extension}`,
+      )
+    }
   }
 
   // WooCommerce/WordPress: `nazov-800x600.jpg` → `nazov.jpg`
@@ -301,15 +347,18 @@ export const imageCandidates = (url: string): string[] => {
   return out
 }
 
-/** Kľúč na deduplikáciu: rôzne veľkosti toho istého obrázka sú jeden obrázok. */
+/**
+ * Kľúč na deduplikáciu: rôzne veľkosti toho istého obrázka sú jeden obrázok.
+ *
+ * Bez neho sa do galérie dostane `og:image` (500×500 zmenšenina prvej fotky)
+ * ako samostatná položka vedľa originálu — overené na wiklinowa-wies.pl, kde
+ * `og:image` a `<link itemprop="image">` ukazujú na tú istú fotku dvomi
+ * úplne odlišnými cestami.
+ */
 const imageKey = (url: string): string => {
-  const shoper = url.match(/productGfx_([a-f0-9]+)_/i)
+  const shoper = shoperImageParts(url)
 
-  if (shoper) return shoper[1]!.toLowerCase()
-
-  const gfx = url.match(/\/gfx\/([a-f0-9]+)\./i)
-
-  if (gfx) return gfx[1]!.toLowerCase()
+  if (shoper) return `${shoper.id}/${shoper.file ?? ''}`.toLowerCase()
 
   return url.replace(/-\d{2,4}x\d{2,4}(\.\w+)$/, '$1').toLowerCase()
 }

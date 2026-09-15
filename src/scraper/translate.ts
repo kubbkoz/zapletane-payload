@@ -49,6 +49,10 @@ const SYSTEM_PROMPT = [
   '- Názvy kategórií prekladaj ako bežné slovenské pomenovania tovaru (napr. „Fotele wiklinowe" → „Prútené kreslá").',
   '- Názvy aj hodnoty vlastností prekladaj rovnako vecne („Kolor: biały" → „Farba: biela").',
   '- Ak je časť textu už po slovensky, nechaj ju tak.',
+  // Bez tohto pravidla model k slovenskej dolnej úvodzovke („) dopisuje
+  // obyčajnú hornú ("), ktorú v JSON reťazci nezaescapuje a rozbije tým celú
+  // odpoveď. `repairJsonQuotes` to síce opraví, ale lepšie je nezaviniť to.
+  '- V texte NIKDY nepoužívaj obyčajnú dvojitú úvodzovku ("). Namiesto nej píš slovenské typografické úvodzovky „ a “.',
   'Odpovedaj VÝHRADNE jedným JSON objektom bez akéhokoľvek ďalšieho textu, v tvare:',
   '{"products":[{"index":0,"title":"...","paragraphs":["...","..."],"categoryPath":["..."],"attributes":[{"name":"...","value":"..."}]}]}',
 ].join('\n')
@@ -80,6 +84,95 @@ const passthrough = (item: TranslationItem): TranslatedProduct => ({
   title: item.title,
 })
 
+/**
+ * Znaky, ktorými smie v platnom JSON-e začínať hodnota alebo kľúč hneď za
+ * čiarkou. Slúžia ako dôkaz, že úvodzovka pred čiarkou bola naozaj koncová.
+ */
+const JSON_VALUE_START = /["{[\-\dtfn]/
+
+/**
+ * Oprava nezaescapovaných úvodzoviek vnútri reťazcov.
+ *
+ * Toto nie je teoretická poistka — je to najčastejší spôsob, akým sa rozbije
+ * preklad práve tohto obsahu. Slovenčina aj poľština používajú dolnú otváraciu
+ * úvodzovku („) a model k nej rád dopíše OBYČAJNÚ hornú ("), ktorú do JSON
+ * reťazca nezaescapuje:
+ *
+ *     "Predstavujeme kolekciu „Little Cottage", ktorú tvoria:"
+ *                                            ↑ tu sa JSON.parse zlomí
+ *
+ * Bez opravy padne celá dávka na pôvodný jazyk a majiteľka dostane poľské
+ * produkty. Preto sa reťazec prejde znak po znaku a každá úvodzovka vnútri
+ * reťazca sa posúdi: skutočná koncová je len tá, za ktorou (po bielych
+ * znakoch) nasleduje `:` `}` `]`, alebo `,` a po nej začiatok ďalšej hodnoty.
+ * Čokoľvek iné je úvodzovka v texte a doplní sa jej spätné lomítko.
+ *
+ * Zámerne sa nič iné neopravuje (chýbajúce čiarky, komentáre…): tam už je
+ * riziko, že sa „oprava" trafí vedľa, väčšie než úžitok — vtedy je správne
+ * nechať text nepreložený a napísať to do logu.
+ */
+export const repairJsonQuotes = (input: string): string => {
+  let out = ''
+  let inString = false
+  let escaped = false
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i]!
+
+    if (!inString) {
+      out += char
+      if (char === '"') inString = true
+      continue
+    }
+
+    if (escaped) {
+      out += char
+      escaped = false
+      continue
+    }
+
+    if (char === '\\') {
+      out += char
+      escaped = true
+      continue
+    }
+
+    if (char !== '"') {
+      out += char
+      continue
+    }
+
+    // Kandidát na koniec reťazca — pozrime sa, čo nasleduje.
+    let j = i + 1
+
+    while (j < input.length && /\s/.test(input[j]!)) j++
+
+    const next = input[j]
+
+    const closes =
+      next === ':' ||
+      next === '}' ||
+      next === ']' ||
+      (next === ',' &&
+        (() => {
+          let k = j + 1
+
+          while (k < input.length && /\s/.test(input[k]!)) k++
+
+          return k >= input.length || JSON_VALUE_START.test(input[k]!)
+        })())
+
+    if (closes) {
+      out += char
+      inString = false
+    } else {
+      out += '\\"'
+    }
+  }
+
+  return out
+}
+
 /** Z odpovede modelu vytiahne JSON objekt (aj z ```json bloku alebo vety okolo). */
 const extractJson = (text: string): null | Record<string, unknown> => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
@@ -89,13 +182,19 @@ const extractJson = (text: string): null | Record<string, unknown> => {
 
   if (start === -1 || end <= start) return null
 
-  try {
-    const parsed: unknown = JSON.parse(candidate.slice(start, end + 1))
+  const body = candidate.slice(start, end + 1)
 
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
-  } catch {
-    return null
+  for (const attempt of [body, repairJsonQuotes(body)]) {
+    try {
+      const parsed: unknown = JSON.parse(attempt)
+
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+    } catch {
+      // Skúsi sa opravená verzia; keď ani tá neprejde, vráti sa `null`.
+    }
   }
+
+  return null
 }
 
 /** Z odpovede Messages API poskladá text (content[] je pole blokov). */
@@ -132,6 +231,15 @@ const asAttributes = (value: unknown): ScrapedAttribute[] =>
 
 export type TranslationUsage = {
   calls: number
+  /**
+   * Prečo niektorá dávka ostala nepreložená. Prázdne pole = všetko prešlo.
+   *
+   * Preklad zámerne nikdy nehodí výnimku (import nesmie spadnúť kvôli
+   * prekladu), takže bez tejto stopy by zlyhanie vyzeralo v admine úplne
+   * rovnako ako zdroj, ktorý je náhodou po slovensky — a nikto by sa to
+   * nedozvedel. Route ju vypisuje do logu úlohy.
+   */
+  failures: string[]
   inputTokens: number
   outputTokens: number
 }
@@ -144,7 +252,11 @@ const translateChunk = async (
 ): Promise<TranslatedProduct[]> => {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
 
-  if (!apiKey) return items.map(passthrough)
+  if (!apiKey) {
+    usage.failures.push('Chýba ANTHROPIC_API_KEY — texty ostávajú v pôvodnom jazyku.')
+
+    return items.map(passthrough)
+  }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
@@ -178,9 +290,14 @@ const translateChunk = async (
       signal: controller.signal,
     })
 
-    if (!response.ok) return items.map(passthrough)
+    if (!response.ok) {
+      usage.failures.push(`Preklad: API odpovedalo ${response.status}.`)
+
+      return items.map(passthrough)
+    }
 
     const payload = (await response.json()) as {
+      stop_reason?: string
       usage?: { input_tokens?: number; output_tokens?: number }
     }
 
@@ -188,8 +305,21 @@ const translateChunk = async (
     usage.inputTokens += payload.usage?.input_tokens ?? 0
     usage.outputTokens += payload.usage?.output_tokens ?? 0
 
-    const parsed = extractJson(responseText(payload))
+    const raw = responseText(payload)
+    const parsed = extractJson(raw)
     const translatedList = Array.isArray(parsed?.products) ? parsed.products : []
+
+    if (!translatedList.length) {
+      // `max_tokens` je najčastejšia príčina: odpoveď sa odsekne uprostred
+      // JSON-u a parser z nej nevytiahne nič. Preto je v hláške aj dôvod
+      // zastavenia a začiatok odpovede — z toho sa dá rozhodnúť, či stačí
+      // zmenšiť dávku, alebo je zlý prompt.
+      usage.failures.push(
+        `Preklad: z odpovede sa nedali prečítať produkty (stop_reason=${
+          payload.stop_reason ?? '?'
+        }, ${raw.length} znakov): ${raw.slice(0, 200).replace(/\s+/g, ' ')}`,
+      )
+    }
 
     return items.map((item) => {
       const match = translatedList.find(
@@ -212,7 +342,11 @@ const translateChunk = async (
         title: title || item.title,
       }
     })
-  } catch {
+  } catch (error) {
+    usage.failures.push(
+      `Preklad zlyhal: ${error instanceof Error ? error.message : String(error)}`,
+    )
+
     return items.map(passthrough)
   } finally {
     clearTimeout(timer)
@@ -234,7 +368,7 @@ export const translateBatch = async (
   products: ScrapedProduct[],
   fromLang: null | string,
 ): Promise<TranslateBatchResult> => {
-  const usage: TranslationUsage = { calls: 0, inputTokens: 0, outputTokens: 0 }
+  const usage: TranslationUsage = { calls: 0, failures: [], inputTokens: 0, outputTokens: 0 }
   const items = products.map(toTranslationItem)
 
   if (!items.length) return { items: [], usage }

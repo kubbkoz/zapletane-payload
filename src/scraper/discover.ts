@@ -33,15 +33,35 @@ const MAX_LISTING_FETCHES = 60
 /** Koľko strán stránkovania sa skúsi na jednu kategóriu, kým sa to vzdá. */
 const MAX_PAGES_PER_CATEGORY = 25
 
+/**
+ * Stav prehľadávania — zároveň výsledok jedného kroku aj vstup toho ďalšieho.
+ *
+ * Prečo sa to vôbec dá prerušiť: medzi dvomi požiadavkami na cudzí server je
+ * povinná sekundová pauza, takže obchod s 31 kategóriami potrebuje na
+ * prejdenie vyše minúty — a serverless funkcia má 60 s. Prehľadávanie preto
+ * beží „na hodiny": dokedy môže, zvyšok kategórií odloží do `categories` a
+ * `complete: false` povie volajúcemu, že sa má ozvať znova. Tvar je obyčajný
+ * JSON, takže sa celý uloží do `scraper-jobs.productLinks` a prežije to, že
+ * ďalšiu dávku obslúži úplne iná inštancia funkcie.
+ */
 export type DiscoverResult = {
-  /** Kategórie, ktoré sa prešli — len pre log v admine. */
+  /** Kategórie, ktoré ešte NEBOLI prejdené. Prázdne = nič neostáva. */
   categories: string[]
+  /** `false` = došiel čas alebo strop, volaj znova s týmto výsledkom. */
+  complete: boolean
+  productUrls: string[]
   /** Ako sa produkty našli; ide do logu úlohy. */
   strategy: 'generic' | 'shoper' | 'sitemap' | 'single' | 'woocommerce'
-  productUrls: string[]
 }
 
 export type DiscoverOptions = {
+  /**
+   * Absolútny čas (`Date.now()`), po ktorom sa už nezačne ďalšia požiadavka.
+   * Bez neho beží prehľadávanie až po `MAX_LISTING_FETCHES`.
+   */
+  deadlineAt?: number
+  /** Výsledok predchádzajúceho kroku — prehľadávanie sa v ňom pokračuje. */
+  known?: null | DiscoverResult
   maxProducts?: number
   /** Voliteľný odber priebehu (log do úlohy). */
   onProgress?: (message: string) => void
@@ -161,6 +181,83 @@ const readSitemap = async (
   return urls
 }
 
+// --- prechod kategórií -----------------------------------------------------
+
+/**
+ * Prejde kategórie z `pending` a doplní nájdené produkty.
+ *
+ * Kategórie sa z `pending` odoberajú AŽ po dokončení celej svojej stránkovanej
+ * série — vďaka tomu je zvyšok poľa vždy presne to, čo ešte treba prejsť, a
+ * ďalší krok môže pokračovať bez toho, aby niektorú preskočil alebo zopakoval.
+ *
+ * Vracia zvyšné (neprejdené) kategórie.
+ */
+const crawlCategories = async ({
+  addProducts,
+  base,
+  budget,
+  isProduct,
+  log,
+  maxProducts,
+  outOfTime,
+  pending,
+  products,
+  shoper,
+}: {
+  addProducts: (urls: string[]) => void
+  base: URL
+  budget: { fetches: number }
+  isProduct: (url: string) => boolean
+  log?: (message: string) => void
+  maxProducts: number
+  outOfTime: () => boolean
+  pending: string[]
+  products: Set<string>
+  shoper: boolean
+}): Promise<string[]> => {
+  while (pending.length) {
+    if (products.size >= maxProducts) return []
+    if (budget.fetches >= MAX_LISTING_FETCHES || outOfTime()) return [...pending]
+
+    const category = pending[0]!
+
+    for (let page = 1; page <= MAX_PAGES_PER_CATEGORY; page++) {
+      if (products.size >= maxProducts) return []
+      if (budget.fetches >= MAX_LISTING_FETCHES || outOfTime()) return [...pending]
+
+      const pageUrl = shoper
+        ? shoperPageUrl(category, page)
+        : page === 1
+          ? category
+          : `${category.replace(/\/$/, '')}/page/${page}/`
+
+      budget.fetches++
+
+      const listing = await tryFetchPage(pageUrl)
+
+      await politeDelay()
+
+      if (!listing) break
+
+      const found = collectLinks(listing.html, listing.finalUrl, base).filter(isProduct)
+      const fresh = found.filter((url) => !products.has(url))
+
+      addProducts(found)
+
+      log?.(`${pageUrl} → ${found.length} produktov (${fresh.length} nových)`)
+
+      // Shoper pri prekročení poslednej strany vráti prvú stranu (rovnaké
+      // produkty) namiesto 404 — prázdny prírastok je preto jediný spoľahlivý
+      // signál konca stránkovania.
+      if (!fresh.length) break
+    }
+
+    pending.shift()
+  }
+
+  return []
+}
+
 // --- verejné API -----------------------------------------------------------
 
 export const discover = async (
@@ -171,9 +268,14 @@ export const discover = async (
   const log = options.onProgress
   const base = new URL(startUrl)
   const budget = { fetches: 0 }
+  const known = options.known
 
-  const products = new Set<string>()
-  const categories = new Set<string>()
+  /** Došiel čas? Kontroluje sa PRED každou požiadavkou, nie po nej. */
+  const outOfTime = (): boolean =>
+    typeof options.deadlineAt === 'number' && Date.now() >= options.deadlineAt
+
+  const products = new Set<string>(known?.productUrls ?? [])
+  const pending: string[] = [...(known?.categories ?? [])]
 
   const addProducts = (urls: string[]) => {
     for (const url of urls) {
@@ -184,7 +286,40 @@ export const discover = async (
 
   // Zadaná adresa je rovno produkt → netreba nič prehľadávať.
   if (isShoperProduct(startUrl) || WOO_PRODUCT.test(startUrl)) {
-    return { categories: [], productUrls: [normalize(startUrl)], strategy: 'single' }
+    return {
+      categories: [],
+      complete: true,
+      productUrls: [normalize(startUrl)],
+      strategy: 'single',
+    }
+  }
+
+  // --- pokračovanie prerušeného behu ---------------------------------------
+  // Úvodná stránka sa už raz stiahla, kategórie sú uložené — netreba ju čítať
+  // znova, stačí dojsť zvyšok zoznamu.
+  if (known && known.strategy !== 'generic' && known.strategy !== 'sitemap') {
+    const isProduct =
+      known.strategy === 'woocommerce' ? (url: string) => WOO_PRODUCT.test(url) : isShoperProduct
+
+    const remaining = await crawlCategories({
+      addProducts,
+      base,
+      budget,
+      isProduct,
+      log,
+      maxProducts,
+      outOfTime,
+      pending,
+      products,
+      shoper: known.strategy === 'shoper',
+    })
+
+    return {
+      categories: remaining,
+      complete: remaining.length === 0,
+      productUrls: [...products],
+      strategy: known.strategy,
+    }
   }
 
   budget.fetches++
@@ -200,8 +335,13 @@ export const discover = async (
   addProducts(entryLinks.filter(isShoperProduct))
 
   for (const link of entryLinks) {
-    if (isShoperCategory(link)) categories.add(shoperPageUrl(link, 1))
-    else if (WOO_CATEGORY.test(link)) categories.add(link)
+    const category = isShoperCategory(link)
+      ? shoperPageUrl(link, 1)
+      : WOO_CATEGORY.test(link)
+        ? link
+        : null
+
+    if (category && !pending.includes(category)) pending.push(category)
   }
 
   const shoper = entryLinks.some(isShoperProduct) || entryLinks.some(isShoperCategory)
@@ -210,46 +350,29 @@ export const discover = async (
   // --- 1) platformové heuristiky ------------------------------------------
   if (shoper || woo) {
     const strategy: DiscoverResult['strategy'] = shoper ? 'shoper' : 'woocommerce'
-    const isProduct = shoper ? isShoperProduct : (url: string) => WOO_PRODUCT.test(url)
 
-    log?.(`Platforma: ${strategy}, kategórií: ${categories.size}`)
+    log?.(`Platforma: ${strategy}, kategórií: ${pending.length}`)
 
-    for (const category of categories) {
-      if (products.size >= maxProducts || budget.fetches >= MAX_LISTING_FETCHES) break
-
-      for (let page = 1; page <= MAX_PAGES_PER_CATEGORY; page++) {
-        if (products.size >= maxProducts || budget.fetches >= MAX_LISTING_FETCHES) break
-
-        const pageUrl = shoper
-          ? shoperPageUrl(category, page)
-          : page === 1
-            ? category
-            : `${category.replace(/\/$/, '')}/page/${page}/`
-
-        budget.fetches++
-
-        const listing = await tryFetchPage(pageUrl)
-
-        await politeDelay()
-
-        if (!listing) break
-
-        const found = collectLinks(listing.html, listing.finalUrl, base).filter(isProduct)
-        const fresh = found.filter((url) => !products.has(url))
-
-        addProducts(found)
-
-        log?.(`${pageUrl} → ${found.length} produktov (${fresh.length} nových)`)
-
-        // Shoper pri prekročení poslednej strany vráti prvú stranu (rovnaké
-        // produkty) namiesto 404 — prázdny prírastok je preto jediný spoľahlivý
-        // signál konca stránkovania.
-        if (!fresh.length) break
-      }
-    }
+    const remaining = await crawlCategories({
+      addProducts,
+      base,
+      budget,
+      isProduct: shoper ? isShoperProduct : (url: string) => WOO_PRODUCT.test(url),
+      log,
+      maxProducts,
+      outOfTime,
+      pending,
+      products,
+      shoper,
+    })
 
     if (products.size) {
-      return { categories: [...categories], productUrls: [...products], strategy }
+      return {
+        categories: remaining,
+        complete: remaining.length === 0,
+        productUrls: [...products],
+        strategy,
+      }
     }
   }
 
@@ -264,7 +387,8 @@ export const discover = async (
     if (fromSitemap.length) {
       addProducts(fromSitemap)
 
-      return { categories: [...categories], productUrls: [...products], strategy: 'sitemap' }
+      // Sitemapa dá celý katalóg naraz — nie je čo odkladať na ďalší krok.
+      return { categories: [], complete: true, productUrls: [...products], strategy: 'sitemap' }
     }
   }
 
@@ -276,7 +400,12 @@ export const discover = async (
 
   addProducts(entryLinks.filter((url) => GENERIC_PRODUCT.test(url)))
 
-  while (queue.length && products.size < maxProducts && budget.fetches < MAX_LISTING_FETCHES) {
+  while (
+    queue.length &&
+    products.size < maxProducts &&
+    budget.fetches < MAX_LISTING_FETCHES &&
+    !outOfTime()
+  ) {
     const current = queue.shift()!
 
     if (visited.has(current)) continue
@@ -304,5 +433,9 @@ export const discover = async (
     }
   }
 
-  return { categories: [...categories], productUrls: [...products], strategy: 'generic' }
+  // Generický crawl nemá stabilný „zvyšok kategórií", ktorý by sa dal odložiť:
+  // fronta vzniká z odkazov, na ktoré sa práve narazilo. Preto sa vracia ako
+  // dokončený a čo našiel, to našiel — pri takom zdroji je aj tak namieste
+  // dať majiteľke radšej presnú adresu kategórie.
+  return { categories: [], complete: true, productUrls: [...products], strategy: 'generic' }
 }

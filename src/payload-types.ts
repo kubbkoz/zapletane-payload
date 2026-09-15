@@ -84,6 +84,7 @@ export interface Config {
     'discount-codes': DiscountCode;
     'product-filters': ProductFilter;
     'product-properties': ProductProperty;
+    'scraper-jobs': ScraperJob;
     'push-subscriptions': PushSubscription;
     redirects: Redirect;
     forms: Form;
@@ -126,6 +127,7 @@ export interface Config {
     'discount-codes': DiscountCodesSelect<false> | DiscountCodesSelect<true>;
     'product-filters': ProductFiltersSelect<false> | ProductFiltersSelect<true>;
     'product-properties': ProductPropertiesSelect<false> | ProductPropertiesSelect<true>;
+    'scraper-jobs': ScraperJobsSelect<false> | ScraperJobsSelect<true>;
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
@@ -381,6 +383,19 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Vypĺňa sa automaticky pri importe z webu. Podľa adresy sa pozná, že produkt už raz stiahnutý bol, takže opakovaný import ho preskočí.
+   */
+  importSource?: {
+    /**
+     * Stránka produktu v pôvodnom e-shope.
+     */
+    url?: string | null;
+    /**
+     * Číslo alebo slug z adresy zdroja — len pre orientáciu.
+     */
+    externalId?: string | null;
+  };
   /**
    * Časť adresy za lomkou. Prázdne = doplní sa z názvu (bez diakritiky). Pri zmene názvu sa prepíše automaticky a na starú adresu vznikne presmerovanie.
    */
@@ -1489,6 +1504,76 @@ export interface ProductFilter {
   createdAt: string;
 }
 /**
+ * Stiahne produkty z ľubovoľného e-shopu, preloží ich do slovenčiny, prepočíta ceny na eurá a naimportuje. Najprv sa vždy spustí testovací beh — importuje sa až po potvrdení.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "scraper-jobs".
+ */
+export interface ScraperJob {
+  id: number;
+  /**
+   * Celá adresa vrátane https://, napr. https://wiklinowa-wies.pl/. Môže to byť domovská stránka, kategória aj jeden produkt.
+   */
+  sourceUrl: string;
+  /**
+   * Mení sa sám podľa toho, čo práve beží.
+   */
+  status?: ('new' | 'preview_running' | 'awaiting_confirm' | 'importing' | 'done' | 'failed') | null;
+  /**
+   * Dvojpísmenový kód (pl, cs, de…). Pri „sk“ sa preklad preskočí.
+   */
+  detectedLanguage?: string | null;
+  /**
+   * Koľko jednotiek cudzej meny za 1 €. Použije sa, keď sa nepodarí stiahnuť živý denný kurz (predvolené 4,3 PLN/€).
+   */
+  fallbackRate?: number | null;
+  /**
+   * Koľko produktov sa naimportuje v jednom kroku. Viac než 10 sa do jedného volania nezmestí.
+   */
+  batchSize?: number | null;
+  /**
+   * Strop na počet produktov, ktoré sa z obchodu vôbec vezmú.
+   */
+  maxProducts?: number | null;
+  /**
+   * Priebeh importu. Aktualizuje sa po každej dávke.
+   */
+  counters?: {
+    discovered?: number | null;
+    imported?: number | null;
+    skipped?: number | null;
+    failed?: number | null;
+  };
+  /**
+   * Takto budú produkty vyzerať po importe. Vykresľuje ich panel „Ovládanie importu“ — surové dáta sú tu len na kontrolu.
+   */
+  previews?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Posledné riadky sú navrchu.
+   */
+  log?: string | null;
+  productLinks?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  cursor?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Prehliadače, ktoré si zapli notifikácie o stave objednávky. Zapisuje ich storefront (Povoliť notifikácie), nie admin — ručne sa tu dá odber nanajvýš zmazať.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1850,6 +1935,24 @@ export interface PayloadMcpApiKey {
      */
     delete?: boolean | null;
   };
+  scraperJobs?: {
+    /**
+     * Allow clients to find scraper-jobs.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create scraper-jobs.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update scraper-jobs.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete scraper-jobs.
+     */
+    delete?: boolean | null;
+  };
   orders?: {
     /**
      * Allow clients to find orders.
@@ -2026,6 +2129,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'product-properties';
         value: number | ProductProperty;
+      } | null)
+    | ({
+        relationTo: 'scraper-jobs';
+        value: number | ScraperJob;
       } | null)
     | ({
         relationTo: 'push-subscriptions';
@@ -2521,6 +2628,32 @@ export interface ProductPropertiesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "scraper-jobs_select".
+ */
+export interface ScraperJobsSelect<T extends boolean = true> {
+  sourceUrl?: T;
+  status?: T;
+  detectedLanguage?: T;
+  fallbackRate?: T;
+  batchSize?: T;
+  maxProducts?: T;
+  counters?:
+    | T
+    | {
+        discovered?: T;
+        imported?: T;
+        skipped?: T;
+        failed?: T;
+      };
+  previews?: T;
+  log?: T;
+  productLinks?: T;
+  cursor?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "push-subscriptions_select".
  */
 export interface PushSubscriptionsSelect<T extends boolean = true> {
@@ -2823,6 +2956,12 @@ export interface ProductsSelect<T extends boolean = true> {
         tag?: T;
         id?: T;
       };
+  importSource?:
+    | T
+    | {
+        url?: T;
+        externalId?: T;
+      };
   slug?: T;
   slugLock?: T;
   generateSlug?: T;
@@ -3037,6 +3176,14 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         delete?: T;
       };
   productProperties?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  scraperJobs?:
     | T
     | {
         find?: T;

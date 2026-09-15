@@ -28,6 +28,7 @@ import { Posts } from '@/collections/Posts'
 import { ProductFilters } from '@/collections/ProductFilters'
 import { ProductProperties } from '@/collections/ProductProperties'
 import { PushSubscriptions } from '@/collections/PushSubscriptions'
+import { ScraperJobs } from '@/collections/ScraperJobs'
 import { ShippingMethods } from '@/collections/ShippingMethods'
 import { Users } from '@/collections/Users'
 import { globalConfigs } from '@/globals'
@@ -132,6 +133,8 @@ export default buildConfig({
     DiscountCodes,
     ProductFilters,
     ProductProperties,
+    // Z12 — import produktov z cudzieho e-shopu (scraper + preklad + ceny).
+    ScraperJobs,
     PushSubscriptions,
   ],
   db: databaseAdapter,

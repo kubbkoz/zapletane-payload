@@ -1,3 +1,4 @@
+import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
 import { CallToAction } from '@/blocks/CallToAction/config'
 import { Content } from '@/blocks/Content/config'
 import { MediaBlock } from '@/blocks/MediaBlock/config'
@@ -471,6 +472,50 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
           type: 'text',
           label: 'Štítok',
           required: true,
+        },
+      ],
+    },
+    // --- Pôvod importu (Z12) ----------------------------------------------
+    // Vyplní ho scraper (`src/scraper/importProduct.ts`) a slúži na dve veci:
+    // je to kľúč idempotencie („tento produkt sme z tejto adresy už raz
+    // stiahli, preskoč ho") a stopa pre majiteľku, odkiaľ položka prišla.
+    // Ručne založený produkt má skupinu prázdnu — to je normálny stav.
+    //
+    // `index` je na `url`, lebo práve podľa nej sa hľadá pred KAŽDÝM
+    // zakladaním; bez indexu by import stoviek položiek robil stovky
+    // sekvenčných prechodov cez celú tabuľku produktov.
+    {
+      name: 'importSource',
+      type: 'group',
+      label: 'Pôvod importu',
+      access: {
+        // Viditeľné a editovateľné len pre administrátorku: zákazníkovi je
+        // adresa cudzieho e-shopu na nič a v REST odpovedi nemá čo robiť.
+        read: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
+      admin: {
+        description:
+          'Vypĺňa sa automaticky pri importe z webu. Podľa adresy sa pozná, že produkt už raz stiahnutý bol, takže opakovaný import ho preskočí.',
+        position: 'sidebar',
+      },
+      fields: [
+        {
+          name: 'url',
+          type: 'text',
+          label: 'Adresa zdroja',
+          index: true,
+          admin: {
+            description: 'Stránka produktu v pôvodnom e-shope.',
+          },
+        },
+        {
+          name: 'externalId',
+          type: 'text',
+          label: 'Identifikátor v zdroji',
+          admin: {
+            description: 'Číslo alebo slug z adresy zdroja — len pre orientáciu.',
+          },
         },
       ],
     },

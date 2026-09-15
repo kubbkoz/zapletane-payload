@@ -116,6 +116,10 @@ async function main() {
     // Y1 — vlastnosti produktov (the dictionary; the per-product value is part
     // of the `products` document and is already covered by `products`).
     productProperties: fullCrud,
+    // Z12 — importy z webu (scraper). Konfiguračná kolekcia: agent smie úlohu
+    // založiť, sledovať a upratať; samotný beh spúšťa admin UI cez
+    // /api/scraper/run, ktorá MCP kľúč neakceptuje.
+    scraperJobs: fullCrud,
     orders: findAndUpdate,
     transactions: findAndUpdate,
     carts: findAndUpdate,

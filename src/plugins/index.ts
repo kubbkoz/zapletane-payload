@@ -502,7 +502,8 @@ export const plugins: Plugin[] = [
   //   - full CRUD  : products, categories, pages, posts, redirects, media,
   //                  variants, variantOptions, shipping-methods,
   //                  payment-methods, discount-codes, product-filters,
-  //                  product-properties, and every registered global.
+  //                  product-properties, scraper-jobs, and every registered
+  //                  global.
   //   - find+update: orders, transactions, carts, addresses (no create/delete
   //                  — these are financial/checkout records, not
   //                  agent-authored content).
@@ -622,6 +623,16 @@ export const plugins: Plugin[] = [
       'product-properties': {
         description:
           'Shop-wide product property definitions (name, slug, optional unit, optional predefined value suggestions, sort order). The per-product value lives in products.properties[]. Catalog configuration, agent-editable.',
+        enabled: mcpFullCrud,
+      },
+      // Z12 — importy z cudzích e-shopov. Konfiguračná kolekcia rovnakého
+      // druhu ako `product-filters`: agent musí vedieť úlohu založiť (zadať
+      // adresu, kurz, veľkosť dávky), sledovať jej stav a po dobehnutí ju
+      // upratať. Samotné sťahovanie beží cez `/api/scraper/run`, ktorá je
+      // chránená prihlásením administrátorky — MCP nástroj ju nespúšťa.
+      'scraper-jobs': {
+        description:
+          'Web-scraper import jobs (source shop URL, status, detected language, fallback FX rate, batch size, max products, counters, test-run previews, log). Creating a job only queues it — the actual crawl/translate/import is triggered from the admin UI.',
         enabled: mcpFullCrud,
       },
       orders: {

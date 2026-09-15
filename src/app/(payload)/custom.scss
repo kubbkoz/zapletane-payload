@@ -588,3 +588,12 @@ $zap-nav-icon-close: '</svg>';
     "<path d='M4 11a9 9 0 0 1 9 9'/><path d='M4 4a16 16 0 0 1 16 16'/><circle cx='5' cy='19' r='1'/>"
   );
 }
+
+/* §7 doplnky — Z12: import produktov z cudzieho e-shopu */
+
+#nav-scraper-jobs {
+  // CloudDownload
+  @include zap-nav-icon(
+    "<path d='M12 13v8l-4-4'/><path d='m12 21 4-4'/><path d='M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284'/>"
+  );
+}
