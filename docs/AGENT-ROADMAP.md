@@ -21,6 +21,23 @@
 - [x] Fáza 4 (X1–X4): shipping rules, zľavové kódy, search settings, dynamické
       filtre, OAuth (Google/FB — čaká na klientske kľúče), admin SK + ikony —
       HOTOVÉ, nasadené
+- [x] Fáza 6 (Z1–Z9) — HOTOVÉ, nasadené (482c2a1): Z1 search overlay (blur,
+      centrovaný input, live results, odporúčané produkty/kategórie v search
+      settings); Z2 kompletný účet (adresy fakturačná/dodacia cez kind,
+      objednávky+stavy SK, reklamačná stránka); Z3 web push (VAPID, push-
+      subscriptions, order-status hook) + PWA (manifest, sw.js, install);
+      Z4 SEO/GEO (AI meta cez Claude + fallback šablóna, JSON-LD, sitemap +
+      robots fix, alt fix); Z5 topbar režimy (kontakty/marquee/off); Z6 cookie
+      consent (vanilla-cookieconsent, gating scriptov + push, footer
+      preferencie); Z7 SEO slugy + auto 301 redirecty (plugin-redirects,
+      kolaps reťazcov) + Blog (/blog/[slug]) + /kategoria/[slug]; Z8 admin
+      štatistiky (global statistiky, Ecommerce group, dashboard hero →
+      objednávky → štatistiky, orders prvé v nav); Z9 hero video/obrázok
+      per slide + auto optimalizácia uploadov (WebP q82, video H.264 CRF23,
+      beforeOperation buffer swap). Infra: Vercel Blob storage (media),
+      blob remotePatterns + ffmpeg tracing v next.config, ANTHROPIC_API_KEY
+      + VAPID env na Verceli. Pozn.: prod upload strop ~4,3 MB (serverless
+      body limit); clientUploads by ho zdvihol, ale vypol by optimalizáciu.
 - [x] Fáza 5 (Y1–Y4): vlastnosti produktov + rozmery/hmotnosť + cross/upsell,
       Google Merchant + Meta feedy s mapovaním atribútov, tracking scripty
       (head/body), PDP/cart rendering, mobilný app-shell (bottom bar, hamburger
