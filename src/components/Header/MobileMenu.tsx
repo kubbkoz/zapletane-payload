@@ -4,13 +4,12 @@ import type { Header } from '@/payload-types'
 import type { ResolvedContact } from '@/lib/contact'
 import type { SocialLink, TopBarLink } from '@/lib/navigation'
 
-import { Logo } from '@/components/Logo'
 import { SocialIcon } from '@/components/SocialIcon'
 import { DEFAULT_CONTACT } from '@/lib/contact'
 import { isExternalHref, SOCIAL_LINKS, TOP_BAR_LINKS } from '@/lib/navigation'
 import { useAuth } from '@/providers/Auth'
 import { cn } from '@/utilities/cn'
-import { BookOpen, Mail, Phone, User, X } from 'lucide-react'
+import { BookOpen, Mail, Phone, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
@@ -33,23 +32,23 @@ type Props = {
 const SECONDARY_ICONS: Record<string, React.ElementType> = { BookOpen, Mail, Phone }
 
 /**
- * Full-screen mobile menu — REDESIGNED presentation (visible refresh, per the
- * owner's request). Data contract, trigger and portal mechanics are
- * unchanged from the previous version; only what gets rendered inside the
- * portal changed:
+ * Mobile menu panel — opens UNDER the static header row (app-shell rule: the
+ * top bar never changes, only the band below it does). The panel has no top
+ * row of its own: the header's logo stays visible and its HamburgerButton —
+ * morphed into an X — is the single close control, so the line→X animation is
+ * actually watchable (`z-30` keeps the panel below the `z-50` <nav>, and
+ * `--navbar-height-current` pads the panel's content out from under it).
  *
- *   1. Top row       Logo + 40×40 bordered close chip
- *   2. Search        compact SearchBar (mobile's only search entry point —
- *                     NavIcons hides its own search button below `lg`)
- *   3. Main nav       large display-type list, numbered, staggered entrance,
+ *   1. Search        compact SearchBar (the menu's search entry point; the
+ *                     bottom bar's Hľadať tab opens the fullscreen overlay)
+ *   2. Main nav       large display-type list, numbered, staggered entrance,
  *                     active route in `text-brand`; an item's optional
  *                     `children` (Header global, one level) render indented
  *                     under it in the small uppercase font-tech face
- *   4. Secondary      the TopBar's quick links — now the `header` global's
- *                     `topBar.links` array, no longer hard-coded — + the
- *                     account link (mobile's only account entry point:
- *                     NavIcons hides it below `md`), small uppercase font-tech
- *   5. Contact        phone + email + social icon-ring row, from the
+ *   3. Secondary      the TopBar's quick links — the `header` global's
+ *                     `topBar.links` array — + the account link, small
+ *                     uppercase font-tech
+ *   4. Contact        phone + email + social icon-ring row, from the
  *                     `site-settings` and `footer` globals
  *
  * Every CMS value arrives as a prop (this is a client component); each prop
@@ -105,32 +104,23 @@ export function MobileMenu({
       // mounted so the fade/stagger transition can run on open + close).
       inert={!isOpen}
       className={cn(
-        'fixed inset-0 z-[120] flex h-[100dvh] w-full flex-col overflow-hidden bg-brand-50 lg:hidden',
+        // z-30 on purpose: below the z-50 <nav> (logo + morphing hamburger stay
+        // visible and clickable on top) and below the z-40 bottom bar.
+        'fixed inset-0 z-30 flex h-[100dvh] w-full flex-col overflow-hidden bg-brand-50 lg:hidden',
         'transition-opacity ease-[var(--ease-out)] motion-reduce:transition-none',
         isOpen
           ? 'pointer-events-auto opacity-100 duration-300'
           : 'pointer-events-none opacity-0 duration-150',
       )}
+      // The static header row stays above this panel — start the content
+      // below it. Measured live by HeaderClient's ResizeObserver.
+      style={{ paddingTop: 'var(--navbar-height-current, 106px)' }}
     >
-      {/* 1. Top row — wordmark + close chip */}
-      <div className="flex h-[var(--navbar-height-unscrolled,72px)] w-full shrink-0 items-center justify-between border-b border-gray-200 px-6">
-        <Logo />
-
-        <button
-          aria-label="Zatvoriť menu"
-          className="flex h-10 w-10 items-center justify-center rounded-default border border-gray-300 text-black transition-colors duration-200 hover:border-brand hover:text-brand active:scale-95"
-          onClick={onClose}
-          type="button"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      <div className="scrollbar-hide w-full flex-1 overflow-y-auto px-6 pb-safe pt-8">
-        {/* 2. Search — the only search entry point on mobile widths */}
+      <div className="scrollbar-hide mobile-nav-offset w-full flex-1 overflow-y-auto px-6 pb-safe pt-8">
+        {/* 1. Search — the menu's search entry point */}
         <SearchBar className="relative mb-10 flex w-full" placeholder={searchPlaceholder} />
 
-        {/* 3. Main nav — large display type, numbered, staggered entrance */}
+        {/* 2. Main nav — large display type, numbered, staggered entrance */}
         {items.length ? (
           <nav aria-label="Hlavná navigácia" className="mb-10">
             <div className="flex flex-col">
@@ -207,7 +197,7 @@ export function MobileMenu({
           </nav>
         ) : null}
 
-        {/* 4. Secondary links — TopBar's quick links + account (mobile-only entry point) */}
+        {/* 3. Secondary links — TopBar's quick links + account */}
         <RevealItem
           className="mb-10 border-t border-gray-200 pt-8"
           delayIndex={secondaryDelayIndex}
@@ -243,7 +233,7 @@ export function MobileMenu({
           </div>
         </RevealItem>
 
-        {/* 5. Contact block — phone / email + social icon-ring row */}
+        {/* 4. Contact block — phone / email + social icon-ring row */}
         <RevealItem
           className="border-t border-gray-200 pb-10 pt-8"
           delayIndex={contactDelayIndex}
