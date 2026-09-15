@@ -625,3 +625,23 @@ button {
     }
   }
 }
+
+/* ============================================================================
+   Appended by the mobile app-shell pass — new classes only, nothing above is
+   modified.
+   ============================================================================ */
+@layer components {
+  /* §2.4 — the mobile bottom bar is `position: fixed`, so it takes no space in
+     the flow. This hands its height (60px + the home-indicator inset) back to
+     the page as bottom padding below `md`, where the bar exists, and zeroes it
+     from `md` up, where it does not. Applied once, to the wrapper around
+     <main> + <Footer>, so the footer clears the bar as well. */
+  .mobile-nav-offset {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+  @media (width >= 48rem) {
+    .mobile-nav-offset {
+      padding-bottom: 0;
+    }
+  }
+}

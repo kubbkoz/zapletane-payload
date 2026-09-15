@@ -4,10 +4,12 @@ import type { ReactNode } from 'react'
 import type { SiteSetting } from '@/payload-types'
 
 import { AdminBar } from '@/components/AdminBar'
+import { CartDrawerProvider } from '@/components/Cart/CartDrawerProvider'
 import { ComingSoonPage } from '@/components/ComingSoon'
 import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
+import { MobileBottomNav } from '@/components/MobileBottomNav'
 import { COMING_SOON_BYPASS_COOKIE } from '@/lib/comingSoon'
 import { ensureStartsWith } from '@/utilities/ensureStartsWith'
 import { getSiteSettings } from '@/utilities/getSiteSettings'
@@ -139,9 +141,23 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <AdminBar />
           <LivePreviewListener />
 
-          <Header />
-          <main>{children}</main>
-          <Footer />
+          {/* App shell: a static header above, a static bottom bar below, and
+              only the band between them changing. `CartDrawerProvider` spans
+              both so the bottom bar's cart tab opens the header's drawer.
+
+              Everything here sits inside the post-gate branch of this layout —
+              the coming-soon page returns above, before any of it — so the
+              bottom bar can never appear on the pre-launch page. */}
+          <CartDrawerProvider>
+            <Header />
+            {/* `.mobile-nav-offset` gives back the fixed bar's 60px + safe area
+                below `md` (0 from `md` up), so nothing is ever covered. */}
+            <div className="mobile-nav-offset">
+              <main>{children}</main>
+              <Footer />
+            </div>
+            <MobileBottomNav />
+          </CartDrawerProvider>
         </Providers>
       </body>
     </html>

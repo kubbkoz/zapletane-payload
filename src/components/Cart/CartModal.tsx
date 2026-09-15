@@ -10,6 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { cn } from '@/utilities/cn'
 import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
 import { ArrowRight, ShoppingCart } from 'lucide-react'
 import Image from 'next/image'
@@ -17,9 +18,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useMemo, useState } from 'react'
 
+import { useCartDrawer } from './CartDrawerProvider'
 import { DeleteItemButton } from './DeleteItemButton'
 import { EditItemQuantityButton } from './EditItemQuantityButton'
 import { OpenCartButton } from './OpenCart'
+import { useIsMobileViewport } from './useIsMobileViewport'
 import { Product, Variant } from '@/payload-types'
 
 type GalleryItem = NonNullable<Product['gallery']>[number]
@@ -28,14 +31,34 @@ type VariantOptionRef = Variant['options'][number]
 /**
  * Cart drawer — the "Aero" off-canvas recipe (DESIGN-SPEC §3.2/§3.4): on desktop
  * a floating 440px panel inset by 4 from the top/right/bottom with
- * `shadow-panel` and near-square corners; a full-bleed sheet on mobile.
- * Header / scrollable item list / pinned footer, cream-and-espresso throughout.
+ * `shadow-panel` and near-square corners. Below `md` the same panel becomes a
+ * bottom sheet — it slides up from the bottom edge, capped at 85dvh, with a
+ * grabber and rounded top corners — which is what §3.2's Aero standard already
+ * prescribed for mobile ("mobile floats from the bottom") and what an app-shell
+ * layout with a fixed bottom bar wants.
+ *
+ * Radix cannot make `side` responsive on its own (it is a prop, not a class),
+ * so the side is chosen from `useIsMobileViewport()` and the panel's own
+ * positioning classes follow it. There is no first-paint flash: the sheet's
+ * content is only mounted once it opens, always after hydration, so the
+ * SSR-safe `false` default is never the value anything paints with.
+ *
+ * Open state comes from `CartDrawerProvider` when one is mounted (the layout
+ * mounts it), so the mobile bottom bar opens this exact drawer; without a
+ * provider it falls back to local state and behaves exactly as before.
  *
  * Every hook and handler below is the template's — this is a skin, not a rewire.
  */
 export function CartModal() {
   const { cart } = useCart()
-  const [isOpen, setIsOpen] = useState(false)
+  const drawer = useCartDrawer()
+  const [localOpen, setLocalOpen] = useState(false)
+
+  const isOpen = drawer ? drawer.isOpen : localOpen
+  const setIsOpen = drawer ? drawer.setOpen : setLocalOpen
+
+  const isMobile = useIsMobileViewport()
+  const side = isMobile ? 'bottom' : 'right'
 
   const pathname = usePathname()
 
@@ -57,8 +80,30 @@ export function CartModal() {
         <OpenCartButton quantity={totalQuantity} />
       </SheetTrigger>
 
-      <SheetContent className="flex w-full flex-col gap-0 border-gray-200 bg-white p-0 shadow-panel sm:max-w-none md:inset-y-4 md:right-4 md:h-auto md:w-[440px] md:rounded-default md:border">
-        <SheetHeader className="shrink-0 gap-1 border-b border-gray-200 px-6 py-5 pr-16">
+      <SheetContent
+        className={cn(
+          'flex w-full flex-col gap-0 border-gray-200 bg-white p-0 shadow-panel sm:max-w-none',
+          side === 'bottom'
+            ? // Bottom sheet: capped so the page stays visible behind it, with
+              // the grabber's breathing room above the header.
+              'h-auto max-h-[85dvh] rounded-t-[12px] border-t'
+            : 'md:inset-y-4 md:right-4 md:h-auto md:w-[440px] md:rounded-default md:border',
+        )}
+        side={side}
+      >
+        {side === 'bottom' ? (
+          <div
+            aria-hidden="true"
+            className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-gray-200"
+          />
+        ) : null}
+
+        <SheetHeader
+          className={cn(
+            'shrink-0 gap-1 border-b border-gray-200 px-6 py-5 pr-16',
+            side === 'bottom' && 'pt-3',
+          )}
+        >
           <SheetTitle className="font-tech text-sm font-bold uppercase tracking-widest text-black">
             Nákupný košík
           </SheetTitle>
@@ -68,7 +113,12 @@ export function CartModal() {
         </SheetHeader>
 
         {isEmpty ? (
-          <div className="flex grow flex-col items-center justify-center gap-4 px-8 py-16 text-center">
+          <div
+            className={cn(
+              'flex grow flex-col items-center justify-center gap-4 px-8 py-16 text-center',
+              side === 'bottom' && 'pb-[calc(4rem+env(safe-area-inset-bottom))]',
+            )}
+          >
             <span className="flex size-16 items-center justify-center rounded-full bg-brand-100 text-brand">
               <ShoppingCart className="size-7" strokeWidth={1.5} />
             </span>
@@ -85,7 +135,9 @@ export function CartModal() {
           </div>
         ) : (
           <React.Fragment>
-            <ul className="grow overflow-y-auto px-6">
+            {/* `min-h-0` lets the list actually scroll inside the capped
+                bottom sheet (a flex child defaults to min-height:auto). */}
+            <ul className="min-h-0 grow overflow-y-auto px-6">
               {cart?.items?.map((item, i) => {
                 const product = item.product
                 const variant = item.variant
@@ -200,7 +252,14 @@ export function CartModal() {
               })}
             </ul>
 
-            <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-5 shadow-panel-top md:rounded-b-md">
+            <div
+              className={cn(
+                'shrink-0 border-t border-gray-200 bg-white px-6 py-5 shadow-panel-top md:rounded-b-md',
+                // Home-indicator clearance on the bottom sheet (the desktop
+                // panel floats inset by 4 and needs none).
+                side === 'bottom' && 'pb-[calc(1.25rem+env(safe-area-inset-bottom))]',
+              )}
+            >
               {typeof cart?.subtotal === 'number' && (
                 <div className="flex items-end justify-between gap-4">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">

@@ -3,10 +3,11 @@
 import { Cart } from '@/components/Cart'
 import { OpenCartButton } from '@/components/Cart/OpenCart'
 import { useAuth } from '@/providers/Auth'
-import { cn } from '@/utilities/cn'
-import { Menu, Search, User, X } from 'lucide-react'
+import { Search, User } from 'lucide-react'
 import Link from 'next/link'
 import React, { Suspense } from 'react'
+
+import { HamburgerButton } from './Hamburger'
 
 type Props = {
   isMobileMenuOpen: boolean
@@ -49,22 +50,16 @@ export function NavIcons({ isMobileMenuOpen, onSearchClick, onToggleMobileMenu }
         ) : null}
       </Link>
 
-      <div className="flex items-center">
+      {/* Below `md` the bar is logo + hamburger only — the cart lives in the
+          fixed bottom bar there (the drawer itself is still mounted here and
+          portals to <body>, so the bottom bar can open this very sheet). */}
+      <div className="hidden items-center md:flex">
         <Suspense fallback={<OpenCartButton />}>
           <Cart />
         </Suspense>
       </div>
 
-      <button
-        aria-label="Menu"
-        className={cn(
-          'rounded-sm bg-transparent p-2 text-black transition-colors hover:text-brand lg:hidden',
-        )}
-        onClick={onToggleMobileMenu}
-        type="button"
-      >
-        {isMobileMenuOpen ? <X className="h-7 w-7" /> : <Menu className="h-7 w-7" />}
-      </button>
+      <HamburgerButton isOpen={isMobileMenuOpen} onClick={onToggleMobileMenu} />
     </div>
   )
 }
