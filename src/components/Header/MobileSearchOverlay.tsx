@@ -124,9 +124,26 @@ export function MobileSearchOverlay({ isOpen, onClose, placeholder }: Props) {
             placeholder={placeholder || DEFAULT_PLACEHOLDER}
             ref={inputRef}
             spellCheck={false}
-            type="search"
+            /* `text`, not `search`: Chrome paints its own off-brand blue clear
+               glyph inside a search input. The clear affordance below is the
+               header SearchBar's. */
+            type="text"
             value={value}
           />
+
+          {value ? (
+            <button
+              aria-label="Zmazať hľadanie"
+              className="absolute right-12 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-gray-400 transition-colors hover:text-gray-700"
+              onClick={() => {
+                setValue('')
+                inputRef.current?.focus()
+              }}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
 
           <button
             aria-label="Hľadať"

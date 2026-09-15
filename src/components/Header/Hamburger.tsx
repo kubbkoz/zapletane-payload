@@ -19,7 +19,7 @@ type Props = {
  * re-measured on each press.
  *
  * Here nothing mounts or unmounts and nothing is measured: three absolutely
- * positioned 2px spans inside a fixed 40×40 hit area (22×14 glyph box) animate
+ * positioned 2px spans inside a fixed 44×44 hit area (22×14 glyph box) animate
  * `transform` and `opacity` only — never width, height, or any box property —
  * so the morph is GPU-only and provably zero-CLS. The top/bottom rules slide
  * 6px to the centre line and counter-rotate ±45°, the middle one fades.
@@ -37,7 +37,7 @@ export function HamburgerButton({ className, isOpen, onClick }: Props) {
       aria-expanded={isOpen}
       aria-label={isOpen ? 'Zavrieť menu' : 'Otvoriť menu'}
       className={cn(
-        'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-transparent text-black transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand lg:hidden',
+        'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-transparent text-black transition-colors duration-200 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand lg:hidden',
         className,
       )}
       onClick={onClick}

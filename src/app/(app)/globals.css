@@ -645,3 +645,13 @@ button {
     }
   }
 }
+
+/* Sonner toasts below `md` must clear the fixed bottom bar (60px + safe area),
+   otherwise "Pridané do košíka" covers the cart tab for the toast's lifetime.
+   Sonner's own mobile breakpoint is 600px, so the bar's full <48rem range is
+   targeted directly; the inline --offset style forces the !important. */
+@media (width < 48rem) {
+  [data-sonner-toaster][data-y-position='bottom'] {
+    bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  }
+}
