@@ -26,6 +26,7 @@ import * as migration_20260915_121302_z9_hero_video from './20260915_121302_z9_h
 import * as migration_20260915_134529_z10_wishlist from './20260915_134529_z10_wishlist';
 import * as migration_20260915_150558_z12_scraper from './20260915_150558_z12_scraper';
 import * as migration_20260915_151000_z12_mcp_scraper_grants from './20260915_151000_z12_mcp_scraper_grants';
+import * as migration_20260915_155500_z13_mcp_widen_all_keys from './20260915_155500_z13_mcp_widen_all_keys';
 
 export const migrations = [
   {
@@ -167,5 +168,10 @@ export const migrations = [
     up: migration_20260915_151000_z12_mcp_scraper_grants.up,
     down: migration_20260915_151000_z12_mcp_scraper_grants.down,
     name: '20260915_151000_z12_mcp_scraper_grants'
+  },
+  {
+    up: migration_20260915_155500_z13_mcp_widen_all_keys.up,
+    down: migration_20260915_155500_z13_mcp_widen_all_keys.down,
+    name: '20260915_155500_z13_mcp_widen_all_keys',
   },
 ];
