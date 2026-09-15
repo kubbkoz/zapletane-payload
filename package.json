@@ -37,6 +37,7 @@
     "@payloadcms/plugin-ecommerce": "3.89.0",
     "@payloadcms/plugin-form-builder": "3.89.0",
     "@payloadcms/plugin-mcp": "^3.89.0",
+    "@payloadcms/plugin-redirects": "^3.89.0",
     "@payloadcms/plugin-seo": "3.89.0",
     "@payloadcms/richtext-lexical": "3.89.0",
     "@payloadcms/translations": "3.89.0",
