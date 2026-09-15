@@ -81,6 +81,7 @@ export interface Config {
     'payment-methods': PaymentMethod;
     'discount-codes': DiscountCode;
     'product-filters': ProductFilter;
+    'product-properties': ProductProperty;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -119,6 +120,7 @@ export interface Config {
     'payment-methods': PaymentMethodsSelect<false> | PaymentMethodsSelect<true>;
     'discount-codes': DiscountCodesSelect<false> | DiscountCodesSelect<true>;
     'product-filters': ProductFiltersSelect<false> | ProductFiltersSelect<true>;
+    'product-properties': ProductPropertiesSelect<false> | ProductPropertiesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -364,7 +366,43 @@ export interface Product {
   };
   priceInEUREnabled?: boolean | null;
   priceInEUR?: number | null;
+  /**
+   * Voľné odporúčania zobrazené na stránke produktu.
+   */
   relatedProducts?: (number | Product)[] | null;
+  /**
+   * Zobrazia sa v košíku ako tip na dokúpenie.
+   */
+  crossSell?: (number | Product)[] | null;
+  /**
+   * Drahšie/lepšie alternatívy zobrazené na stránke produktu.
+   */
+  upsell?: (number | Product)[] | null;
+  /**
+   * Vlastnosť vyberáš zo spoločného zoznamu („Vlastnosti“ v menu), hodnotu píšeš pre tento produkt. Jednotka sa berie z definície vlastnosti.
+   */
+  properties?:
+    | {
+        /**
+         * Napr. „Materiál“.
+         */
+        property: number | ProductProperty;
+        /**
+         * Napr. „vlna“. Predvolené hodnoty pri vlastnosti sú len návrh — zadať sa dá čokoľvek.
+         */
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Rozmery v cm, hmotnosť v gramoch — použije sa aj v produktových feedoch.
+   */
+  dimensions?: {
+    width?: number | null;
+    height?: number | null;
+    depth?: number | null;
+    weight?: number | null;
+  };
   meta?: {
     title?: string | null;
     /**
@@ -960,6 +998,42 @@ export interface Variant {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * Zoznam vlastností, ktoré sa dajú vyplniť na produkte (napr. Materiál, Farba, Dĺžka). Hodnotu zadávaš na konkrétnom produkte v záložke „Vlastnosti“.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-properties".
+ */
+export interface ProductProperty {
+  id: number;
+  /**
+   * Zobrazí sa na produkte aj v tabuľke vlastností, napr. „Materiál“.
+   */
+  name: string;
+  /**
+   * Malé písmená a pomlčky, napr. „material“. Prázdne = doplní sa automaticky z názvu. Používa sa v produktových feedoch a v URL.
+   */
+  slug: string;
+  /**
+   * Voliteľné. Napr. „cm“ alebo „g“ — pripojí sa za hodnotu pri zobrazení. Prázdne = bez jednotky.
+   */
+  unit?: string | null;
+  /**
+   * Voliteľný zoznam návrhov (napr. vlna, bavlna, prútie). Na produkte sa dá zadať aj iná hodnota — nič sa nevynucuje.
+   */
+  predefinedValues?:
+    | {
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Nižšie číslo = vyššie v zozname vlastností.
+   */
+  sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "transactions".
  */
@@ -1338,7 +1412,7 @@ export interface FormSubmission {
   createdAt: string;
 }
 /**
- * API keys control which collections, resources, tools, and prompts MCP clients can access
+ * API kľúče pre MCP klientov. Každý kľúč koná ako používateľ, ku ktorému patrí, a jeho zaškrtávacie polia určujú, ktoré nástroje smie klient použiť.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-mcp-api-keys".
@@ -1555,6 +1629,24 @@ export interface PayloadMcpApiKey {
      */
     delete?: boolean | null;
   };
+  productProperties?: {
+    /**
+     * Allow clients to find product-properties.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create product-properties.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update product-properties.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete product-properties.
+     */
+    delete?: boolean | null;
+  };
   orders?: {
     /**
      * Allow clients to find orders.
@@ -1703,6 +1795,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'product-filters';
         value: number | ProductFilter;
+      } | null)
+    | ({
+        relationTo: 'product-properties';
+        value: number | ProductProperty;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2105,6 +2201,24 @@ export interface ProductFiltersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-properties_select".
+ */
+export interface ProductPropertiesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  unit?: T;
+  predefinedValues?:
+    | T
+    | {
+        value?: T;
+        id?: T;
+      };
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "forms_select".
  */
 export interface FormsSelect<T extends boolean = true> {
@@ -2341,6 +2455,23 @@ export interface ProductsSelect<T extends boolean = true> {
   priceInEUREnabled?: T;
   priceInEUR?: T;
   relatedProducts?: T;
+  crossSell?: T;
+  upsell?: T;
+  properties?:
+    | T
+    | {
+        property?: T;
+        value?: T;
+        id?: T;
+      };
+  dimensions?:
+    | T
+    | {
+        width?: T;
+        height?: T;
+        depth?: T;
+        weight?: T;
+      };
   meta?:
     | T
     | {
@@ -2588,6 +2719,14 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         delete?: T;
       };
   productFilters?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  productProperties?:
     | T
     | {
         find?: T;

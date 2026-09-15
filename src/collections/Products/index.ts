@@ -18,7 +18,30 @@ import {
   InlineToolbarFeature,
   lexicalEditor,
 } from '@payloadcms/richtext-lexical'
-import { DefaultDocumentIDType, Where } from 'payload'
+import { DefaultDocumentIDType, RelationshipField, Where } from 'payload'
+
+/**
+ * Shared `filterOptions` for the three product↔product relationships
+ * (relatedProducts / crossSell / upsell): never offer the product itself.
+ * Copied from the template's `relatedProducts`, including its seeding caveat —
+ * during a seed the document id is still undefined, so the filter degrades to
+ * "any existing product" instead of an impossible query.
+ */
+const excludeSelf: RelationshipField['filterOptions'] = ({ id }) => {
+  if (id) {
+    return {
+      id: {
+        not_in: [id],
+      },
+    }
+  }
+
+  return {
+    id: {
+      exists: true,
+    },
+  }
+}
 
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
@@ -146,27 +169,137 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
             {
               name: 'relatedProducts',
               type: 'relationship',
-              filterOptions: ({ id }) => {
-                if (id) {
-                  return {
-                    id: {
-                      not_in: [id],
-                    },
-                  }
-                }
-
-                // ID comes back as undefined during seeding so we need to handle that case
-                return {
-                  id: {
-                    exists: true,
-                  },
-                }
+              label: 'Súvisiace produkty',
+              admin: {
+                description: 'Voľné odporúčania zobrazené na stránke produktu.',
               },
+              // ID comes back as undefined during seeding so we need to handle that case
+              filterOptions: excludeSelf,
+              hasMany: true,
+              relationTo: 'products',
+            },
+            // --- Cross-sell / upsell (Y1) -------------------------------
+            // Two *separate* lists on purpose: they are read in different
+            // places (košík vs. PDP) and answer different questions, so a
+            // single "related" list cannot serve both without the storefront
+            // guessing. Both exclude the product itself.
+            {
+              name: 'crossSell',
+              type: 'relationship',
+              label: 'Doplnkové produkty (cross-sell)',
+              admin: {
+                description: 'Zobrazia sa v košíku ako tip na dokúpenie.',
+              },
+              filterOptions: excludeSelf,
+              hasMany: true,
+              relationTo: 'products',
+            },
+            {
+              name: 'upsell',
+              type: 'relationship',
+              label: 'Upsell produkty',
+              admin: {
+                description: 'Drahšie/lepšie alternatívy zobrazené na stránke produktu.',
+              },
+              filterOptions: excludeSelf,
               hasMany: true,
               relationTo: 'products',
             },
           ],
           label: 'Product Details',
+        },
+        // --- Vlastnosti a rozmery (Y1) ------------------------------------
+        // Own tab so the product form does not grow a third long scroll:
+        // the property table and the shipping dimensions are what the PDP
+        // (Y3) and the product feeds (Y2) read, and they are edited together.
+        {
+          fields: [
+            {
+              name: 'properties',
+              type: 'array',
+              label: 'Vlastnosti',
+              labels: { plural: 'Vlastnosti', singular: 'Vlastnosť' },
+              admin: {
+                description:
+                  'Vlastnosť vyberáš zo spoločného zoznamu („Vlastnosti“ v menu), hodnotu píšeš pre tento produkt. Jednotka sa berie z definície vlastnosti.',
+              },
+              fields: [
+                {
+                  type: 'row',
+                  fields: [
+                    {
+                      name: 'property',
+                      type: 'relationship',
+                      label: 'Vlastnosť',
+                      relationTo: 'product-properties',
+                      required: true,
+                      admin: {
+                        description: 'Napr. „Materiál“.',
+                        sortOptions: 'name',
+                        width: '50%',
+                      },
+                    },
+                    {
+                      name: 'value',
+                      type: 'text',
+                      label: 'Hodnota',
+                      required: true,
+                      admin: {
+                        description:
+                          'Napr. „vlna“. Predvolené hodnoty pri vlastnosti sú len návrh — zadať sa dá čokoľvek.',
+                        width: '50%',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              name: 'dimensions',
+              type: 'group',
+              label: 'Rozmery a hmotnosť',
+              admin: {
+                description:
+                  'Rozmery v cm, hmotnosť v gramoch — použije sa aj v produktových feedoch.',
+              },
+              fields: [
+                {
+                  type: 'row',
+                  fields: [
+                    {
+                      name: 'width',
+                      type: 'number',
+                      label: 'Šírka (cm)',
+                      min: 0,
+                      admin: { width: '25%' },
+                    },
+                    {
+                      name: 'height',
+                      type: 'number',
+                      label: 'Výška (cm)',
+                      min: 0,
+                      admin: { width: '25%' },
+                    },
+                    {
+                      name: 'depth',
+                      type: 'number',
+                      label: 'Hĺbka (cm)',
+                      min: 0,
+                      admin: { width: '25%' },
+                    },
+                    {
+                      name: 'weight',
+                      type: 'number',
+                      label: 'Hmotnosť (g)',
+                      min: 0,
+                      admin: { width: '25%' },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          label: 'Vlastnosti',
         },
         {
           name: 'meta',

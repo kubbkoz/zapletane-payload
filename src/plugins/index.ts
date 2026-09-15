@@ -258,8 +258,8 @@ export const plugins: Plugin[] = [
   // sign-off — see MCP-PLAN.md):
   //   - full CRUD  : products, categories, pages, media, variants,
   //                  variantOptions, shipping-methods, payment-methods,
-  //                  discount-codes, product-filters, and every registered
-  //                  global.
+  //                  discount-codes, product-filters, product-properties, and
+  //                  every registered global.
   //   - find+update: orders, transactions, carts, addresses (no create/delete
   //                  — these are financial/checkout records, not
   //                  agent-authored content).
@@ -270,6 +270,49 @@ export const plugins: Plugin[] = [
   // — no edit needed here.
   mcpPlugin({
     userCollection: 'users',
+    // --- API key collection visibility / access (Y1) ----------------------
+    // The plugin ships a fail-safe default: every operation on
+    // `payload-mcp-api-keys` is restricted to the *requesting user's own*
+    // documents (`restrictToOwnKeys`). That is why the shop owner opened the
+    // admin and saw an empty (or missing) key list: the keys exist, but they
+    // are owned by the user that minted them (the MCP dev/production admin),
+    // so another admin's row filter excluded every document.
+    //
+    // For this project the key list is an administration screen: an admin must
+    // be able to audit and revoke *every* key, not just their own. So all five
+    // operations are lifted from "own keys" to `isAdmin` — which is a
+    // *narrowing* for everyone below admin (a customer no longer has any
+    // access at all, not even to their own key) and a widening only for
+    // admins.
+    //
+    // Deliberately NOT touched: the `user` field's `create`/`update` access
+    // (both hard-false in the plugin). A key acts as the user it is bound to,
+    // so re-binding stays impossible even for an admin — a new key is always
+    // issued to whoever creates it.
+    overrideApiKeyCollection: (collection) => ({
+      ...collection,
+      access: {
+        ...collection.access,
+        create: isAdmin,
+        delete: isAdmin,
+        read: isAdmin,
+        unlock: isAdmin,
+        update: isAdmin,
+      },
+      admin: {
+        ...collection.admin,
+        defaultColumns: ['label', 'user', 'description', 'updatedAt'],
+        description:
+          'API kľúče pre MCP klientov. Každý kľúč koná ako používateľ, ku ktorému patrí, a jeho zaškrtávacie polia určujú, ktoré nástroje smie klient použiť.',
+        // Explicit: the collection belongs in the admin navigation. Without a
+        // readable key list there is no way to see what a client may do.
+        hidden: false,
+      },
+      labels: {
+        plural: 'MCP API kľúče',
+        singular: 'MCP API kľúč',
+      },
+    }),
     collections: {
       products: {
         description: 'Store catalog products: title, price, description, images, variants.',
@@ -317,6 +360,11 @@ export const plugins: Plugin[] = [
       'product-filters': {
         description:
           'Admin-defined filters for the shop page (label, slug, type tags/categories/price/availability, tag options, category subset, enabled, sort order). Shop configuration, agent-editable.',
+        enabled: mcpFullCrud,
+      },
+      'product-properties': {
+        description:
+          'Shop-wide product property definitions (name, slug, optional unit, optional predefined value suggestions, sort order). The per-product value lives in products.properties[]. Catalog configuration, agent-editable.',
         enabled: mcpFullCrud,
       },
       orders: {

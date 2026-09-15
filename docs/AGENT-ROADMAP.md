@@ -251,3 +251,11 @@ zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.
 
 Pozn.: MCP API keys „miznutie" = default pluginu (restrictToOwnKeys +
 hidden kolekcia), nie strata dát — kľúče v DB sú.
+
+- [ ] Y4 Mobilný app-like shell (Opus, frontend-only, paralelne s Y1;
+      Y3 až PO Y4 — kolízia na Cart komponentoch): statická horná lišta
+      (logo + hamburger s plynulou morph animáciou čiarky→X, bez
+      preblikov a layout shiftov), statická spodná lišta (Domov, telefón,
+      e-mail, vyhľadávanie, účet, košík s počítadlom — DESIGN-SPEC §2.4
+      ako 1:1 základ), obsah sa mení medzi lištami; cart drawer na
+      mobile zo SPODU; vyhľadávanie na mobile = fullscreen overlay.

@@ -260,6 +260,155 @@ const seedDiscountsAndFilters = async (payload: Awaited<ReturnType<typeof getPay
 }
 
 /**
+ * Vlastnosti produktov, rozmery a odporúčania (Y1).
+ *
+ * Idempotent by the natural key (`slug`) and run on every seed, so an existing
+ * dev database picks the demo data up too. Deliberately non-destructive: a
+ * product that already has properties / dimensions / cross-sell or upsell links
+ * keeps them — the seed only fills what is still empty.
+ *
+ * The property *definitions* are shop-wide ("Materiál", "Farba"); the value is
+ * per product. `predefinedValues` are suggestions only, which is why the basket
+ * may say "prútie" (a listed suggestion) and "ružová" (not listed anywhere).
+ */
+const seedProductPropertiesAndRelations = async (
+  payload: Awaited<ReturnType<typeof getPayload>>,
+) => {
+  const propertyDefs = [
+    {
+      name: 'Materiál',
+      slug: 'material',
+      predefinedValues: [{ value: 'vlna' }, { value: 'bavlna' }, { value: 'prútie' }],
+      sortOrder: 10,
+    },
+    {
+      name: 'Farba',
+      slug: 'farba',
+      sortOrder: 20,
+    },
+  ]
+
+  /** property slug -> id, so the product wiring below can reference them. */
+  const propertyIds = new Map<string, number | string>()
+
+  for (const data of propertyDefs) {
+    const existing = await payload.find({
+      collection: 'product-properties',
+      limit: 1,
+      where: { slug: { equals: data.slug } },
+    })
+
+    const existingDoc = existing.docs[0]
+
+    if (existingDoc) {
+      propertyIds.set(data.slug, existingDoc.id)
+      continue
+    }
+
+    const created = await payload.create({ collection: 'product-properties', data })
+    propertyIds.set(data.slug, created.id)
+    console.log(`seeded product property: ${data.name}`)
+  }
+
+  const demoProducts = [
+    {
+      slug: 'prutene-kose',
+      properties: [
+        { property: 'material', value: 'prútie' },
+        { property: 'farba', value: 'ružová' },
+      ],
+      dimensions: { width: 40, height: 25, depth: 30, weight: 900 },
+      // Do košíka k deke sa hodí aj kôš — a naopak: kôš je drahšia/lepšia
+      // alternatíva, ktorú ukazujeme na stránke deky.
+      crossSell: ['pletena-deka'],
+      upsell: [] as string[],
+    },
+    {
+      slug: 'pletena-deka',
+      properties: [
+        { property: 'material', value: 'vlna' },
+        { property: 'farba', value: 'béžová' },
+      ],
+      dimensions: { width: 130, height: 170, depth: 3, weight: 1800 },
+      crossSell: [] as string[],
+      upsell: ['prutene-kose'],
+    },
+  ]
+
+  const productIdBySlug = new Map<string, number | string>()
+
+  for (const demo of demoProducts) {
+    const found = await payload.find({
+      collection: 'products',
+      limit: 1,
+      where: { slug: { equals: demo.slug } },
+    })
+
+    if (found.docs[0]) {
+      productIdBySlug.set(demo.slug, found.docs[0].id)
+    }
+  }
+
+  for (const demo of demoProducts) {
+    const productId = productIdBySlug.get(demo.slug)
+
+    if (!productId) {
+      continue
+    }
+
+    const current = await payload.findByID({ collection: 'products', id: productId, depth: 0 })
+
+    const data: Record<string, unknown> = {}
+
+    if (!current.properties?.length) {
+      const properties = demo.properties
+        .map((entry) => ({ property: propertyIds.get(entry.property), value: entry.value }))
+        .filter((entry): entry is { property: number | string; value: string } =>
+          Boolean(entry.property),
+        )
+
+      if (properties.length) {
+        data.properties = properties
+      }
+    }
+
+    const dimensions = current.dimensions
+
+    if (
+      dimensions?.width == null &&
+      dimensions?.height == null &&
+      dimensions?.depth == null &&
+      dimensions?.weight == null
+    ) {
+      data.dimensions = demo.dimensions
+    }
+
+    const crossSell = demo.crossSell
+      .map((slug) => productIdBySlug.get(slug))
+      .filter((id): id is number | string => Boolean(id))
+
+    if (crossSell.length && !current.crossSell?.length) {
+      data.crossSell = crossSell
+    }
+
+    const upsell = demo.upsell
+      .map((slug) => productIdBySlug.get(slug))
+      .filter((id): id is number | string => Boolean(id))
+
+    if (upsell.length && !current.upsell?.length) {
+      data.upsell = upsell
+    }
+
+    if (Object.keys(data).length === 0) {
+      continue
+    }
+
+    await payload.update({ collection: 'products', id: productId, data })
+    console.log(`filled product data (${Object.keys(data).join(', ')}) on: ${demo.slug}`)
+  }
+}
+
+/**
  * Editable content (W2).
  *
  * Writes the *current hard-coded* values into the globals so an editor opens a
@@ -364,6 +513,7 @@ const run = async () => {
   await seedProducts(payload)
   await seedCheckoutMethods(payload)
   await seedDiscountsAndFilters(payload)
+  await seedProductPropertiesAndRelations(payload)
   await seedContentGlobals(payload)
 
   await payload.destroy()

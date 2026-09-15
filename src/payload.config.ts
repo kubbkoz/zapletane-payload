@@ -25,6 +25,7 @@ import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
 import { PaymentMethods } from '@/collections/PaymentMethods'
 import { ProductFilters } from '@/collections/ProductFilters'
+import { ProductProperties } from '@/collections/ProductProperties'
 import { ShippingMethods } from '@/collections/ShippingMethods'
 import { Users } from '@/collections/Users'
 import { globalConfigs } from '@/globals'
@@ -120,6 +121,7 @@ export default buildConfig({
     PaymentMethods,
     DiscountCodes,
     ProductFilters,
+    ProductProperties,
   ],
   db: databaseAdapter,
   editor: lexicalEditor({

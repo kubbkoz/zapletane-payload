@@ -109,6 +109,9 @@ async function main() {
     // X1 — zľavové kódy a filtre v obchode. Shop configuration, same ceiling.
     discountCodes: fullCrud,
     productFilters: fullCrud,
+    // Y1 — vlastnosti produktov (the dictionary; the per-product value is part
+    // of the `products` document and is already covered by `products`).
+    productProperties: fullCrud,
     orders: findAndUpdate,
     transactions: findAndUpdate,
     carts: findAndUpdate,
