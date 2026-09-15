@@ -73,6 +73,7 @@ export interface Config {
   };
   blocks: {};
   collections: {
+    orders: Order;
     users: User;
     pages: Page;
     posts: Post;
@@ -93,7 +94,6 @@ export interface Config {
     variantOptions: VariantOption;
     products: Product;
     carts: Cart;
-    orders: Order;
     transactions: Transaction;
     'payload-mcp-api-keys': PayloadMcpApiKey;
     'payload-kv': PayloadKv;
@@ -115,6 +115,7 @@ export interface Config {
     };
   };
   collectionsSelect: {
+    orders: OrdersSelect<false> | OrdersSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
@@ -135,7 +136,6 @@ export interface Config {
     variantOptions: VariantOptionsSelect<false> | VariantOptionsSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     carts: CartsSelect<false> | CartsSelect<true>;
-    orders: OrdersSelect<false> | OrdersSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
     'payload-mcp-api-keys': PayloadMcpApiKeysSelect<false> | PayloadMcpApiKeysSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -153,6 +153,7 @@ export interface Config {
     homepage: Homepage;
     'site-settings': SiteSetting;
     'feed-settings': FeedSetting;
+    statistiky: Statistiky;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
@@ -160,6 +161,7 @@ export interface Config {
     homepage: HomepageSelect<false> | HomepageSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
     'feed-settings': FeedSettingsSelect<false> | FeedSettingsSelect<true>;
+    statistiky: StatistikySelect<false> | StatistikySelect<true>;
   };
   locale: null;
   widgets: {
@@ -222,56 +224,6 @@ export interface PayloadMcpApiKeyAuthOperations {
     email: string;
     password: string;
   };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users".
- */
-export interface User {
-  id: number;
-  name?: string | null;
-  roles?: ('admin' | 'customer')[] | null;
-  /**
-   * Externý poskytovateľ prihlásenia prepojený s účtom. Prázdne = klasické prihlásenie e-mailom a heslom.
-   */
-  oauthProvider?: ('google' | 'facebook') | null;
-  /**
-   * Stabilný identifikátor účtu u poskytovateľa (Google `sub`, Facebook `id`).
-   */
-  oauthSub?: string | null;
-  orders?: {
-    docs?: (number | Order)[];
-    hasNextPage?: boolean;
-    totalDocs?: number;
-  };
-  cart?: {
-    docs?: (number | Cart)[];
-    hasNextPage?: boolean;
-    totalDocs?: number;
-  };
-  addresses?: {
-    docs?: (number | Address)[];
-    hasNextPage?: boolean;
-    totalDocs?: number;
-  };
-  updatedAt: string;
-  createdAt: string;
-  email: string;
-  resetPasswordToken?: string | null;
-  resetPasswordExpiration?: string | null;
-  salt?: string | null;
-  hash?: string | null;
-  loginAttempts?: number | null;
-  lockUntil?: string | null;
-  sessions?:
-    | {
-        id: string;
-        createdAt?: string | null;
-        expiresAt: string;
-      }[]
-    | null;
-  password?: string | null;
-  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1057,6 +1009,144 @@ export interface ProductProperty {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "users".
+ */
+export interface User {
+  id: number;
+  name?: string | null;
+  roles?: ('admin' | 'customer')[] | null;
+  /**
+   * Externý poskytovateľ prihlásenia prepojený s účtom. Prázdne = klasické prihlásenie e-mailom a heslom.
+   */
+  oauthProvider?: ('google' | 'facebook') | null;
+  /**
+   * Stabilný identifikátor účtu u poskytovateľa (Google `sub`, Facebook `id`).
+   */
+  oauthSub?: string | null;
+  orders?: {
+    docs?: (number | Order)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  cart?: {
+    docs?: (number | Cart)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  addresses?: {
+    docs?: (number | Address)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  updatedAt: string;
+  createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "carts".
+ */
+export interface Cart {
+  id: number;
+  items?:
+    | {
+        product?: (number | null) | Product;
+        variant?: (number | null) | Variant;
+        quantity: number;
+        id?: string | null;
+      }[]
+    | null;
+  secret?: string | null;
+  customer?: (number | null) | User;
+  purchasedAt?: string | null;
+  status?: ('active' | 'purchased' | 'abandoned') | null;
+  subtotal?: number | null;
+  currency?: 'EUR' | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "addresses".
+ */
+export interface Address {
+  id: number;
+  customer?: (number | null) | User;
+  title?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country:
+    | 'US'
+    | 'GB'
+    | 'CA'
+    | 'AU'
+    | 'AT'
+    | 'BE'
+    | 'BR'
+    | 'BG'
+    | 'CY'
+    | 'CZ'
+    | 'DK'
+    | 'EE'
+    | 'FI'
+    | 'FR'
+    | 'DE'
+    | 'GR'
+    | 'HK'
+    | 'HU'
+    | 'IN'
+    | 'IE'
+    | 'IT'
+    | 'JP'
+    | 'LV'
+    | 'LT'
+    | 'LU'
+    | 'MY'
+    | 'MT'
+    | 'MX'
+    | 'NL'
+    | 'NZ'
+    | 'NO'
+    | 'PL'
+    | 'PT'
+    | 'RO'
+    | 'SG'
+    | 'SK'
+    | 'SI'
+    | 'ES'
+    | 'SE'
+    | 'CH';
+  phone?: string | null;
+  /**
+   * Slot, do ktorého adresa patrí v zákazníckom účte. Prázdne = adresa uložená pred zavedením slotov.
+   */
+  kind?: ('billing' | 'shipping') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "transactions".
  */
 export interface Transaction {
@@ -1136,29 +1226,6 @@ export interface Transaction {
   createdAt: string;
 }
 /**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "carts".
- */
-export interface Cart {
-  id: number;
-  items?:
-    | {
-        product?: (number | null) | Product;
-        variant?: (number | null) | Variant;
-        quantity: number;
-        id?: string | null;
-      }[]
-    | null;
-  secret?: string | null;
-  customer?: (number | null) | User;
-  purchasedAt?: string | null;
-  status?: ('active' | 'purchased' | 'abandoned') | null;
-  subtotal?: number | null;
-  currency?: 'EUR' | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
  * Spôsoby doručenia ponúkané v pokladni. Cena je v eurocentoch (4.90 € = 490). Vypnutý spôsob sa v pokladni nezobrazí.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1199,71 +1266,6 @@ export interface ShippingMethod {
    * Nižšie číslo = vyššie v zozname.
    */
   sortOrder?: number | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "addresses".
- */
-export interface Address {
-  id: number;
-  customer?: (number | null) | User;
-  title?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  company?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  city?: string | null;
-  state?: string | null;
-  postalCode?: string | null;
-  country:
-    | 'US'
-    | 'GB'
-    | 'CA'
-    | 'AU'
-    | 'AT'
-    | 'BE'
-    | 'BR'
-    | 'BG'
-    | 'CY'
-    | 'CZ'
-    | 'DK'
-    | 'EE'
-    | 'FI'
-    | 'FR'
-    | 'DE'
-    | 'GR'
-    | 'HK'
-    | 'HU'
-    | 'IN'
-    | 'IE'
-    | 'IT'
-    | 'JP'
-    | 'LV'
-    | 'LT'
-    | 'LU'
-    | 'MY'
-    | 'MT'
-    | 'MX'
-    | 'NL'
-    | 'NZ'
-    | 'NO'
-    | 'PL'
-    | 'PT'
-    | 'RO'
-    | 'SG'
-    | 'SK'
-    | 'SI'
-    | 'ES'
-    | 'SE'
-    | 'CH';
-  phone?: string | null;
-  /**
-   * Slot, do ktorého adresa patrí v zákazníckom účte. Prázdne = adresa uložená pred zavedením slotov.
-   */
-  kind?: ('billing' | 'shipping') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1934,6 +1936,12 @@ export interface PayloadMcpApiKey {
      */
     update?: boolean | null;
   };
+  statistiky?: {
+    /**
+     * Allow clients to find statistiky global.
+     */
+    find?: boolean | null;
+  };
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -1965,6 +1973,10 @@ export interface PayloadKv {
 export interface PayloadLockedDocument {
   id: number;
   document?:
+    | ({
+        relationTo: 'orders';
+        value: number | Order;
+      } | null)
     | ({
         relationTo: 'users';
         value: number | User;
@@ -2046,10 +2058,6 @@ export interface PayloadLockedDocument {
         value: number | Cart;
       } | null)
     | ({
-        relationTo: 'orders';
-        value: number | Order;
-      } | null)
-    | ({
         relationTo: 'transactions';
         value: number | Transaction;
       } | null)
@@ -2108,6 +2116,50 @@ export interface PayloadMigration {
   batch?: number | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders_select".
+ */
+export interface OrdersSelect<T extends boolean = true> {
+  items?:
+    | T
+    | {
+        product?: T;
+        variant?: T;
+        quantity?: T;
+        id?: T;
+      };
+  shippingAddress?:
+    | T
+    | {
+        title?: T;
+        firstName?: T;
+        lastName?: T;
+        company?: T;
+        addressLine1?: T;
+        addressLine2?: T;
+        city?: T;
+        state?: T;
+        postalCode?: T;
+        country?: T;
+        phone?: T;
+      };
+  customer?: T;
+  customerEmail?: T;
+  transactions?: T;
+  status?: T;
+  amount?: T;
+  currency?: T;
+  accessToken?: T;
+  shippingMethod?: T;
+  paymentType?: T;
+  shippingFee?: T;
+  codFee?: T;
+  discountCode?: T;
+  discountAmount?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2791,50 +2843,6 @@ export interface CartsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "orders_select".
- */
-export interface OrdersSelect<T extends boolean = true> {
-  items?:
-    | T
-    | {
-        product?: T;
-        variant?: T;
-        quantity?: T;
-        id?: T;
-      };
-  shippingAddress?:
-    | T
-    | {
-        title?: T;
-        firstName?: T;
-        lastName?: T;
-        company?: T;
-        addressLine1?: T;
-        addressLine2?: T;
-        city?: T;
-        state?: T;
-        postalCode?: T;
-        country?: T;
-        phone?: T;
-      };
-  customer?: T;
-  customerEmail?: T;
-  transactions?: T;
-  status?: T;
-  amount?: T;
-  currency?: T;
-  accessToken?: T;
-  shippingMethod?: T;
-  paymentType?: T;
-  shippingFee?: T;
-  codFee?: T;
-  discountCode?: T;
-  discountAmount?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "transactions_select".
  */
 export interface TransactionsSelect<T extends boolean = true> {
@@ -3082,6 +3090,11 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
     | {
         find?: T;
         update?: T;
+      };
+  statistiky?:
+    | T
+    | {
+        find?: T;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -3561,6 +3574,18 @@ export interface FeedSetting {
   createdAt?: string | null;
 }
 /**
+ * Prehľad predaja: tržby, objednávky, výkon produktov a kategórií. Údaje sa prepočítavajú každých 5 minút.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "statistiky".
+ */
+export interface Statistiky {
+  id: number;
+  _placeholder?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "header_select".
  */
@@ -3853,6 +3878,16 @@ export interface FeedSettingsSelect<T extends boolean = true> {
         staticValue?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "statistiky_select".
+ */
+export interface StatistikySelect<T extends boolean = true> {
+  _placeholder?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

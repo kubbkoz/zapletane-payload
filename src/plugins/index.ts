@@ -28,6 +28,7 @@ import { REDIRECT_COLLECTIONS, revalidateRedirects, revalidateRedirectsOnDelete 
 import { globalConfigs } from '@/globals'
 import { generateProductMeta } from '@/seo/generate'
 import { toSeoProductInput } from '@/seo/productInput'
+import { reorderNav } from './reorderNav'
 
 const SITE_NAME = process.env.SITE_NAME || 'ZAPLETANE'
 
@@ -82,6 +83,21 @@ const generateURL: GenerateURL<Product | Page> = ({ doc }) => {
 const mcpFullCrud = { create: true, delete: true, find: true, update: true }
 const mcpFindAndUpdate = { create: false, delete: false, find: true, update: true }
 const mcpFindOnly = { create: false, delete: false, find: true, update: false }
+
+/**
+ * Per-global MCP ceilings. A global not listed here keeps the default `true`
+ * (find + update — everything a singleton supports).
+ *
+ * `statistiky` (Z8) is a read-only *view*, not stored content: the global holds
+ * a single hidden placeholder field purely so Payload renders a nav item for
+ * the statistics page, and its `access.update` is hard-false. Granting `update`
+ * would expose a tool that can only ever write a field nobody reads — and it
+ * would add a `statistiky_update` grant column to the API-key collection for
+ * no reason. `find` alone keeps the tool surface honest.
+ */
+const mcpGlobalCeilings: Record<string, { find: boolean; update: boolean }> = {
+  statistiky: { find: true, update: false },
+}
 
 type MCPCollectionEntry = NonNullable<NonNullable<MCPPluginConfig['collections']>['users']>
 
@@ -621,10 +637,15 @@ export const plugins: Plugin[] = [
         {
           description: `Site-wide "${global.slug}" global configuration.`,
           // Globals only ever support find/update (they're singletons) —
-          // `true` grants the maximum available, i.e. both.
-          enabled: true,
+          // `true` grants the maximum available, i.e. both. A slug listed in
+          // `mcpGlobalCeilings` is narrowed instead.
+          enabled: mcpGlobalCeilings[global.slug] ?? true,
         },
       ]),
     ) as NonNullable<MCPPluginConfig['globals']>,
   }),
+  // MUSÍ zostať posledný: mení poradie `config.collections` tak, aby v menu
+  // (skupina „Ecommerce") boli Objednávky prvé. Kolekcie tam dokladá
+  // `ecommercePlugin` vyššie, takže skôr by `orders` ešte neexistovali.
+  reorderNav,
 ]

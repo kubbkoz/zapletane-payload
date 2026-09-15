@@ -86,8 +86,14 @@ export default buildConfig({
     components: {
       // Slovak intro above the login form.
       beforeLogin: ['@/components/BeforeLogin#BeforeLogin'],
-      // ZAPLETANE welcome card with quick links, above the dashboard.
-      beforeDashboard: ['@/components/BeforeDashboard#BeforeDashboard'],
+      // Nástenka, zhora nadol (Z8): uvítacia karta → posledné objednávky →
+      // súhrn štatistík → predvolené karty kolekcií, ktoré Payload vykreslí
+      // hneď za týmto poľom (ModularDashboard).
+      beforeDashboard: [
+        '@/components/BeforeDashboard#BeforeDashboard',
+        '@/components/admin/RecentOrders#RecentOrders',
+        '@/components/admin/StatsSummary#StatsSummary',
+      ],
       graphics: {
         // ZAPLETANE mark in the nav / step-nav "home" link (18×18 box).
         Icon: '@/components/admin/Icon#Icon',
