@@ -172,3 +172,24 @@ telo scroll-lock. Rešpektuj tokeny; `prefers-reduced-motion` fallback.
 3. Vlna B: W2 (Opus).
 4. Finále: tsc, build, Playwright (checkout s dobierkou end-to-end lokálne),
    screenshoty userovi, commit+push, deploy watch, update tohto Stavu.
+
+## Fáza 4 (2026-09-15)
+
+- [ ] X1 Commerce schéma: shipping rules (freeAboveSubtotal na shipping-methods,
+      checkout ju aplikuje server-side), kolekcia discount-codes (kód, percento/
+      fixná suma, minSubtotal, platnosť od-do, maxUses/usedCount, enabled) +
+      pole v checkoute + prepočet + order polia discountCode/discountAmount,
+      SiteSettings skupina search (searchable fields, placeholder, minChars),
+      kolekcia product-filters (label, typ, options→tagy, enabled, order) +
+      products.filterTags (array text). Migrácie aditívne, MCP grants, seed-dev.
+- [ ] X2 Admin v slovenčine: payload.config i18n (sk z @payloadcms/translations),
+      brand ikony v admin nav cez CSS mask (lucide SVG data-URI, farba --zap
+      tokeny) v custom.scss — Payload 3.89 nemá per-collection icon config.
+- [ ] X3 OAuth registrácia (PO X1): Google + Facebook login/registrácia na
+      frontende, route handlers (redirect + callback → find/create user →
+      payload session), gated za GOOGLE_CLIENT_ID/SECRET a FACEBOOK_APP_ID/
+      SECRET env (tlačidlá skryté bez env), e-mail flow ostáva.
+- [ ] X4 Frontend filtre/search (PO X1): /shop filter panel generovaný z
+      product-filters kolekcie (tag filtre + existujúce cena/dostupnosť/
+      kategórie pod kontrolou backendu), vyhľadávanie podľa SiteSettings.search.
+- [ ] Finále: build, Playwright, push, deploy, screenshoty, update Stavu.
