@@ -26,6 +26,7 @@ import { Pages } from '@/collections/Pages'
 import { PaymentMethods } from '@/collections/PaymentMethods'
 import { ProductFilters } from '@/collections/ProductFilters'
 import { ProductProperties } from '@/collections/ProductProperties'
+import { PushSubscriptions } from '@/collections/PushSubscriptions'
 import { ShippingMethods } from '@/collections/ShippingMethods'
 import { Users } from '@/collections/Users'
 import { globalConfigs } from '@/globals'
@@ -122,6 +123,7 @@ export default buildConfig({
     DiscountCodes,
     ProductFilters,
     ProductProperties,
+    PushSubscriptions,
   ],
   db: databaseAdapter,
   editor: lexicalEditor({
