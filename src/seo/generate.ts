@@ -89,6 +89,33 @@ const cutAtWord = (text: string, max: number): string => {
 
 const endsWithSentence = (text: string): boolean => /[.!?…]$/u.test(text)
 
+/**
+ * Úvod popisu: toľko celých viet, koľko sa zmestí do `max`.
+ *
+ * Prečo nie obyčajné orezanie: „Vhodný ku krbu aj ako." je gramaticky mŕtva
+ * veta — vo výsledku vyhľadávania vyzerá ako chyba. Keď sa nezmestí ani prvá
+ * veta, radšej sa oreže na slove a doplní výpustka.
+ */
+const leadSentences = (text: string, max: number): string => {
+  if (text.length <= max) return text
+
+  let out = ''
+
+  for (const sentence of text.match(/[^.!?…]+[.!?…]+\s*/gu) ?? []) {
+    const candidate = (out + sentence).trimEnd()
+
+    if (candidate.length > max) break
+
+    out = candidate
+  }
+
+  if (out) return out
+
+  const cut = cutAtWord(text, max - 1)
+
+  return cut ? `${cut}…` : ''
+}
+
 /** Doplní bodku, a keď sa už nezmestí, spraví na ňu miesto. */
 const finishSentence = (text: string, max: number): string => {
   if (!text || endsWithSentence(text)) return text
@@ -247,7 +274,7 @@ export const buildMetaDescription = (input: SeoProductInput): string => {
   const room = tail ? MAX_DESCRIPTION - tail.length - 1 : MAX_DESCRIPTION
 
   // Úvod sa zaradí len ak z neho zostane čitateľný kus vety.
-  const head = lead && room >= 40 ? finishSentence(cutAtWord(lead, room), room) : ''
+  const head = lead && room >= 40 ? finishSentence(leadSentences(lead, room), room) : ''
 
   return clampDescription([head, tail].filter(Boolean).join(' '))
 }

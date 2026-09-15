@@ -4,6 +4,8 @@ import { Bell, BellOff, BellRing, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import React, { useCallback, useEffect, useState } from 'react'
 
+import { OpenPreferencesButton } from '@/components/CookieConsent/OpenPreferencesButton'
+import { isConsentAccepted, onConsentChange } from '@/components/CookieConsent/consent'
 import { useAuth } from '@/providers/Auth'
 import { cn } from '@/utilities/cn'
 
@@ -14,6 +16,7 @@ import { isIos, isStandalone, supportsPush, urlBase64ToUint8Array } from './supp
  * - `unsupported`  — no Push API, or no VAPID key configured. Renders nothing.
  * - `ios-install`  — iOS, not installed: Web Push is unreachable until it is.
  * - `signed-out`   — push is tied to an account, so there is nothing to notify about yet.
+ * - `needs-consent`— the `functional` cookie category has not been granted.
  * - `idle`         — everything is ready and the shopper has not decided.
  * - `busy`         — a permission prompt / subscribe round-trip is in flight.
  * - `enabled`      — granted *and* a subscription is stored server-side.
@@ -28,6 +31,7 @@ type State =
   | 'idle'
   | 'ios-install'
   | 'loading'
+  | 'needs-consent'
   | 'signed-out'
   | 'unsupported'
 
@@ -39,6 +43,30 @@ async function readyRegistration(): Promise<ServiceWorkerRegistration> {
   // still works if it is ever rendered on a page that provider does not cover.
   await navigator.serviceWorker.register('/sw.js', { scope: '/' })
   return navigator.serviceWorker.ready
+}
+
+/**
+ * Drop the browser subscription and the row that backs it.
+ *
+ * Shared by the explicit „Vypnúť notifikácie" button and by the silent
+ * teardown that runs when `functional` consent has been withdrawn — the same
+ * order in both cases (server first, so a surviving row can never outlive the
+ * endpoint it points at).
+ */
+async function teardownSubscription(): Promise<void> {
+  const registration = await readyRegistration()
+  const subscription = await registration.pushManager.getSubscription()
+
+  if (!subscription) return
+
+  await fetch('/api/push/unsubscribe', {
+    body: JSON.stringify({ endpoint: subscription.endpoint }),
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  }).catch(() => {})
+
+  await subscription.unsubscribe()
 }
 
 type Props = {
@@ -63,10 +91,38 @@ type Props = {
  * `Notification.permission` value and any subscription the browser already
  * holds — and refreshes `lastSeenAt` server-side when both are already in
  * place, so the admin can tell live browsers from abandoned ones.
+ *
+ * CONSENT
+ * Push sits in the `functional` cookie category. Without it the card shows the
+ * way into the cookie dialog instead of the CTA, the permission prompt is
+ * unreachable, and an existing subscription is torn down on the next page load
+ * (see the `needs-consent` branch of the probe). Granting or withdrawing the
+ * category swaps the card over live, through `onConsentChange` — no reload.
  */
 export function PushOptIn({ className, variant = 'card' }: Props) {
   const { user } = useAuth()
   const [state, setState] = useState<State>('loading')
+
+  // Push notifications live in the `functional` cookie category, so nothing
+  // here may touch `Notification.requestPermission()` before that is granted.
+  //
+  // The initialiser runs on the client's first render (the server always says
+  // `false`, and renders nothing either way, so there is no hydration
+  // mismatch). It has to be read that early rather than in an effect: starting
+  // at `false` would make the probe below mistake "not known yet" for
+  // "withdrawn" and tear down a perfectly good subscription.
+  const [functionalConsent, setFunctionalConsent] = useState(() =>
+    isConsentAccepted('functional'),
+  )
+
+  useEffect(() => {
+    // Re-read once mounted, in case the consent plugin finished loading
+    // between render and effect, then follow every later change — this is what
+    // swaps the card over without a reload when the shopper flips the toggle.
+    setFunctionalConsent(isConsentAccepted('functional'))
+
+    return onConsentChange(({ functional }) => setFunctionalConsent(functional))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -83,6 +139,17 @@ export function PushOptIn({ className, variant = 'card' }: Props) {
       // `undefined` means the /api/users/me round-trip is still in flight.
       if (user === undefined) return
       if (!user) return setState('signed-out')
+
+      // Consent withdrawn (or never given): offer the way back into the cookie
+      // dialog, and quietly undo any subscription that is still live — a
+      // withdrawal has to stop the notifications actually arriving, not just
+      // hide the button. Best effort and silent: the shopper asked for less
+      // tracking, not for an error message.
+      if (!functionalConsent) {
+        void teardownSubscription().catch(() => {})
+
+        return setState('needs-consent')
+      }
 
       if (Notification.permission === 'denied') return setState('denied')
       if (Notification.permission !== 'granted') return setState('idle')
@@ -116,9 +183,13 @@ export function PushOptIn({ className, variant = 'card' }: Props) {
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [functionalConsent, user])
 
   const enable = useCallback(async () => {
+    // Belt and braces: the CTA is not rendered without consent, but the
+    // permission prompt must never be reachable without it.
+    if (!isConsentAccepted('functional')) return setState('needs-consent')
+
     setState('busy')
 
     try {
@@ -163,21 +234,9 @@ export function PushOptIn({ className, variant = 'card' }: Props) {
     setState('busy')
 
     try {
-      const registration = await readyRegistration()
-      const subscription = await registration.pushManager.getSubscription()
-
-      if (subscription) {
-        // Server first: if the row survived while the browser subscription did
-        // not, every later send would waste a request on a dead endpoint.
-        await fetch('/api/push/unsubscribe', {
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          method: 'POST',
-        }).catch(() => {})
-
-        await subscription.unsubscribe()
-      }
+      // Server first: if the row survived while the browser subscription did
+      // not, every later send would waste a request on a dead endpoint.
+      await teardownSubscription()
 
       setState('idle')
     } catch (error) {
@@ -235,6 +294,25 @@ export function PushOptIn({ className, variant = 'card' }: Props) {
             </Link>
             .
           </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (state === 'needs-consent') {
+    return (
+      <div className={wrapper}>
+        {icon(<BellOff size={16} />)}
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-sm font-medium leading-tight text-black">
+            Notifikácie o objednávke
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-600">
+            Najprv povoľte funkčné cookies.
+          </p>
+          <OpenPreferencesButton className="mt-3 rounded-default bg-brand px-4 py-2 font-sans text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-brand-600">
+            Nastavenia cookies
+          </OpenPreferencesButton>
         </div>
       </div>
     )

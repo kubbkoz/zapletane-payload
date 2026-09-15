@@ -13,8 +13,10 @@
  * would a hand-written tag.
  *
  * WHAT IS RECOGNISED (everything else in the field is ignored):
- *   - `<script src=…>` and `<script>…inline…</script>` (also self-closing)
- *   - `<noscript>…</noscript>` — the GTM iframe fallback
+ *   - `<script src=…>` and `<script>…inline…</script>` (also self-closing) —
+ *     rendered inert and consent-gated, see `renderNodes.tsx`
+ *   - `<noscript>…</noscript>` — kept only when it carries no tracking payload,
+ *     see `isTrackingNoscript` below
  *   - `<meta …>` — e.g. `google-site-verification`
  *   - `<link …>` — e.g. `dns-prefetch` / `preconnect` for a tag host
  *
@@ -55,6 +57,23 @@ const REACT_PROP_NAMES: Record<string, string> = {
 
 /** Attributes whose mere presence means `true`. */
 const BOOLEAN_ATTRS = new Set(['async', 'defer', 'nomodule'])
+
+/**
+ * Does this `<noscript>` block actually track the visitor?
+ *
+ * The GTM `<noscript>` fallback is an `<iframe>` to googletagmanager.com; Meta
+ * and friends use a 1x1 `<img>`. Both fire the moment the HTML is parsed, and
+ * neither can be gated the way a script can: `vanilla-cookieconsent` works by
+ * activating inert `<script>` tags, and there is no inert form of an iframe or
+ * an image — and by definition no JavaScript running to activate one, since
+ * the block only renders when JavaScript is off.
+ *
+ * So it is dropped. A visitor without JavaScript gets no GTM at all, which is
+ * the GDPR-safe default: no consent can be collected from them either, and
+ * loading the fallback anyway would be tracking without consent. Anything else
+ * inside a `<noscript>` (a plain "zapnite si JavaScript" notice) is kept.
+ */
+const isTrackingNoscript = (html: string): boolean => /<\s*(iframe|img)\b/i.test(html)
 
 const ATTR_PATTERN =
   /([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
@@ -147,7 +166,7 @@ export const parseTrackingScripts = (input?: null | string): TrackingNode[] => {
     if (noscriptContent !== undefined) {
       const html = noscriptContent.trim()
 
-      if (html) nodes.push({ html, type: 'noscript' })
+      if (html && !isTrackingNoscript(html)) nodes.push({ html, type: 'noscript' })
       continue
     }
 

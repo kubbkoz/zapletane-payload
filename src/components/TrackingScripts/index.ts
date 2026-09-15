@@ -7,6 +7,11 @@
  *
  * See `src/lib/trackingScripts.ts` for what the parser recognises and what it
  * deliberately ignores.
+ *
+ * Both mount points render their `<script>` tags INERT
+ * (`type="text/plain" data-category="analytics"`); `vanilla-cookieconsent`
+ * activates them once the shopper accepts analytics. See `renderNodes.tsx` and
+ * `src/components/CookieConsent/`.
  */
 export { TrackingScriptsBodyStart } from './BodyStart'
 export { TrackingScriptsHead } from './Head'
