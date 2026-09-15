@@ -146,6 +146,48 @@ export const Posts: CollectionConfig = {
       },
       index: true,
     },
+    /**
+     * AI asistent (Z15) — téma na vstupe, hotový koncept na výstupe.
+     *
+     * `collapsible` je čisto vizuálne zoskupenie: v databáze vzniká jediný
+     * stĺpec `ai_prompt`. Pomenovaná `group` by pole zanorila a zmenila
+     * schému, čo za rámček v bočnom paneli nestojí.
+     *
+     * Pole `aiPrompt` zostáva uložené aj po vygenerovaní — je to poznámka,
+     * z čoho článok vznikol, a zároveň východisko, keď si majiteľka nechá
+     * napísať ďalšiu verziu.
+     */
+    {
+      type: 'collapsible',
+      admin: {
+        initCollapsed: false,
+        position: 'sidebar',
+      },
+      fields: [
+        {
+          name: 'aiPrompt',
+          type: 'textarea',
+          label: 'Téma / pokyny pre článok',
+          admin: {
+            description:
+              'O čom má článok byť, komu je určený a čo v ňom zdôrazniť. Pokojne celými vetami — čím konkrétnejšie zadanie, tým lepší text. Napr.: „Ako vybrať prvú hračku pre bábätko, tipy z vlastnej skúsenosti, spomeň pletené hračky."',
+            rows: 5,
+          },
+          maxLength: 2000,
+        },
+        {
+          name: 'generateArticle',
+          type: 'ui',
+          admin: {
+            components: {
+              Field: '@/components/admin/GenerateArticleButton#GenerateArticleButton',
+            },
+          },
+          label: 'Vygenerovať článok',
+        },
+      ],
+      label: 'AI asistent',
+    },
     {
       type: 'tabs',
       tabs: [
