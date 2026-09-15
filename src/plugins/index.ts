@@ -351,9 +351,24 @@ export const plugins: Plugin[] = [
     customers: {
       slug: 'users',
     },
+    // Slovenské labely: plugin dodáva anglické názvy kolekcií a slovenský
+    // preklad nemá — override je jediné miesto, kde sa dajú nastaviť.
+    carts: {
+      cartsCollectionOverride: ({ defaultCollection }) => ({
+        ...defaultCollection,
+        labels: { plural: 'Košíky', singular: 'Košík' },
+      }),
+    },
+    transactions: {
+      transactionsCollectionOverride: ({ defaultCollection }) => ({
+        ...defaultCollection,
+        labels: { plural: 'Transakcie', singular: 'Transakcia' },
+      }),
+    },
     orders: {
       ordersCollectionOverride: ({ defaultCollection }) => ({
         ...defaultCollection,
+        labels: { plural: 'Objednávky', singular: 'Objednávka' },
         fields: [
           ...defaultCollection.fields,
           {

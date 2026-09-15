@@ -138,6 +138,7 @@ const autofillProductMeta: CollectionBeforeChangeHook = async ({
 
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
+  labels: { plural: 'Produkty', singular: 'Produkt' },
   hooks: {
     ...defaultCollection?.hooks,
     // Z7: premenovanie produktu prepíše `slug`, takže stará adresa
