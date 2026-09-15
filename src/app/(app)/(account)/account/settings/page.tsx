@@ -2,9 +2,10 @@ import type { Metadata } from 'next'
 
 import { AccountForm } from '@/components/forms/AccountForm'
 import { AccountCard } from '@/components/account/AccountCard'
+import { PushOptInInline } from '@/components/Pwa/PushOptIn'
 import { mergeOpenGraph } from '@/utilities/mergeOpenGraph'
 import configPromise from '@payload-config'
-import { KeyRound, UserRound } from 'lucide-react'
+import { BellRing, KeyRound, UserRound } from 'lucide-react'
 import { headers as getHeaders } from 'next/headers.js'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -53,6 +54,14 @@ export default async function AccountSettingsPage() {
         >
           Obnoviť heslo e-mailom
         </Link>
+      </AccountCard>
+
+      <AccountCard
+        description="Push notifikácie o zmene stavu vašich objednávok — priamo do prehliadača alebo nainštalovanej aplikácie."
+        icon={BellRing}
+        title="Notifikácie"
+      >
+        <PushOptInInline />
       </AccountCard>
     </>
   )

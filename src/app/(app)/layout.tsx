@@ -6,6 +6,7 @@ import type { SiteSetting } from '@/payload-types'
 import { AdminBar } from '@/components/AdminBar'
 import { CartDrawerProvider } from '@/components/Cart/CartDrawerProvider'
 import { ComingSoonPage } from '@/components/ComingSoon'
+import { CookieConsentBanner } from '@/components/CookieConsent/index.client'
 import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
@@ -146,6 +147,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <AdminBar />
           <LivePreviewListener />
           <PwaProvider />
+          <CookieConsentBanner />
 
           {/* App shell: a static header above, a static bottom bar below, and
               only the band between them changing. `CartDrawerProvider` spans
