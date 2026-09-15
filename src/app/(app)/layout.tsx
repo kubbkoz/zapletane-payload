@@ -10,6 +10,8 @@ import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { MobileBottomNav } from '@/components/MobileBottomNav'
+import { TrackingScriptsBodyStart } from '@/components/TrackingScripts/BodyStart'
+import { TrackingScriptsHead } from '@/components/TrackingScripts/Head'
 import { COMING_SOON_BYPASS_COOKIE } from '@/lib/comingSoon'
 import { ensureStartsWith } from '@/utilities/ensureStartsWith'
 import { getSiteSettings } from '@/utilities/getSiteSettings'
@@ -129,6 +131,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="sk" suppressHydrationWarning>
       <head>
+        <TrackingScriptsHead />
         <InitTheme />
         <meta content="#FAF7F5" name="theme-color" />
         <link href="/favicon.ico" rel="icon" sizes="32x32" />
@@ -137,6 +140,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link href="/manifest.webmanifest" rel="manifest" />
       </head>
       <body>
+        <TrackingScriptsBodyStart />
         <Providers>
           <AdminBar />
           <LivePreviewListener />

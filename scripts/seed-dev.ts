@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
@@ -6,6 +8,8 @@ import { CONTACT } from '@/lib/contact'
 import { FOOTER_DEFAULTS } from '@/lib/footerDefaults'
 import { homepageDefaultData } from '@/lib/homeDefaults'
 import { SOCIAL_LINKS, TOP_BAR_LINKS } from '@/lib/navigation'
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Minimal Lexical document with a single paragraph — enough for seed copy. */
 const paragraph = (text: string) => ({
@@ -84,6 +88,71 @@ const seedProducts = async (payload: Awaited<ReturnType<typeof getPayload>>) => 
     },
   })
   console.log('seeded 2 products')
+}
+
+/**
+ * Produktové fotografie (Y2).
+ *
+ * The demo products were seeded without a gallery, which made them invisible to
+ * anything that needs an image: the product card, the PDP — and the product
+ * feeds, where `image_link` is a required attribute, so an image-less product
+ * is dropped from the feed entirely.
+ *
+ * Reuses the two hero photos already committed under `public/assets/images`
+ * instead of adding new binaries. Idempotent twice over: a product that already
+ * has a gallery is left alone, and the media document is looked up by filename
+ * before it is created.
+ */
+const seedProductImages = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+  const demoImages = [
+    {
+      alt: 'Prútený košík ZAPLETANE',
+      file: 'hero-kolekcia.webp',
+      slug: 'prutene-kose',
+    },
+    {
+      alt: 'Pletená vlnená deka ZAPLETANE',
+      file: 'hero-zahrada.webp',
+      slug: 'pletena-deka',
+    },
+  ]
+
+  for (const demo of demoImages) {
+    const { docs } = await payload.find({
+      collection: 'products',
+      depth: 0,
+      limit: 1,
+      where: { slug: { equals: demo.slug } },
+    })
+
+    const product = docs[0]
+
+    if (!product || product.gallery?.length) continue
+
+    const existingMedia = await payload.find({
+      collection: 'media',
+      limit: 1,
+      where: { filename: { equals: demo.file } },
+    })
+
+    const mediaId =
+      existingMedia.docs[0]?.id ??
+      (
+        await payload.create({
+          collection: 'media',
+          data: { alt: demo.alt },
+          filePath: path.resolve(projectRoot, 'public/assets/images/hero', demo.file),
+        })
+      ).id
+
+    await payload.update({
+      collection: 'products',
+      id: product.id,
+      data: { gallery: [{ image: mediaId }] },
+    })
+
+    console.log(`attached gallery image to: ${demo.slug}`)
+  }
 }
 
 /**
@@ -511,6 +580,7 @@ const run = async () => {
   const payload = await getPayload({ config })
 
   await seedProducts(payload)
+  await seedProductImages(payload)
   await seedCheckoutMethods(payload)
   await seedDiscountsAndFilters(payload)
   await seedProductPropertiesAndRelations(payload)

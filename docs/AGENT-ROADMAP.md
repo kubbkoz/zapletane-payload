@@ -236,7 +236,9 @@ zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.
       MCP API keys kolekcie (overrideApiKeyCollection — admini vidia
       všetky kľúče, kolekcia viditeľná v nav). Migrácie, MCP grants,
       seed, typy.
-- [ ] Y2 Feedy + tracking (Opus, schéma solo, PO Y1): global feed-settings
+- [x] Y2 Feedy + tracking — HOTOVÉ (lokálne overené na PORT=3002; build/push robí
+      manažér; TrackingScripts komponenty čakajú na 2 riadky v `(app)/layout.tsx`
+      — pozri „Y2 — výsledok"): global feed-settings
       (enable, brand default, google_product_category, condition default,
       array mapovania: feedAttribute → zdroj [vlastnosť|pole|statická
       hodnota]); route handlery /feeds/google-merchant.xml (RSS 2.0 g:
@@ -309,6 +311,92 @@ hodnota je `properties[].value` (string). `dimensions` je plochý objekt
 sú polia vzťahov na `products` — pri `depth >= 1` sa vracia len podmnožina z
 `defaultPopulate` produktu (title, slug, gallery, priceInEUR, inventory,
 enableVariants, variants, meta), čo na kartu stačí; pri `depth: 0` sú to len ID.
+
+### Y2 — výsledok
+
+**Nový global `feed-settings`** (`src/globals/FeedSettings.ts`, label „Produktové
+feedy", registrovaný cez `globalConfigs` → automaticky aj v MCP ako
+`feedSettings` find/update): `enabled` (checkbox, **default FALSE** — kým je
+vypnutý, všetky tri adresy feedov vracajú 404, lebo feed je verejný dump
+katalógu s cenami), group `defaults` (`brand` = „ZAPLETANE", `condition`
+new/refurbished/used, `googleProductCategory` — ID alebo cesta,
+`shippingCountry` = „SK", `shippingPriceOverride` v centoch — prázdne = `g:shipping`
+sa vôbec nezapíše), array `attributeMappings`
+`[{ feedAttribute, customAttribute?, source, property?, staticValue? }]`.
+`feedAttribute` = kurátorovaný zoznam (`g:material`, `g:color`, `g:size`,
+`g:pattern`, `g:age_group`, `g:gender`, `g:custom_label_0..4`,
+`g:product_length/width/height/weight`, `g:mpn`, `g:gtin`, + `custom` →
+`customAttribute`, validované regexom, inak sa riadok ignoruje). `source` =
+`property` (→ relationship na `product-properties`) | `dimensions.width|height|
+depth|weight` | `filterTags` | `static`. Rozmery sa formátujú s jednotkou
+automaticky (cm / g), vlastnosť si berie jednotku z definície vlastnosti,
+`filterTags` sa spájajú čiarkou, prázdna hodnota = atribút sa pre daný produkt
+vynechá, prvý riadok pre daný atribút vyhráva (žiadne duplicitné elementy).
+
+**Feed route handlery** (`src/app/(app)/feeds/*`, logika v `src/lib/feeds/*`):
+`/feeds/google-merchant.xml` (RSS 2.0 + `xmlns:g`), `/feeds/meta-catalog.xml`
+(ten istý dokument — Meta akceptuje google formát, jeden renderer = feedy si
+nikdy neprotirečia) a `/feeds/meta-catalog.csv` (Meta stĺpce, `in stock` /
+`out of stock`, `shipping_weight` namiesto `g:product_weight`, UTF-8 **s BOM**
+kvôli Excelu). Route handlery NEPREchádzajú cez `(app)/layout.tsx`, takže
+coming-soon gate ich neblokuje (overené: `/` vrátilo predspúšťaciu stránku,
+feed súčasne 200). Do feedu ide len publikovaný produkt s `priceInEUREnabled`
+a s aspoň jedným obrázkom v galérii — produkt bez obrázka sa **vynechá** (oba
+feedy `image_link` vyžadujú) a počet vynechaných je v XML komentári aj
+v hlavičke `x-feed-skipped-no-image`. Popis = plain text z lexicalu cez
+`convertLexicalToPlaintext` (`@payloadcms/richtext-lexical/plaintext`) →
+`meta.description` → `title`. Dostupnosť: `getStockState` → `in_stock` /
+`out_of_stock` / `backorder` (netrackovaný sklad, `inventory === null`).
+
+**Revalidácia:** `getFeedPayload` je `unstable_cache` s `revalidate: 3600`
+a tagmi `feeds` + `global_feed-settings`. Tag `feeds` púšťajú `afterChange`
+aj `afterDelete` na kolekcii `products` (`src/collections/Products/index.ts`)
+a `afterChange` na `feed-settings`. POZOR na semantiku Next 16: po
+`revalidateTag` vráti **najbližší** request ešte starú verziu a na pozadí si
+vyžiada novú (stale-while-revalidate) — druhý request je už aktuálny. Pre
+crawlera je to irelevantné, pri ručnom overovaní treba requestnúť dvakrát.
+
+**Tracking skripty:** `site-settings` má novú skupinu `marketing`
+(`headScripts`, `bodyStartScripts`) — obsah sa vkladá doslovne, preto zostáva
+`update: adminOnly` na globale trust boundary. `src/lib/trackingScripts.ts`
+parsuje z uloženého textu `<script src>`, inline `<script>`, `<noscript>`,
+`<meta>` a `<link>` a `src/components/TrackingScripts/*` ich renderuje ako
+skutočné elementy (ostatné značky, vrátane `on*` atribútov, sa zahodia — raw
+HTML sa do `<head>` v App Routeri vložiť nedá).
+
+**TODO pre manažéra — 2 riadky do `src/app/(app)/layout.tsx`** (súbor patril
+počas Y2 mobilnému agentovi, preto ho Y2 nezmenil). Import hore:
+
+```tsx
+import { TrackingScriptsBodyStart } from '@/components/TrackingScripts/BodyStart'
+import { TrackingScriptsHead } from '@/components/TrackingScripts/Head'
+```
+
+a potom presne tieto dva riadky — prvý ako prvý potomok `<head>`, druhý ako
+prvý potomok `<body>`:
+
+```tsx
+        <TrackingScriptsHead />
+        <TrackingScriptsBodyStart />
+```
+
+t. j. `<head>` začne `<TrackingScriptsHead />` (pred `<InitTheme />`) a `<body>`
+začne `<TrackingScriptsBodyStart />` (pred `<Providers>`). Overené na dočasnom
+izolovanom root layoute: inline skript, `<script async src>` aj `<meta>` skončili
+v `<head>`, GTM `<noscript>` hneď za `<body>`, `<p>` sa ignoroval.
+
+**Migrácie (aditívne):** `src/migrations-pg/20260915_072320_y2_feeds_tracking.*`
++ sqlite dvojička `src/migrations/20260915_072334_y2_feeds_tracking.ts` (tabuľky
+`feed_settings`, `feed_settings_attribute_mappings`, stĺpce
+`site_settings.marketing_*` a `payload_mcp_api_keys.feed_settings_*`) a dátová
+migrácia `src/migrations-pg/20260915_072600_y2_feed_grants.ts` (zapne
+`feedSettings` find/update na „Production MCP key"; lokálny kľúč rieši
+`scripts/mint-mcp-key.ts`).
+
+**Seed:** `seedProductImages` v `scripts/seed-dev.ts` pripojí demo produktom
+galériu z už commitnutých hero fotiek (`public/assets/images/hero`) — bez
+obrázka by demo produkty vo feede vôbec neboli (a chýbali by aj na PDP pre Y3).
+Idempotentné: produkt s galériou sa nechá tak, médium sa hľadá podľa `filename`.
 
 - [ ] Y4 Mobilný app-like shell (Opus, frontend-only, paralelne s Y1;
       Y3 až PO Y4 — kolízia na Cart komponentoch): statická horná lišta
