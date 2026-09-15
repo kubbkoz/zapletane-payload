@@ -10,6 +10,7 @@ import { Footer } from '@/components/Footer'
 import { Header } from '@/components/Header'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { MobileBottomNav } from '@/components/MobileBottomNav'
+import { PwaProvider } from '@/components/Pwa/PwaProvider'
 import { TrackingScriptsBodyStart } from '@/components/TrackingScripts/BodyStart'
 import { TrackingScriptsHead } from '@/components/TrackingScripts/Head'
 import { COMING_SOON_BYPASS_COOKIE } from '@/lib/comingSoon'
@@ -144,6 +145,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <Providers>
           <AdminBar />
           <LivePreviewListener />
+          <PwaProvider />
 
           {/* App shell: a static header above, a static bottom bar below, and
               only the band between them changing. `CartDrawerProvider` spans

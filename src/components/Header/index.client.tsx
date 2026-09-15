@@ -134,11 +134,10 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
         <div ref={navbarInnerRef}>
           <TopBar contact={contact} isHidden={shouldHideTopBar} links={topBarLinks} />
 
+          {/* Owner's call: the bar is always fully opaque — no translucent
+              scrolled state, no blur (content must never shimmer through). */}
           <div
-            className={cn(
-              'relative z-40 border-b border-gray-200 py-4 transition-all duration-300 ease-linear',
-              isScrolled ? 'bg-brand-50/90 backdrop-blur-md' : 'bg-brand-50',
-            )}
+            className="relative z-40 border-b border-gray-200 bg-brand-50 py-4 transition-all duration-300 ease-linear"
             id="navbar-main-row"
           >
             <div className="container-page">

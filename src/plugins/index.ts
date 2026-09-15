@@ -20,6 +20,7 @@ import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
 import { customerOnlyFieldAccess } from '@/access/customerOnlyFieldAccess'
 import { isAdmin } from '@/access/isAdmin'
 import { isDocumentOwner } from '@/access/isDocumentOwner'
+import { notifyOrderStatusChange } from '@/push/notifyOrderStatus'
 import { globalConfigs } from '@/globals'
 
 const SITE_NAME = process.env.SITE_NAME || 'ZAPLETANE'
@@ -257,6 +258,11 @@ export const plugins: Plugin[] = [
             label: 'Zľava',
           },
         ],
+        // Web push (Z3): tell the customer when the order's status changes.
+        hooks: {
+          ...defaultCollection.hooks,
+          afterChange: [...(defaultCollection.hooks?.afterChange ?? []), notifyOrderStatusChange],
+        },
       }),
     },
     payments: {
