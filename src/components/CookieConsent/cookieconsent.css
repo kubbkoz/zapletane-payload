@@ -61,7 +61,8 @@
   --cc-toggle-disabled-icon-color: #ffffff;
   --cc-toggle-readonly-bg: #e4d2cb;
   --cc-toggle-readonly-knob-bg: #ffffff;
-  --cc-toggle-readonly-knob-icon-color: #e4d2cb;
+  /* Darker than the track so the "locked on" check actually reads. */
+  --cc-toggle-readonly-knob-icon-color: #a67f76;
 
   /* Category blocks in the preferences dialog. */
   --cc-cookie-category-block-bg: #faf7f5;
@@ -141,6 +142,25 @@
   background: var(--cc-btn-secondary-hover-bg);
   border-color: var(--cc-btn-secondary-hover-border-color);
   color: var(--cc-btn-secondary-hover-color);
+}
+
+/*
+ * „Nastavenia" is the third step, not a third choice of equal weight — a plain
+ * text button keeps the accept / reject pair the only two filled controls and
+ * makes the hierarchy readable at a glance.
+ */
+#cc-main .cm__btn[data-role='show'] {
+  background: transparent;
+  border-color: transparent;
+  color: #5a423d;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+#cc-main .cm__btn[data-role='show']:hover {
+  background: transparent;
+  border-color: transparent;
+  color: #241917;
 }
 
 #cc-main .cm__btn--close {
