@@ -709,3 +709,32 @@ button {
    is measured by the ResizeObserver in Header/index.client.tsx, so the spacer
    under the fixed header follows the compaction on its own. */
 @custom-variant small-desktop (@media (width >= 1024px) and (width <= 1599.98px));
+
+/* ============================================================================
+   Appended by the Z11 pass — hero viewport-fill on small-desktop. New variant
+   only; nothing above is modified.
+   ============================================================================ */
+
+/* HomeHero.tsx used a single `lg:min-h-[calc(100dvh-var(--header-height))]`
+   (and a matching `lg:text-[50px]` heading step) for every viewport ≥1024px.
+   `--header-height` is a *static* 80px reference token (see the `:root`
+   block above) — far smaller than the real navbar, so the hero always ran
+   taller than the fold on every desktop width. The owner's Z11 spec fixes
+   this ONLY inside the small-desktop window (1024–1599.98px) and requires
+   1600px-and-up to stay byte-identical to what it rendered before.
+
+   Splitting the old single `lg:` rule into two mutually exclusive,
+   non-overlapping variants — `small-desktop` (already defined above) and
+   `large-desktop` below — sidesteps any ambiguity about which of two
+   simultaneously-matching media queries would win the cascade: at any given
+   viewport width exactly one of the two can ever match, so there is no
+   override to reason about. `large-desktop` reproduces the exact old `lg:`
+   formula (`100dvh - 80px`) so 1600px+ is pixel-identical to pre-Z11;
+   `small-desktop` instead subtracts the REAL, measured navbar height via
+   `--navbar-height-full` (written by the ResizeObserver in
+   Header/index.client.tsx — the stable, pre-scroll value, so the hero never
+   jumps when the topbar collapses on scroll), falling back to 131px — the
+   Z11-compacted header height with DesktopNav at ≥1280px width (measured:
+   23px TopBar + 67px main row + 41px DesktopNav = 131px; see HomeHero.tsx
+   for the matching heading-size split). */
+@custom-variant large-desktop (@media (width >= 1600px));

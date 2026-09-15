@@ -141,13 +141,15 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
 
           {/* Owner's call: the bar is always fully opaque — no translucent
               scrolled state, no blur (content must never shimmer through). */}
-          {/* `small-desktop:py-3` (Z10) — on a 1280–1599px laptop the row gives
-              back 8px of the 32px it spends on padding. Below 1024 and from
-              1600 up the variant does not match, so the row renders exactly as
-              before. The row's content height is set by the search field
-              (50px), not the logo (27px), so nothing is scaled. */}
+          {/* `small-desktop:py-2` (Z11, was `py-3` in Z10) — on a 1280–1599px
+              laptop the row now gives back 16px of the 32px it spends on
+              padding (a further notch down from Z10's 8px, part of the Z11
+              "further −10%" header pass). Below 1024 and from 1600 up the
+              variant does not match, so the row renders exactly as before.
+              The row's content height is set by the search field (50px), not
+              the logo (27px), so nothing is scaled. */}
           <div
-            className="relative z-40 border-b border-gray-200 bg-brand-50 py-4 transition-all duration-300 ease-linear small-desktop:py-3"
+            className="relative z-40 border-b border-gray-200 bg-brand-50 py-4 transition-all duration-300 ease-linear small-desktop:py-2"
             id="navbar-main-row"
           >
             <div className="container-page">

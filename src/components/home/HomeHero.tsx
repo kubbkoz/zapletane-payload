@@ -107,14 +107,27 @@ const SlideMedia: React.FC<{ active: boolean; priority: boolean; slide: HeroSlid
  *
  * `bg-brand-50` band, `container-editorial`, two columns on lg
  * (`minmax(0,1fr) minmax(0,1.15fr)`, text left / photo right, min-height
- * `calc(100dvh - var(--header-height))`). Left: eyebrow → the one H1 in the app
- * that keeps the Unbounded display face (the documented "homepage hero
- * exception") → lede → `btn-primary` + the circular play link → the three brand
- * perks. Right: full-bleed `rounded-sm` photo with the shoppable hotspot layer
- * and the pill dots on a blurred ink chip.
+ * `calc(100dvh - var(--header-height))` from 1600px up). Left: eyebrow → the
+ * one H1 in the app that keeps the Unbounded display face (the documented
+ * "homepage hero exception") → lede → `btn-primary` + the circular play link →
+ * the three brand perks. Right: full-bleed `rounded-sm` photo with the
+ * shoppable hotspot layer and the pill dots on a blurred ink chip.
  *
  * Crossfades are opacity-only (compositor-safe) and honour reduced motion; there
  * is no bounce/elastic easing anywhere (design.md §9).
+ *
+ * Z11 — small-desktop (1024–1599.98px) viewport fill: the owner wants the
+ * hero to end exactly at the fold on a 13–14" laptop, i.e.
+ * `header height + hero height ≈ 100dvh`. Below 1600px the row's min-height
+ * switches from the static `--header-height` reference token to
+ * `--navbar-height-full` (the ResizeObserver's stable, pre-scroll
+ * measurement — NOT `--navbar-height-current`, which shrinks on scroll and
+ * would make the hero jump), via the `small-desktop`/`large-desktop`
+ * custom-variant split in globals.css. Inside that same window the heading
+ * drops its `lg:` 50px step (so it falls through to the existing `sm:` 44px
+ * step — one size down, no new class needed), the lede shrinks one notch, and
+ * the perk row's top margin tightens — all `small-desktop:`-scoped, so
+ * <1024 and ≥1600 render byte-identical classes to before.
  */
 export const HomeHero: React.FC<Props> = ({ perks = HERO_PERKS, slides = HERO_SLIDES }) => {
   const [current, setCurrent] = React.useState(0)
@@ -138,16 +151,16 @@ export const HomeHero: React.FC<Props> = ({ perks = HERO_PERKS, slides = HERO_SL
   return (
     <section className="relative w-full overflow-hidden bg-brand-50">
       <div className="container-editorial">
-        <div className="relative grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:py-6 lg:min-h-[calc(100dvh-var(--header-height))]">
+        <div className="relative grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-16 lg:py-6 small-desktop:min-h-[calc(100dvh-var(--navbar-height-full,131px))] large-desktop:min-h-[calc(100dvh-var(--header-height))]">
           {/* LEFT — text column */}
           <div className="relative z-20 order-2 max-w-[500px] lg:order-1">
             {slide.badge && <p className="eyebrow">{slide.badge}</p>}
 
-            <h1 className="mt-6 break-words font-display text-[36px] font-medium leading-[1.06] tracking-tight text-black sm:text-[44px] lg:text-[50px]">
+            <h1 className="mt-6 break-words font-display text-[36px] font-medium leading-[1.06] tracking-tight text-black sm:text-[44px] large-desktop:text-[50px]">
               {slide.title}
             </h1>
 
-            <p className="mt-7 max-w-[420px] font-sans text-[15px] leading-[1.75] text-gray-700">
+            <p className="mt-7 max-w-[420px] font-sans text-[15px] leading-[1.75] text-gray-700 small-desktop:text-[14px] small-desktop:leading-[1.65]">
               {slide.subtitle}
             </p>
 
@@ -172,7 +185,7 @@ export const HomeHero: React.FC<Props> = ({ perks = HERO_PERKS, slides = HERO_SL
               )}
             </div>
 
-            <ul className="mt-14 flex flex-wrap gap-9">
+            <ul className="mt-14 flex flex-wrap gap-9 small-desktop:mt-8">
               {perks.map((perk) => (
                 <li className="flex w-[92px] flex-col items-center text-center" key={perk.label}>
                   <ContentIcon className="size-8 text-brand" name={perk.icon} strokeWidth={1.4} />
@@ -182,8 +195,15 @@ export const HomeHero: React.FC<Props> = ({ perks = HERO_PERKS, slides = HERO_SL
             </ul>
           </div>
 
-          {/* RIGHT — dominant hero photo */}
-          <div className="relative order-1 min-h-[320px] sm:min-h-[420px] lg:order-2 lg:min-h-[560px]">
+          {/* RIGHT — dominant hero photo. `small-desktop:min-h-[440px]` (was
+              `lg:min-h-[560px]`) is the priority-2 shrink lever; the paired
+              `max-h-[...]` mirrors the row's own content budget (viewport
+              minus header minus the row's vertical padding) as a safety cap,
+              so the photo can never be what pushes the hero past the fold —
+              measured to hold even at the shortest tested small-desktop
+              height (1280×720: 440px column still fits inside a 541px
+              budget). */}
+          <div className="relative order-1 min-h-[320px] sm:min-h-[420px] lg:order-2 small-desktop:min-h-[440px] small-desktop:max-h-[calc(100dvh-var(--navbar-height-full,131px)-48px)] large-desktop:min-h-[560px]">
             {slides.map((item, index) => (
               <div
                 aria-hidden={index !== current}
