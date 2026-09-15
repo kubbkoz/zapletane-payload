@@ -1,5 +1,6 @@
 import { formBuilderPlugin } from '@payloadcms/plugin-form-builder'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
+import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob'
 import { seoPlugin } from '@payloadcms/plugin-seo'
 import { Field, Plugin } from 'payload'
 import { GenerateDescription, GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
@@ -184,6 +185,15 @@ const localizeRedirectField = (field: Field): Field => {
 }
 
 export const plugins: Plugin[] = [
+  // Vercel serverless has an ephemeral filesystem — without blob storage every
+  // production upload (product photos, blog hero images) silently disappears.
+  // Locally (no BLOB_READ_WRITE_TOKEN) the adapter stays off and media lands
+  // on disk as before.
+  vercelBlobStorage({
+    collections: { media: true },
+    enabled: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    token: process.env.BLOB_READ_WRITE_TOKEN || '',
+  }),
   seoPlugin({
     generateDescription,
     generateTitle,

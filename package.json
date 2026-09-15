@@ -40,6 +40,7 @@
     "@payloadcms/plugin-redirects": "^3.89.0",
     "@payloadcms/plugin-seo": "3.89.0",
     "@payloadcms/richtext-lexical": "3.89.0",
+    "@payloadcms/storage-vercel-blob": "^3.89.0",
     "@payloadcms/translations": "3.89.0",
     "@payloadcms/ui": "3.89.0",
     "@radix-ui/react-accordion": "1.2.11",
