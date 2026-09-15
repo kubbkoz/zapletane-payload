@@ -3,6 +3,7 @@ import * as migration_20260914_204423_site_settings from './20260914_204423_site
 import * as migration_20260914_213000_eur_currency from './20260914_213000_eur_currency';
 import * as migration_20260914_222556_shipping_payments from './20260914_222556_shipping_payments';
 import * as migration_20260914_230139_content_management from './20260914_230139_content_management';
+import * as migration_20260915_055133_x1_commerce_schema from './20260915_055133_x1_commerce_schema';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20260914_230139_content_management.up,
     down: migration_20260914_230139_content_management.down,
-    name: '20260914_230139_content_management'
+    name: '20260914_230139_content_management',
+  },
+  {
+    up: migration_20260915_055133_x1_commerce_schema.up,
+    down: migration_20260915_055133_x1_commerce_schema.down,
+    name: '20260915_055133_x1_commerce_schema'
   },
 ];

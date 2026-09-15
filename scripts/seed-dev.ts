@@ -327,7 +327,13 @@ const seedContentGlobals = async (payload: Awaited<ReturnType<typeof getPayload>
 
   const siteSettings = await payload.findGlobal({ slug: 'site-settings', depth: 0 })
 
-  if (!siteSettings?.updatedAt || !siteSettings?.contact?.phone || !siteSettings?.contact?.email) {
+  const needsContact =
+    !siteSettings?.updatedAt || !siteSettings?.contact?.phone || !siteSettings?.contact?.email
+  // X1 — the search multi-select lives in its own table and so starts empty on a
+  // row saved before the field existed; the scalars carry SQL defaults.
+  const needsSearchFields = !siteSettings?.search?.searchFields?.length
+
+  if (needsContact || needsSearchFields) {
     await payload.updateGlobal({
       slug: 'site-settings',
       data: {
@@ -337,9 +343,18 @@ const seedContentGlobals = async (payload: Awaited<ReturnType<typeof getPayload>
           email: siteSettings?.contact?.email || CONTACT.email.info,
           phone: siteSettings?.contact?.phone || CONTACT.phone.display,
         },
+        search: {
+          ...(siteSettings?.search || {}),
+          minChars: siteSettings?.search?.minChars ?? 2,
+          placeholder: siteSettings?.search?.placeholder || 'Hľadať produkty…',
+          resultsPerPage: siteSettings?.search?.resultsPerPage ?? 12,
+          searchFields: siteSettings?.search?.searchFields?.length
+            ? siteSettings.search.searchFields
+            : ['title', 'description'],
+        },
       },
     })
-    console.log('seeded site settings contact details (phone, e-mail, company name)')
+    console.log('seeded site settings (contact details + search defaults)')
   }
 }
 

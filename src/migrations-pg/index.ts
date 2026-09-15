@@ -9,6 +9,7 @@ import * as migration_20260914_223000_mcp_shipping_payment_grants from './202609
 import * as migration_20260914_230125_content_management from './20260914_230125_content_management';
 import * as migration_20260914_231500_content_defaults from './20260914_231500_content_defaults';
 import * as migration_20260915_055107_x1_commerce_schema from './20260915_055107_x1_commerce_schema';
+import * as migration_20260915_060000_x1_grants_and_search_defaults from './20260915_060000_x1_grants_and_search_defaults';
 
 export const migrations = [
   {
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20260915_055107_x1_commerce_schema.up,
     down: migration_20260915_055107_x1_commerce_schema.down,
     name: '20260915_055107_x1_commerce_schema'
+  },
+  {
+    up: migration_20260915_060000_x1_grants_and_search_defaults.up,
+    down: migration_20260915_060000_x1_grants_and_search_defaults.down,
+    name: '20260915_060000_x1_grants_and_search_defaults',
   },
 ];
