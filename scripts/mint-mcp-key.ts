@@ -106,6 +106,9 @@ async function main() {
     // `shippingMethods`), which is how the MCP plugin generates them.
     shippingMethods: fullCrud,
     paymentMethods: fullCrud,
+    // X1 — zľavové kódy a filtre v obchode. Shop configuration, same ceiling.
+    discountCodes: fullCrud,
+    productFilters: fullCrud,
     orders: findAndUpdate,
     transactions: findAndUpdate,
     carts: findAndUpdate,

@@ -179,6 +179,72 @@ export const SiteSettings: GlobalConfig = {
         },
       ],
     },
+    // --- Vyhľadávanie (X1) -------------------------------------------------
+    // Schema + defaults only. Every default below is exactly what the search UI
+    // does today (placeholder copy, 2-character minimum, title+description
+    // matching, 12 results per page), so saving this global changes nothing
+    // until the search wave (X4) starts reading it.
+    {
+      name: 'search',
+      type: 'group',
+      label: 'Vyhľadávanie',
+      admin: {
+        description:
+          'Správanie vyhľadávania v obchode. Predvolené hodnoty zodpovedajú súčasnému stavu — meniť ich treba len pri zmene požiadaviek.',
+      },
+      fields: [
+        {
+          name: 'placeholder',
+          type: 'text',
+          defaultValue: 'Hľadať produkty…',
+          label: 'Text v poli vyhľadávania',
+          admin: {
+            description: 'Napovedajúci text (placeholder) v prázdnom vyhľadávacom poli.',
+          },
+        },
+        {
+          type: 'row',
+          fields: [
+            {
+              name: 'minChars',
+              type: 'number',
+              defaultValue: 2,
+              min: 1,
+              max: 10,
+              label: 'Minimálny počet znakov',
+              admin: {
+                description: 'Pod týmto počtom znakov sa vyhľadávanie nespustí.',
+                width: '50%',
+              },
+            },
+            {
+              name: 'resultsPerPage',
+              type: 'number',
+              defaultValue: 12,
+              min: 1,
+              max: 96,
+              label: 'Počet výsledkov na stránku',
+              admin: { width: '50%' },
+            },
+          ],
+        },
+        {
+          name: 'searchFields',
+          type: 'select',
+          hasMany: true,
+          defaultValue: ['title', 'description'],
+          label: 'Prehľadávané polia',
+          options: [
+            { label: 'Názov produktu', value: 'title' },
+            { label: 'Popis', value: 'description' },
+            { label: 'Kategórie', value: 'categories' },
+          ],
+          admin: {
+            description: 'Ktoré časti produktu sa prehľadávajú. Aspoň jedno pole musí byť zvolené.',
+          },
+        },
+      ],
+    },
     {
       name: 'payments',
       type: 'group',

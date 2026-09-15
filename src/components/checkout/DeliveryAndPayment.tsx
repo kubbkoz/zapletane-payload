@@ -6,6 +6,7 @@ import { Banknote, CreditCard, Landmark, MapPin, Package, Truck } from 'lucide-r
 import type { PaymentMethod, ShippingMethod } from '@/payload-types'
 
 import { Price } from '@/components/Price'
+import { formatEurocents, qualifiesForFreeShipping } from '@/payments/shared/rules'
 import { cn } from '@/utilities/cn'
 
 type Props = {
@@ -16,6 +17,8 @@ type Props = {
   selectedPaymentID: null | number
   selectedShippingID: null | number
   shippingMethods: ShippingMethod[]
+  /** Product subtotal in eurocents — decides which methods ship free. */
+  subtotal: number
 }
 
 const shippingIcons: Record<NonNullable<ShippingMethod['type']>, typeof Truck> = {
@@ -40,14 +43,31 @@ const MethodCard: React.FC<{
   amount: number
   description?: null | string
   disabled?: boolean
+  /** "Zadarmo od 100 €" — shown when a threshold exists but is not met yet. */
+  hint?: null | string
   Icon: typeof Truck
   meta?: null | string
   name: string
   onSelect: () => void
+  /** Struck-through list price, shown when the threshold zeroed `amount`. */
+  originalAmount?: null | number
   selected: boolean
   title: string
   zeroLabel?: string
-}> = ({ amount, description, disabled, Icon, meta, name, onSelect, selected, title, zeroLabel }) => (
+}> = ({
+  amount,
+  description,
+  disabled,
+  hint,
+  Icon,
+  meta,
+  name,
+  onSelect,
+  originalAmount,
+  selected,
+  title,
+  zeroLabel,
+}) => (
   <label
     className={cn(
       'flex cursor-pointer items-start gap-4 rounded-default border bg-white p-4 transition-colors duration-200',
@@ -90,6 +110,11 @@ const MethodCard: React.FC<{
           {meta}
         </span>
       )}
+      {hint && (
+        <span className="font-tech text-[10px] font-bold uppercase tracking-widest text-accent">
+          {hint}
+        </span>
+      )}
     </span>
 
     {amount > 0 ? (
@@ -99,8 +124,17 @@ const MethodCard: React.FC<{
         className="shrink-0 font-tech text-sm font-bold leading-none text-black"
       />
     ) : (
-      <span className="shrink-0 font-tech text-[11px] font-bold uppercase tracking-widest text-success">
-        {zeroLabel ?? 'Zadarmo'}
+      <span className="flex shrink-0 items-baseline gap-2">
+        {typeof originalAmount === 'number' && originalAmount > 0 && (
+          <Price
+            amount={originalAmount}
+            as="span"
+            className="font-tech text-sm font-bold leading-none text-gray-400 line-through"
+          />
+        )}
+        <span className="font-tech text-[11px] font-bold uppercase tracking-widest text-success">
+          {zeroLabel ?? 'Zadarmo'}
+        </span>
       </span>
     )}
   </label>
@@ -120,6 +154,7 @@ export const DeliveryAndPayment: React.FC<Props> = ({
   selectedPaymentID,
   selectedShippingID,
   shippingMethods,
+  subtotal,
 }) => {
   return (
     <section className="rounded-default border border-gray-200 bg-white p-6 md:p-8">
@@ -138,20 +173,34 @@ export const DeliveryAndPayment: React.FC<Props> = ({
             </p>
           ) : (
             <div className="flex flex-col gap-3">
-              {shippingMethods.map((method) => (
-                <MethodCard
-                  amount={method.price ?? 0}
-                  description={method.description}
-                  disabled={disabled}
-                  Icon={shippingIcons[method.type] ?? Truck}
-                  key={method.id}
-                  meta={method.deliveryEstimate}
-                  name="shippingMethod"
-                  onSelect={() => onSelectShipping(method.id)}
-                  selected={selectedShippingID === method.id}
-                  title={method.title}
-                />
-              ))}
+              {shippingMethods.map((method) => {
+                // Mirrors resolveFees() exactly (both call the same helper), so
+                // the card can never advertise a price the server won't charge.
+                const isFree = qualifiesForFreeShipping(method, subtotal)
+                const listPrice = method.price ?? 0
+                const threshold = method.freeAboveSubtotal
+
+                return (
+                  <MethodCard
+                    amount={isFree ? 0 : listPrice}
+                    description={method.description}
+                    disabled={disabled}
+                    hint={
+                      !isFree && typeof threshold === 'number' && threshold > 0 && listPrice > 0
+                        ? `Zadarmo od ${formatEurocents(threshold)}`
+                        : null
+                    }
+                    Icon={shippingIcons[method.type] ?? Truck}
+                    key={method.id}
+                    meta={method.deliveryEstimate}
+                    name="shippingMethod"
+                    onSelect={() => onSelectShipping(method.id)}
+                    originalAmount={isFree ? listPrice : null}
+                    selected={selectedShippingID === method.id}
+                    title={method.title}
+                  />
+                )
+              })}
             </div>
           )}
         </div>

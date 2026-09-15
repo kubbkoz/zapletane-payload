@@ -23,6 +23,11 @@ import { CreateAddressModal } from '@/components/addresses/CreateAddressModal'
 import { Address, PaymentMethod, Product, ShippingMethod, Variant } from '@/payload-types'
 import { COMGATE_PAYMENT_NAME } from '@/payments/comgate/constants'
 import { MANUAL_PAYMENT_NAME } from '@/payments/manual/constants'
+import {
+  amountMissingForFreeShipping,
+  formatEurocents,
+  qualifiesForFreeShipping,
+} from '@/payments/shared/rules'
 
 type GalleryItem = NonNullable<Product['gallery']>[number]
 type VariantOptionRef = Variant['options'][number]
@@ -101,10 +106,28 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
     [paymentMethods, selectedPaymentID],
   )
 
+  // --- Zľavový kód ------------------------------------------------------
+  // The applied amount below is a *preview* returned by
+  // /api/discount-codes/validate. Only the code string ever travels to
+  // `initiatePayment`; the amount that is charged is recomputed server-side in
+  // resolveFees() against the cart Payload loaded itself.
+  const [discountInput, setDiscountInput] = useState('')
+  const [appliedDiscount, setAppliedDiscount] = useState<null | { amount: number; code: string }>(
+    null,
+  )
+  const [discountError, setDiscountError] = useState<null | string>(null)
+  const [isCheckingDiscount, setCheckingDiscount] = useState(false)
+
   const subtotal = cart?.subtotal ?? 0
-  const shippingFee = selectedShipping?.price ?? 0
+  // Identical helper to the one resolveFees() uses, so the summary and the
+  // order can never disagree about who pays for delivery.
+  const shippingIsFree = qualifiesForFreeShipping(selectedShipping, subtotal)
+  const shippingListPrice = selectedShipping?.price ?? 0
+  const shippingFee = shippingIsFree ? 0 : shippingListPrice
   const codFee = selectedPayment?.surcharge ?? 0
-  const grandTotal = subtotal + shippingFee + codFee
+  const discountAmount = appliedDiscount?.amount ?? 0
+  const missingForFreeShipping = amountMissingForFreeShipping(selectedShipping, subtotal)
+  const grandTotal = Math.max(0, subtotal - discountAmount) + shippingFee + codFee
 
   const addressesComplete = Boolean(
     (email || user) && billingAddress && (billingAddressSameAsShipping || shippingAddress),
@@ -136,6 +159,78 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
     }
   }, [])
 
+  /**
+   * Ask the server whether a code is usable, and for how much.
+   *
+   * Every constraint (existence, enabled, validity window, remaining uses,
+   * minimum subtotal) is checked in the route handler — this only renders the
+   * verdict. `silent` is used by the re-check below so a basket change does not
+   * pop a toast the shopper did not ask for.
+   */
+  const applyDiscountCode = useCallback(
+    async (code: string, { silent = false }: { silent?: boolean } = {}) => {
+      const trimmed = code.trim()
+
+      if (!trimmed) {
+        setDiscountError('Zadajte zľavový kód.')
+        return
+      }
+
+      setCheckingDiscount(true)
+
+      try {
+        const response = await fetch('/api/discount-codes/validate', {
+          body: JSON.stringify({ code: trimmed, subtotal }),
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+        })
+
+        const data = (await response.json()) as {
+          amount?: number
+          code?: string
+          message?: string
+          ok?: boolean
+        }
+
+        if (data?.ok && typeof data.amount === 'number' && data.code) {
+          setAppliedDiscount({ amount: data.amount, code: data.code })
+          setDiscountError(null)
+
+          if (!silent) {
+            toast.success(`Zľavový kód ${data.code} bol uplatnený.`)
+          }
+        } else {
+          setAppliedDiscount(null)
+          setDiscountError(data?.message ?? 'Zľavový kód sa nepodarilo uplatniť.')
+        }
+      } catch {
+        setAppliedDiscount(null)
+        setDiscountError('Zľavový kód sa nepodarilo overiť. Skúste to prosím znova.')
+      } finally {
+        setCheckingDiscount(false)
+      }
+    },
+    [subtotal],
+  )
+
+  const removeDiscountCode = useCallback(() => {
+    setAppliedDiscount(null)
+    setDiscountError(null)
+    setDiscountInput('')
+  }, [])
+
+  // A basket edited in another tab can drop below the code's minimum (or change
+  // what a percentage is worth), so re-ask whenever the subtotal moves. Keyed on
+  // `subtotal` alone on purpose — re-running on `appliedDiscount` would loop.
+  useEffect(() => {
+    if (!appliedDiscount) {
+      return
+    }
+
+    void applyDiscountCode(appliedDiscount.code, { silent: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal])
+
   const goToOrder = useCallback(
     (orderID: number | string, accessToken?: string) => {
       const queryParams = new URLSearchParams()
@@ -162,6 +257,7 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
           additionalData: {
             ...(email ? { customerEmail: email } : {}),
             billingAddress,
+            ...(appliedDiscount ? { discountCode: appliedDiscount.code } : {}),
             paymentMethodID: selectedPaymentID,
             shippingAddress: billingAddressSameAsShipping ? billingAddress : shippingAddress,
             shippingMethodID: selectedShippingID,
@@ -184,6 +280,7 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
       }
     },
     [
+      appliedDiscount,
       billingAddress,
       billingAddressSameAsShipping,
       email,
@@ -224,6 +321,9 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
         additionalData: {
           ...(email ? { customerEmail: email } : {}),
           billingAddress,
+          // Only the code travels — the server re-validates it and computes the
+          // amount itself (src/payments/shared/fees.ts).
+          ...(appliedDiscount ? { discountCode: appliedDiscount.code } : {}),
           paymentMethodID: selectedPayment.id,
           shippingAddress: billingAddressSameAsShipping ? billingAddress : shippingAddress,
           shippingMethodID: selectedShipping.id,
@@ -282,6 +382,7 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
       setSubmitting(false)
     }
   }, [
+    appliedDiscount,
     billingAddress,
     billingAddressSameAsShipping,
     confirmOrder,
@@ -518,6 +619,7 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
             selectedPaymentID={selectedPaymentID}
             selectedShippingID={selectedShippingID}
             shippingMethods={shippingMethods}
+            subtotal={subtotal}
           />
 
           {selectedPayment?.type === 'bankTransfer' && (
@@ -717,6 +819,67 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
                 })}
               </div>
 
+              {/* --- Zľavový kód ------------------------------------------- */}
+              <div className="flex flex-col gap-2 border-t border-gray-200 pt-5">
+                <Label className="form-label" htmlFor="discountCode">
+                  Zľavový kód
+                </Label>
+
+                {appliedDiscount ? (
+                  <div className="flex items-center justify-between gap-3 rounded-default border border-success/30 bg-success/5 px-3 py-2.5">
+                    <span className="font-tech text-[11px] font-bold uppercase tracking-widest text-success">
+                      {appliedDiscount.code}
+                    </span>
+                    <button
+                      className="font-sans text-[11px] font-bold uppercase tracking-widest text-gray-500 underline underline-offset-4 transition-colors hover:text-brand"
+                      disabled={isSubmitting}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        removeDiscountCode()
+                      }}
+                      type="button"
+                    >
+                      Odstrániť
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-stretch gap-2">
+                    <Input
+                      autoCapitalize="characters"
+                      className="form-input border-gray-200 bg-white uppercase"
+                      disabled={isCheckingDiscount || isSubmitting}
+                      id="discountCode"
+                      name="discountCode"
+                      onChange={(e) => setDiscountInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          void applyDiscountCode(discountInput)
+                        }
+                      }}
+                      placeholder="ZAPLETANE10"
+                      type="text"
+                      value={discountInput}
+                    />
+                    <button
+                      className="shrink-0 rounded-default border border-brand px-4 font-sans text-[11px] font-bold uppercase tracking-widest text-brand transition-colors duration-300 hover:bg-brand hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!discountInput.trim() || isCheckingDiscount || isSubmitting}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        void applyDiscountCode(discountInput)
+                      }}
+                      type="button"
+                    >
+                      {isCheckingDiscount ? 'Overujem…' : 'Použiť'}
+                    </button>
+                  </div>
+                )}
+
+                {discountError && (
+                  <p className="font-sans text-[12px] leading-snug text-error">{discountError}</p>
+                )}
+              </div>
+
               <div className="flex flex-col gap-2 border-t border-gray-200 pt-5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-sans text-[13px] text-gray-600">Medzisúčet</span>
@@ -726,6 +889,17 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
                     className="font-tech text-sm font-bold text-black"
                   />
                 </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-sans text-[13px] text-gray-600">
+                      {`Zľava — ${appliedDiscount?.code ?? ''}`}
+                    </span>
+                    <span className="font-tech text-sm font-bold text-success">
+                      {`- ${formatEurocents(discountAmount)}`}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-sans text-[13px] text-gray-600">
@@ -738,11 +912,26 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
                       className="font-tech text-sm font-bold text-black"
                     />
                   ) : (
-                    <span className="font-tech text-[11px] font-bold uppercase tracking-widest text-success">
-                      Zadarmo
+                    <span className="flex items-baseline gap-2">
+                      {shippingIsFree && shippingListPrice > 0 && (
+                        <Price
+                          amount={shippingListPrice}
+                          as="span"
+                          className="font-tech text-sm font-bold text-gray-400 line-through"
+                        />
+                      )}
+                      <span className="font-tech text-[11px] font-bold uppercase tracking-widest text-success">
+                        Zadarmo
+                      </span>
                     </span>
                   )}
                 </div>
+
+                {missingForFreeShipping > 0 && (
+                  <p className="rounded-default bg-brand-50 px-3 py-2 font-sans text-[12px] leading-snug text-brand">
+                    {`Do dopravy zadarmo ti chýba ${formatEurocents(missingForFreeShipping)}.`}
+                  </p>
+                )}
 
                 {codFee > 0 && (
                   <div className="flex items-center justify-between gap-2">

@@ -207,6 +207,30 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
       hasMany: true,
       relationTo: 'categories',
     },
+    // --- Vlastné filtre (X1) ----------------------------------------------
+    // Free-form tags that pair with the `product-filters` collection: a filter
+    // of type „Štítky" lists its own options, and a product shows up under an
+    // option when this array contains that option's value verbatim.
+    // Additive and inert until the shop panel consumes it (X4).
+    {
+      name: 'filterTags',
+      type: 'array',
+      label: 'Filtrovacie štítky',
+      labels: { plural: 'Štítky', singular: 'Štítok' },
+      admin: {
+        description:
+          'Štítky, podľa ktorých sa dá produkt filtrovať v obchode. Hodnota sa musí presne zhodovať s možnosťou v kolekcii „Filtre v obchode“ (napr. „vlna“).',
+        position: 'sidebar',
+      },
+      fields: [
+        {
+          name: 'tag',
+          type: 'text',
+          label: 'Štítok',
+          required: true,
+        },
+      ],
+    },
     slugField(),
   ],
 })

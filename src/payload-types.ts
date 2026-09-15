@@ -79,6 +79,8 @@ export interface Config {
     media: Media;
     'shipping-methods': ShippingMethod;
     'payment-methods': PaymentMethod;
+    'discount-codes': DiscountCode;
+    'product-filters': ProductFilter;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -115,6 +117,8 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'shipping-methods': ShippingMethodsSelect<false> | ShippingMethodsSelect<true>;
     'payment-methods': PaymentMethodsSelect<false> | PaymentMethodsSelect<true>;
+    'discount-codes': DiscountCodesSelect<false> | DiscountCodesSelect<true>;
+    'product-filters': ProductFiltersSelect<false> | ProductFiltersSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -301,6 +305,14 @@ export interface Order {
    * V eurocentoch. Je už započítaný v celkovej sume.
    */
   codFee?: number | null;
+  /**
+   * Kód uplatnený v pokladni (prázdne = bez zľavy).
+   */
+  discountCode?: string | null;
+  /**
+   * V eurocentoch. Je už odpočítaný z celkovej sumy.
+   */
+  discountAmount?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -354,6 +366,15 @@ export interface Product {
     description?: string | null;
   };
   categories?: (number | Category)[] | null;
+  /**
+   * Štítky, podľa ktorých sa dá produkt filtrovať v obchode. Hodnota sa musí presne zhodovať s možnosťou v kolekcii „Filtre v obchode“ (napr. „vlna“).
+   */
+  filterTags?:
+    | {
+        tag: string;
+        id?: string | null;
+      }[]
+    | null;
   /**
    * When enabled, the slug will auto-generate from the title field on save and autosave.
    */
@@ -950,6 +971,9 @@ export interface Transaction {
     shippingMethodID?: string | null;
     shippingFee?: number | null;
     codFee?: number | null;
+    discountCode?: string | null;
+    discountCodeID?: string | null;
+    discountAmount?: number | null;
     shippingAddressSnapshot?:
       | {
           [k: string]: unknown;
@@ -967,6 +991,9 @@ export interface Transaction {
     shippingMethodID?: string | null;
     shippingFee?: number | null;
     codFee?: number | null;
+    discountCode?: string | null;
+    discountCodeID?: string | null;
+    discountAmount?: number | null;
     shippingAddressSnapshot?:
       | {
           [k: string]: unknown;
@@ -1052,6 +1079,14 @@ export interface ShippingMethod {
    * Napr. „2–4 dni“. Zobrazí sa pri výbere dopravy.
    */
   deliveryEstimate?: string | null;
+  /**
+   * 10000 = 100 €. Keď medzisúčet košíka dosiahne túto sumu, doprava je zadarmo. Prázdne pole = doprava nikdy nie je zadarmo.
+   */
+  freeAboveSubtotal?: number | null;
+  /**
+   * Interná poznámka k pravidlám tejto dopravy (hmotnosť, regióny, výnimky). Zákazníkovi sa nezobrazuje.
+   */
+  rules?: string | null;
   /**
    * Vypnutý spôsob dopravy sa zákazníkom v pokladni nezobrazí.
    */
@@ -1176,6 +1211,102 @@ export interface PaymentMethod {
   enabled?: boolean | null;
   /**
    * Nižšie číslo = vyššie v zozname.
+   */
+  sortOrder?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Zľavové kódy pre pokladňu. Zľava sa vždy počíta len z medzisúčtu tovaru — nikdy z dopravy ani z poplatku za dobierku.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "discount-codes".
+ */
+export interface DiscountCode {
+  id: number;
+  /**
+   * Napr. „ZAPLETANE10“. Ukladá sa vždy VEĽKÝMI písmenami, takže na veľkosti písmen pri zadávaní v pokladni nezáleží.
+   */
+  code: string;
+  type: 'percent' | 'fixed';
+  /**
+   * Pri percentuálnej zľave 1–100 (napr. 10 = 10 %), pri pevnej sume v eurocentoch (500 = 5 €).
+   */
+  value: number;
+  /**
+   * 5000 = 50 €. Prázdne pole = kód platí pri akejkoľvek sume.
+   */
+  minSubtotal?: number | null;
+  /**
+   * Prázdne = platí okamžite.
+   */
+  validFrom?: string | null;
+  /**
+   * Prázdne = platí bez obmedzenia.
+   */
+  validUntil?: string | null;
+  /**
+   * Prázdne = neobmedzene.
+   */
+  maxUses?: number | null;
+  /**
+   * Zvyšuje sa automaticky pri vytvorení objednávky (nie pri overení kódu v pokladni).
+   */
+  usedCount?: number | null;
+  /**
+   * Vypnutý kód pokladňa odmietne bez ohľadu na platnosť.
+   */
+  enabled?: boolean | null;
+  /**
+   * Na čo bol kód vydaný. Zákazníkovi sa nezobrazuje.
+   */
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Filtre zobrazené na stránke obchodu. Štítkové filtre sa párujú s poľom „Filtrovacie štítky“ na produkte.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-filters".
+ */
+export interface ProductFilter {
+  id: number;
+  /**
+   * Nadpis filtra v paneli, napr. „Materiál“.
+   */
+  label: string;
+  /**
+   * Malé písmená a pomlčky, napr. „material“. Používa sa ako parameter v URL obchodu.
+   */
+  slug: string;
+  /**
+   * Štítky = vlastné možnosti nižšie. Kategórie = výber z taxonómie. Cena a Dostupnosť nemajú možnosti.
+   */
+  type: 'tags' | 'categories' | 'price' | 'availability';
+  /**
+   * Jedna možnosť = jeden štítok. Hodnota sa musí zhodovať so štítkom zadaným na produkte („Filtrovacie štítky“).
+   */
+  options?:
+    | {
+        label: string;
+        /**
+         * Napr. „vlna“. Presne toto sa zadáva na produkte.
+         */
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Prázdne = ponúknu sa všetky kategórie.
+   */
+  categories?: (number | Category)[] | null;
+  /**
+   * Vypnutý filter sa v obchode nezobrazí.
+   */
+  enabled?: boolean | null;
+  /**
+   * Nižšie číslo = vyššie v paneli filtrov.
    */
   sortOrder?: number | null;
   updatedAt: string;
@@ -1380,6 +1511,42 @@ export interface PayloadMcpApiKey {
      */
     delete?: boolean | null;
   };
+  discountCodes?: {
+    /**
+     * Allow clients to find discount-codes.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create discount-codes.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update discount-codes.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete discount-codes.
+     */
+    delete?: boolean | null;
+  };
+  productFilters?: {
+    /**
+     * Allow clients to find product-filters.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create product-filters.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update product-filters.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete product-filters.
+     */
+    delete?: boolean | null;
+  };
   orders?: {
     /**
      * Allow clients to find orders.
@@ -1520,6 +1687,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'payment-methods';
         value: number | PaymentMethod;
+      } | null)
+    | ({
+        relationTo: 'discount-codes';
+        value: number | DiscountCode;
+      } | null)
+    | ({
+        relationTo: 'product-filters';
+        value: number | ProductFilter;
       } | null)
     | ({
         relationTo: 'forms';
@@ -1856,6 +2031,8 @@ export interface ShippingMethodsSelect<T extends boolean = true> {
   price?: T;
   type?: T;
   deliveryEstimate?: T;
+  freeAboveSubtotal?: T;
+  rules?: T;
   enabled?: T;
   sortOrder?: T;
   updatedAt?: T;
@@ -1872,6 +2049,45 @@ export interface PaymentMethodsSelect<T extends boolean = true> {
   gateway?: T;
   description?: T;
   instructions?: T;
+  enabled?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "discount-codes_select".
+ */
+export interface DiscountCodesSelect<T extends boolean = true> {
+  code?: T;
+  type?: T;
+  value?: T;
+  minSubtotal?: T;
+  validFrom?: T;
+  validUntil?: T;
+  maxUses?: T;
+  usedCount?: T;
+  enabled?: T;
+  note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-filters_select".
+ */
+export interface ProductFiltersSelect<T extends boolean = true> {
+  label?: T;
+  slug?: T;
+  type?: T;
+  options?:
+    | T
+    | {
+        label?: T;
+        value?: T;
+        id?: T;
+      };
+  categories?: T;
   enabled?: T;
   sortOrder?: T;
   updatedAt?: T;
@@ -2123,6 +2339,12 @@ export interface ProductsSelect<T extends boolean = true> {
         description?: T;
       };
   categories?: T;
+  filterTags?:
+    | T
+    | {
+        tag?: T;
+        id?: T;
+      };
   generateSlug?: T;
   slug?: T;
   updatedAt?: T;
@@ -2191,6 +2413,8 @@ export interface OrdersSelect<T extends boolean = true> {
   paymentType?: T;
   shippingFee?: T;
   codFee?: T;
+  discountCode?: T;
+  discountAmount?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2215,6 +2439,9 @@ export interface TransactionsSelect<T extends boolean = true> {
         shippingMethodID?: T;
         shippingFee?: T;
         codFee?: T;
+        discountCode?: T;
+        discountCodeID?: T;
+        discountAmount?: T;
         shippingAddressSnapshot?: T;
       };
   comgate?:
@@ -2226,6 +2453,9 @@ export interface TransactionsSelect<T extends boolean = true> {
         shippingMethodID?: T;
         shippingFee?: T;
         codFee?: T;
+        discountCode?: T;
+        discountCodeID?: T;
+        discountAmount?: T;
         shippingAddressSnapshot?: T;
       };
   stripe?:
@@ -2332,6 +2562,22 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         delete?: T;
       };
   paymentMethods?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  discountCodes?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  productFilters?:
     | T
     | {
         find?: T;
@@ -2706,6 +2952,24 @@ export interface SiteSetting {
     openingHours?: string | null;
   };
   /**
+   * Správanie vyhľadávania v obchode. Predvolené hodnoty zodpovedajú súčasnému stavu — meniť ich treba len pri zmene požiadaviek.
+   */
+  search?: {
+    /**
+     * Napovedajúci text (placeholder) v prázdnom vyhľadávacom poli.
+     */
+    placeholder?: string | null;
+    /**
+     * Pod týmto počtom znakov sa vyhľadávanie nespustí.
+     */
+    minChars?: number | null;
+    resultsPerPage?: number | null;
+    /**
+     * Ktoré časti produktu sa prehľadávajú. Aspoň jedno pole musí byť zvolené.
+     */
+    searchFields?: ('title' | 'description' | 'categories')[] | null;
+  };
+  /**
    * Bankové spojenie pre platbu prevodom. Zobrazí sa zákazníkovi na potvrdení objednávky spolu so sumou a variabilným symbolom.
    */
   payments?: {
@@ -2958,6 +3222,14 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         icDph?: T;
         address?: T;
         openingHours?: T;
+      };
+  search?:
+    | T
+    | {
+        placeholder?: T;
+        minChars?: T;
+        resultsPerPage?: T;
+        searchFields?: T;
       };
   payments?:
     | T

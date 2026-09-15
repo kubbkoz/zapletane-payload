@@ -16,10 +16,15 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 
+import { en } from '@payloadcms/translations/languages/en'
+import { sk } from '@payloadcms/translations/languages/sk'
+
 import { Categories } from '@/collections/Categories'
+import { DiscountCodes } from '@/collections/DiscountCodes'
 import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
 import { PaymentMethods } from '@/collections/PaymentMethods'
+import { ProductFilters } from '@/collections/ProductFilters'
 import { ShippingMethods } from '@/collections/ShippingMethods'
 import { Users } from '@/collections/Users'
 import { globalConfigs } from '@/globals'
@@ -106,7 +111,16 @@ export default buildConfig({
     theme: 'all',
     user: Users.slug,
   },
-  collections: [Users, Pages, Categories, Media, ShippingMethods, PaymentMethods],
+  collections: [
+    Users,
+    Pages,
+    Categories,
+    Media,
+    ShippingMethods,
+    PaymentMethods,
+    DiscountCodes,
+    ProductFilters,
+  ],
   db: databaseAdapter,
   editor: lexicalEditor({
     features: () => {
@@ -146,6 +160,10 @@ export default buildConfig({
   //email: nodemailerAdapter(),
   endpoints: [],
   globals: globalConfigs,
+  i18n: {
+    fallbackLanguage: 'sk',
+    supportedLanguages: { en, sk },
+  },
   plugins,
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

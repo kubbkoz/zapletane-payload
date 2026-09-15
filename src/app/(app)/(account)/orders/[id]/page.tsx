@@ -15,6 +15,7 @@ import { getPayload } from 'payload'
 import { OrderStatus } from '@/components/OrderStatus'
 import { AddressItem } from '@/components/addresses/AddressItem'
 import { OrderPaymentInstructions } from '@/components/checkout/OrderPaymentInstructions'
+import { formatEurocents } from '@/payments/shared/rules'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +91,9 @@ export default async function Order({ params, searchParams }: PageProps) {
         paymentType: true,
         shippingFee: true,
         codFee: true,
+        // X1 — zľavový kód uplatnený v pokladni.
+        discountCode: true,
+        discountAmount: true,
       },
     })
 
@@ -218,13 +222,24 @@ export default async function Order({ params, searchParams }: PageProps) {
           </div>
         )}
 
-        {(order.shippingFee || order.codFee || order.shippingMethod) && (
+        {(order.shippingFee || order.codFee || order.shippingMethod || order.discountAmount) && (
           <div className="border-t border-gray-100 pt-8">
             <h2 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
               Doprava a platba
             </h2>
 
             <div className="flex flex-col gap-2">
+              {Boolean(order.discountAmount) && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-sans text-[13px] text-gray-600">
+                    {order.discountCode ? `Zľava — ${order.discountCode}` : 'Zľava'}
+                  </span>
+                  <span className="font-sans text-sm font-bold text-success">
+                    {`- ${formatEurocents(order.discountAmount ?? 0)}`}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-4">
                 <span className="font-sans text-[13px] text-gray-600">
                   {typeof order.shippingMethod === 'object' && order.shippingMethod

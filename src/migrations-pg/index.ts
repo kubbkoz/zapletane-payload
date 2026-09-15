@@ -8,6 +8,7 @@ import * as migration_20260914_222406_shipping_payments from './20260914_222406_
 import * as migration_20260914_223000_mcp_shipping_payment_grants from './20260914_223000_mcp_shipping_payment_grants';
 import * as migration_20260914_230125_content_management from './20260914_230125_content_management';
 import * as migration_20260914_231500_content_defaults from './20260914_231500_content_defaults';
+import * as migration_20260915_055107_x1_commerce_schema from './20260915_055107_x1_commerce_schema';
 
 export const migrations = [
   {
@@ -59,5 +60,10 @@ export const migrations = [
     up: migration_20260914_231500_content_defaults.up,
     down: migration_20260914_231500_content_defaults.down,
     name: '20260914_231500_content_defaults',
+  },
+  {
+    up: migration_20260915_055107_x1_commerce_schema.up,
+    down: migration_20260915_055107_x1_commerce_schema.down,
+    name: '20260915_055107_x1_commerce_schema'
   },
 ];

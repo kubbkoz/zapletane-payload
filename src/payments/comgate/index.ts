@@ -146,10 +146,16 @@ export const comgateAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =
 
       const requestData = (req.data ?? {}) as Record<string, unknown>
 
+      // Server-loaded cart subtotal — the basis for both the free-delivery
+      // threshold and the discount, never a number the browser sent.
+      const subtotal = cart.subtotal ?? 0
+
       const fees = await resolveFees({
+        discountCode: requestData.discountCode,
         paymentMethodID: requestData.paymentMethodID,
         req,
         shippingMethodID: requestData.shippingMethodID,
+        subtotal,
       })
 
       if (!fees.paymentMethod?.enabled || fees.paymentType !== 'card') {
@@ -158,9 +164,14 @@ export const comgateAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =
       if (!fees.shippingMethod?.enabled) {
         throw new Error('Zvolený spôsob dopravy nie je dostupný.')
       }
+      // Re-validated at order creation — see the same guard in the manual
+      // adapter. The price sent to the gateway must be the price we can defend.
+      if (fees.discountError) {
+        throw new Error(fees.discountError)
+      }
 
       const items = flattenCartItems(cart)
-      const amount = calculateOrderTotal(cart.subtotal ?? 0, fees)
+      const amount = calculateOrderTotal(subtotal, fees)
 
       if (!amount || amount <= 0) {
         throw new Error('Neplatná suma objednávky.')
@@ -175,6 +186,9 @@ export const comgateAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =
           cart: cart.id,
           [GROUP_NAME]: {
             codFee: fees.codFee,
+            discountAmount: fees.discountAmount,
+            discountCode: fees.discountCode,
+            discountCodeID: fees.discountCodeID != null ? String(fees.discountCodeID) : null,
             paymentType: fees.paymentType,
             shippingAddressSnapshot: (shippingAddress ?? billingAddress) as unknown as Record<string, unknown>,
             shippingFee: fees.shippingFee,

@@ -22,7 +22,7 @@ export const ShippingMethods: CollectionConfig = {
     update: adminOnly,
   },
   admin: {
-    defaultColumns: ['title', 'type', 'price', 'enabled', 'sortOrder'],
+    defaultColumns: ['title', 'type', 'price', 'freeAboveSubtotal', 'enabled', 'sortOrder'],
     description:
       'Spôsoby doručenia ponúkané v pokladni. Cena je v eurocentoch (4.90 € = 490). Vypnutý spôsob sa v pokladni nezobrazí.',
     group: 'Ecommerce',
@@ -89,6 +89,30 @@ export const ShippingMethods: CollectionConfig = {
       label: 'Odhad doručenia',
       admin: {
         description: 'Napr. „2–4 dni“. Zobrazí sa pri výbere dopravy.',
+      },
+    },
+    // --- Pravidlá dopravy (X1) --------------------------------------------
+    // The threshold is applied on the server in src/payments/shared/fees.ts —
+    // the storefront only *shows* it. Compared against the product subtotal
+    // BEFORE any fee and BEFORE a discount code, which is the number the
+    // shopper sees as „Medzisúčet" in the summary.
+    {
+      name: 'freeAboveSubtotal',
+      type: 'number',
+      label: 'Doprava zadarmo od (v eurocentoch)',
+      min: 0,
+      admin: {
+        description:
+          '10000 = 100 €. Keď medzisúčet košíka dosiahne túto sumu, doprava je zadarmo. Prázdne pole = doprava nikdy nie je zadarmo.',
+      },
+    },
+    {
+      name: 'rules',
+      type: 'textarea',
+      label: 'Poznámka k pravidlám',
+      admin: {
+        description:
+          'Interná poznámka k pravidlám tejto dopravy (hmotnosť, regióny, výnimky). Zákazníkovi sa nezobrazuje.',
       },
     },
     {

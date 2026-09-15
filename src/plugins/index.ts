@@ -202,6 +202,29 @@ export const plugins: Plugin[] = [
             },
             label: 'Poplatok za dobierku',
           },
+          // --- Zľavový kód (X1) -------------------------------------------
+          // A snapshot, not a relationship: the order must still say what the
+          // shopper actually got even if the code is later edited or deleted.
+          {
+            name: 'discountCode',
+            type: 'text',
+            index: true,
+            admin: {
+              position: 'sidebar',
+              description: 'Kód uplatnený v pokladni (prázdne = bez zľavy).',
+            },
+            label: 'Zľavový kód',
+          },
+          {
+            name: 'discountAmount',
+            type: 'number',
+            defaultValue: 0,
+            admin: {
+              position: 'sidebar',
+              description: 'V eurocentoch. Je už odpočítaný z celkovej sumy.',
+            },
+            label: 'Zľava',
+          },
         ],
       }),
     },
@@ -234,8 +257,9 @@ export const plugins: Plugin[] = [
   // Approved scope (project owner sign-off, do not widen without new
   // sign-off — see MCP-PLAN.md):
   //   - full CRUD  : products, categories, pages, media, variants,
-  //                  variantOptions, shipping-methods, payment-methods, and
-  //                  every registered global.
+  //                  variantOptions, shipping-methods, payment-methods,
+  //                  discount-codes, product-filters, and every registered
+  //                  global.
   //   - find+update: orders, transactions, carts, addresses (no create/delete
   //                  — these are financial/checkout records, not
   //                  agent-authored content).
@@ -283,6 +307,16 @@ export const plugins: Plugin[] = [
       'payment-methods': {
         description:
           'Payment options offered at checkout (title, type cod/bankTransfer/card, surcharge in eurocents, instructions, enabled, sort order). Shop configuration, agent-editable.',
+        enabled: mcpFullCrud,
+      },
+      'discount-codes': {
+        description:
+          'Checkout discount codes (code, type percent/fixed, value, minimum subtotal in eurocents, validity window, max uses, used count, enabled). Shop configuration, agent-editable.',
+        enabled: mcpFullCrud,
+      },
+      'product-filters': {
+        description:
+          'Admin-defined filters for the shop page (label, slug, type tags/categories/price/availability, tag options, category subset, enabled, sort order). Shop configuration, agent-editable.',
         enabled: mcpFullCrud,
       },
       orders: {

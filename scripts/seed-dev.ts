@@ -62,6 +62,8 @@ const seedProducts = async (payload: Awaited<ReturnType<typeof getPayload>>) => 
       priceInEUREnabled: true,
       priceInEUR: 9900,
       categories: [cat.id],
+      // X1 — pairs with the "Materiál" demo filter below.
+      filterTags: [{ tag: 'prutie' }],
       _status: 'published',
       description: paragraph('Ručne pletený prútený košík.'),
     },
@@ -76,6 +78,7 @@ const seedProducts = async (payload: Awaited<ReturnType<typeof getPayload>>) => 
       priceInEUREnabled: true,
       priceInEUR: 14900,
       categories: [cat.id],
+      filterTags: [{ tag: 'vlna' }],
       _status: 'published',
       description: paragraph('Hrubá vlnená deka.'),
     },
@@ -97,6 +100,8 @@ const seedCheckoutMethods = async (payload: Awaited<ReturnType<typeof getPayload
       description: 'Doručenie na adresu kuriérskou službou.',
       deliveryEstimate: '2–4 dni',
       enabled: true,
+      // X1 — doprava zadarmo od 100 €, aplikovaná na serveri vo fees.ts.
+      freeAboveSubtotal: 10000,
       price: 490,
       sortOrder: 10,
       type: 'courier' as const,
@@ -106,6 +111,8 @@ const seedCheckoutMethods = async (payload: Awaited<ReturnType<typeof getPayload
       description: 'Vyzdvihnutie po telefonickej dohode.',
       deliveryEstimate: 'Po dohode',
       enabled: true,
+      // Už je zadarmo — prah nedáva zmysel.
+      freeAboveSubtotal: null,
       price: 0,
       sortOrder: 20,
       type: 'personal' as const,
@@ -119,7 +126,19 @@ const seedCheckoutMethods = async (payload: Awaited<ReturnType<typeof getPayload
       where: { title: { equals: data.title } },
     })
 
-    if (existing.totalDocs > 0) {
+    const existingDoc = existing.docs[0]
+
+    if (existingDoc) {
+      // Back-fill only the free-delivery threshold, and only when the row does
+      // not have one yet — a shop that deliberately cleared it keeps its choice.
+      if (data.freeAboveSubtotal && existingDoc.freeAboveSubtotal == null) {
+        await payload.update({
+          collection: 'shipping-methods',
+          id: existingDoc.id,
+          data: { freeAboveSubtotal: data.freeAboveSubtotal },
+        })
+        console.log(`set free-shipping threshold on: ${data.title}`)
+      }
       continue
     }
 
@@ -173,6 +192,70 @@ const seedCheckoutMethods = async (payload: Awaited<ReturnType<typeof getPayload
 
     await payload.create({ collection: 'payment-methods', data })
     console.log(`seeded payment method: ${data.title}`)
+  }
+}
+
+/**
+ * Zľavové kódy a filtre v obchode (X1).
+ *
+ * Idempotent by the natural key (`code` / `slug`) and run on every seed, like
+ * the checkout methods above, so an existing dev database picks the demo rows
+ * up without losing anything. `usedCount` is never written here — it belongs to
+ * the order-creation path alone.
+ */
+const seedDiscountsAndFilters = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+  const discountCodes = [
+    {
+      code: 'ZAPLETANE10',
+      enabled: true,
+      note: 'Demo kód pre vývoj a testovanie pokladne.',
+      type: 'percent' as const,
+      value: 10,
+    },
+  ]
+
+  for (const data of discountCodes) {
+    const existing = await payload.find({
+      collection: 'discount-codes',
+      limit: 1,
+      where: { code: { equals: data.code } },
+    })
+
+    if (existing.totalDocs > 0) {
+      continue
+    }
+
+    await payload.create({ collection: 'discount-codes', data })
+    console.log(`seeded discount code: ${data.code}`)
+  }
+
+  const filters = [
+    {
+      slug: 'material',
+      enabled: true,
+      label: 'Materiál',
+      options: [
+        { label: 'Vlna', value: 'vlna' },
+        { label: 'Prútie', value: 'prutie' },
+      ],
+      sortOrder: 10,
+      type: 'tags' as const,
+    },
+  ]
+
+  for (const data of filters) {
+    const existing = await payload.find({
+      collection: 'product-filters',
+      limit: 1,
+      where: { slug: { equals: data.slug } },
+    })
+
+    if (existing.totalDocs > 0) {
+      continue
+    }
+
+    await payload.create({ collection: 'product-filters', data })
+    console.log(`seeded product filter: ${data.label}`)
   }
 }
 
@@ -265,6 +348,7 @@ const run = async () => {
 
   await seedProducts(payload)
   await seedCheckoutMethods(payload)
+  await seedDiscountsAndFilters(payload)
   await seedContentGlobals(payload)
 
   await payload.destroy()

@@ -2,6 +2,8 @@ import type { CollectionSlug, Field, PayloadRequest } from 'payload'
 
 import type { Order, Transaction } from '@/payload-types'
 
+import { incrementDiscountUsage } from '@/payments/shared/discounts'
+
 /**
  * Shared plumbing for the non-Stripe payment adapters (`manual` and `comgate`).
  *
@@ -89,6 +91,24 @@ export const checkoutCarryFields: Field[] = [
     label: 'Poplatok za dobierku (v centoch)',
   },
   {
+    name: 'discountCode',
+    type: 'text',
+    admin: { readOnly: true },
+    label: 'Zľavový kód',
+  },
+  {
+    name: 'discountCodeID',
+    type: 'text',
+    admin: { readOnly: true },
+    label: 'ID zľavového kódu',
+  },
+  {
+    name: 'discountAmount',
+    type: 'number',
+    admin: { readOnly: true },
+    label: 'Zľava (v centoch)',
+  },
+  {
     name: 'shippingAddressSnapshot',
     type: 'json',
     admin: { readOnly: true },
@@ -129,6 +149,9 @@ export const assertCartIsNotPurchased = async ({
 /** Shape written into the adapter group by `initiatePayment`. */
 export type CheckoutCarryGroup = {
   codFee?: null | number
+  discountAmount?: null | number
+  discountCode?: null | string
+  discountCodeID?: null | string
   paymentType?: null | string
   shippingAddressSnapshot?: unknown
   shippingFee?: null | number
@@ -209,6 +232,8 @@ export const createOrderFromTransaction = async ({
       amount: transaction.amount,
       codFee: group.codFee ?? 0,
       currency: transaction.currency,
+      discountAmount: group.discountAmount ?? 0,
+      ...(group.discountCode ? { discountCode: group.discountCode } : {}),
       ...(customerID !== null ? { customer: customerID } : {}),
       ...(transaction.customerEmail ? { customerEmail: transaction.customerEmail } : {}),
       items: transaction.items,
@@ -246,6 +271,14 @@ export const createOrderFromTransaction = async ({
     },
     req,
   })
+
+  // Consume one use of the discount code — here and nowhere else. This block is
+  // unreachable for a transaction that already has an order (the early return
+  // above), so a double-submit, a retried Comgate push and a browser refresh all
+  // leave `usedCount` incremented exactly once.
+  if (group.discountCodeID && (group.discountAmount ?? 0) > 0) {
+    await incrementDiscountUsage({ discountCodeID: group.discountCodeID, payload })
+  }
 
   if (decrementInventory && Array.isArray(transaction.items)) {
     for (const item of transaction.items) {

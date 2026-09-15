@@ -138,10 +138,17 @@ export const manualAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =>
 
       const requestData = (req.data ?? {}) as Record<string, unknown>
 
+      // The subtotal comes from the cart the plugin loaded server-side, never
+      // from the browser — it is what both the free-delivery threshold and the
+      // discount are measured against.
+      const subtotal = cart.subtotal ?? 0
+
       const fees = await resolveFees({
+        discountCode: requestData.discountCode,
         paymentMethodID: requestData.paymentMethodID,
         req,
         shippingMethodID: requestData.shippingMethodID,
+        subtotal,
       })
 
       if (!fees.paymentMethod?.enabled) {
@@ -153,9 +160,15 @@ export const manualAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =>
       if (!fees.shippingMethod?.enabled) {
         throw new Error('Zvolený spôsob dopravy nie je dostupný.')
       }
+      // Re-validated here, not trusted from the checkout: a code that expired,
+      // ran out of uses or stopped clearing its minimum between "Použiť" and
+      // "Objednať" stops the order rather than quietly charging full price.
+      if (fees.discountError) {
+        throw new Error(fees.discountError)
+      }
 
       const items = flattenCartItems(cart)
-      const amount = calculateOrderTotal(cart.subtotal ?? 0, fees)
+      const amount = calculateOrderTotal(subtotal, fees)
 
       if (!amount || amount <= 0) {
         throw new Error('Neplatná suma objednávky.')
@@ -173,6 +186,9 @@ export const manualAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =>
           items,
           [GROUP_NAME]: {
             codFee: fees.codFee,
+            discountAmount: fees.discountAmount,
+            discountCode: fees.discountCode,
+            discountCodeID: fees.discountCodeID != null ? String(fees.discountCodeID) : null,
             paymentType: fees.paymentType,
             shippingAddressSnapshot: (shippingAddress ?? billingAddress) as unknown as Record<string, unknown>,
             shippingFee: fees.shippingFee,
@@ -187,6 +203,8 @@ export const manualAdapter = (props: PaymentAdapterArgs = {}): PaymentAdapter =>
       return {
         amount,
         codFee: fees.codFee,
+        discountAmount: fees.discountAmount,
+        discountCode: fees.discountCode,
         message: 'Objednávka je pripravená na potvrdenie.',
         paymentType: fees.paymentType,
         shippingFee: fees.shippingFee,
