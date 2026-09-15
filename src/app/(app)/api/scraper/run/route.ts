@@ -1,32 +1,57 @@
 import type { ScraperJob } from '@/payload-types'
 
 import configPromise from '@payload-config'
+import { after } from 'next/server'
 import { getPayload } from 'payload'
 
 import { checkRole } from '@/access/utilities'
+import {
+  CHAIN_LIMIT,
+  hasInternalToken,
+  internalToken,
+  isHeartbeatStale,
+  kickBatch,
+  runEndpointFrom,
+} from '@/scraper/chain'
 import { detectLanguage } from '@/scraper/language'
-import { discover, type DiscoverResult } from '@/scraper/discover'
+import {
+  discover,
+  discoverCategories,
+  strategyForCategories,
+  type DiscoverResult,
+} from '@/scraper/discover'
 import { importProduct, toPreview } from '@/scraper/importProduct'
 import { tryFetchPage } from '@/scraper/fetchPage'
 import { scrapeAndPrepare } from '@/scraper/pipeline'
-import type { ProductPreview } from '@/scraper/types'
+import { translateCategoryNames } from '@/scraper/translate'
+import type { CategoryMapEntry, ProductPreview } from '@/scraper/types'
 
 /**
- * POST /api/scraper/run — jeden krok importu z cudzieho e-shopu (Z12).
+ * POST /api/scraper/run — jeden krok importu z cudzieho e-shopu (Z12, Z14).
  *
- * Telo: `{ jobId: number|string, mode: 'preview' | 'batch' }`.
+ * Telo: `{ jobId, mode: 'categories' | 'preview' | 'batch' | 'stop',
+ *          chain?: boolean, expectCursor?: number }`.
  *
- * `preview`  — nájde produkty (ak fronta ešte nie je naplnená), prvé tri
- *              stiahne, preloží a prepočíta, uloží ich do `previews` a prepne
- *              úlohu na „čaká na potvrdenie“. NIČ sa neimportuje.
- * `batch`    — spracuje ďalších `batchSize` produktov z fronty: stiahne,
- *              preloží, prepočíta cenu a založí produkt. Posunie kurzor,
- *              dopočíta počítadlá a keď je fronta na konci, prepne na „hotovo“.
+ * `categories` — jednou požiadavkou vytiahne z navigácie zdroja zoznam
+ *                kategórií, jedným volaním modelu preloží ich názvy a uloží
+ *                ich do `categoryMap`. Nič nesťahuje a nič neimportuje.
+ * `preview`    — nájde produkty (ak fronta ešte nie je naplnená), prvé tri
+ *                stiahne, preloží a prepočíta, uloží ich do `previews` a
+ *                prepne úlohu na „čaká na potvrdenie". NIČ sa neimportuje.
+ * `batch`      — spracuje ďalších `batchSize` produktov z fronty a keď fronta
+ *                nie je na konci, zavolá si cez `after()` ďalšiu dávku.
+ * `stop`       — prepne stav na „zastavené"; bežiaca reťaz sa na začiatku
+ *                nasledujúcej dávky vzdá.
  *
- * **Jedno volanie = jedna dávka.** Opakovanie riadi prehliadač
- * (`ScraperJobControls`), nie server: `maxDuration` je 60 s a import stoviek
- * produktov trvá desiatky minút. Keby sa slučka točila tu, funkcia by sa
- * odstrelila uprostred dávky a úloha by ostala v nekonzistentnom stave.
+ * **Jedno volanie = jedna dávka.** To sa nezmenilo: `maxDuration` je 60 s a
+ * import stoviek produktov trvá desiatky minút. Zmenilo sa, KTO volá ďalšiu —
+ * do Z13 prehliadač, od Z14 server sám (`src/scraper/chain.ts`). Prehliadač
+ * teraz len raz kopne a potom sa pozerá na počítadlá, takže zavretá karta
+ * import nezastaví.
+ *
+ * **Autorizácia.** Buď prihlásená administrátorka, alebo hlavička
+ * `Authorization: Bearer <SCRAPER_INTERNAL_TOKEN>` — tú používa reťaz a denný
+ * záchranný beh `/api/scraper/tick`, kde žiadna relácia neexistuje.
  *
  * Zdvorilosť k cudziemu serveru (≥ 1 s medzi požiadavkami) je zabudovaná v
  * `pipeline`/`discover`/`importProduct`, takže platí bez ohľadu na to, kto
@@ -38,9 +63,13 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 type RunBody = {
+  chain?: unknown
+  expectCursor?: unknown
   jobId?: unknown
   mode?: unknown
 }
+
+type Mode = 'batch' | 'categories' | 'preview' | 'stop'
 
 /** Koľko produktov ide do testovacieho behu. */
 const PREVIEW_SIZE = 3
@@ -85,13 +114,30 @@ const appendLog = (existing: null | string | undefined, lines: string[]): string
 
 const json = (body: unknown, status = 200): Response => Response.json(body, { status })
 
+/** `categoryMap` z dokumentu → typované položky (pole je `json`, teda `unknown`). */
+const readCategoryMap = (value: unknown): CategoryMapEntry[] =>
+  Array.isArray(value)
+    ? value
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+        .map((entry) => ({
+          name: String(entry.name ?? ''),
+          productCountEstimate:
+            typeof entry.productCountEstimate === 'number' ? entry.productCountEstimate : null,
+          selected: entry.selected === true,
+          translatedName: String(entry.translatedName ?? entry.name ?? ''),
+          url: String(entry.url ?? ''),
+        }))
+        .filter((entry) => entry.url)
+    : []
+
 export async function POST(request: Request): Promise<Response> {
   const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: request.headers })
+  const internal = hasInternalToken(request.headers)
+  const { user } = internal ? { user: null } : await payload.auth({ headers: request.headers })
 
-  // Scraper siaha von na cudzie servery a míňa AI kredit — žiadny iný než
-  // administrátorský účet ho nesmie spustiť.
-  if (!checkRole(['admin'], user)) {
+  // Scraper siaha von na cudzie servery a míňa AI kredit — pustí ho buď
+  // administrátorský účet, alebo reťaz s interným tokenom. Nikto iný.
+  if (!internal && !checkRole(['admin'], user)) {
     return json({ message: 'Prístup zamietnutý.', ok: false }, 403)
   }
 
@@ -104,7 +150,21 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const jobId = typeof body.jobId === 'number' || typeof body.jobId === 'string' ? body.jobId : null
-  const mode = body.mode === 'batch' ? 'batch' : body.mode === 'preview' ? 'preview' : null
+  const mode: Mode | null =
+    body.mode === 'batch'
+      ? 'batch'
+      : body.mode === 'preview'
+        ? 'preview'
+        : body.mode === 'categories'
+          ? 'categories'
+          : body.mode === 'stop'
+            ? 'stop'
+            : null
+
+  // Reťazové volanie smie prísť len s interným tokenom — inak by si ktokoľvek
+  // s administrátorskou reláciou mohol omylom rozbehnúť druhú reťaz.
+  const isChainCall = body.chain === true && internal
+  const expectCursor = typeof body.expectCursor === 'number' ? body.expectCursor : null
 
   if (jobId === null || mode === null) {
     return json({ message: 'Chýba jobId alebo mode.', ok: false }, 400)
@@ -129,11 +189,27 @@ export async function POST(request: Request): Promise<Response> {
     return json({ message: 'Úloha nemá zadanú adresu obchodu.', ok: false }, 400)
   }
 
+  // --- zastavenie -----------------------------------------------------------
+  if (mode === 'stop') {
+    await payload.update({
+      collection: 'scraper-jobs',
+      id: jobId,
+      data: {
+        log: appendLog(job.log, ['Import zastavený — pokračovať sa dá kedykoľvek.']),
+        status: 'stopped',
+      },
+      overrideAccess: true,
+    })
+
+    return json({ ok: true, status: 'stopped' })
+  }
+
   const counters = {
     discovered: job.counters?.discovered ?? 0,
     failed: job.counters?.failed ?? 0,
     imported: job.counters?.imported ?? 0,
     skipped: job.counters?.skipped ?? 0,
+    skippedExisting: job.counters?.skippedExisting ?? 0,
   }
 
   const maxProducts = Math.max(1, job.maxProducts ?? 500)
@@ -142,6 +218,122 @@ export async function POST(request: Request): Promise<Response> {
 
   const logLines: string[] = []
   const startedAt = Date.now()
+  const categoryMap = readCategoryMap(job.categoryMap)
+
+  let detectedLanguage = job.detectedLanguage ?? null
+
+  // --- zoznam kategórií (Z14) -----------------------------------------------
+  if (mode === 'categories') {
+    try {
+      const { categories, html } = await discoverCategories(sourceUrl, {
+        onProgress: (message) => logLines.push(message),
+      })
+
+      if (!detectedLanguage) {
+        detectedLanguage = await detectLanguage(html)
+        logLines.push(`Jazyk zdroja: ${detectedLanguage ?? 'neurčený'}`)
+      }
+
+      if (!categories.length) {
+        await payload.update({
+          collection: 'scraper-jobs',
+          id: jobId,
+          data: {
+            detectedLanguage,
+            log: appendLog(job.log, [
+              ...logLines,
+              'Na zadanej adrese sa nenašli žiadne kategórie — import pôjde cez celý obchod.',
+            ]),
+          },
+          overrideAccess: true,
+        })
+
+        return json({ categories: [], ok: true, status: job.status })
+      }
+
+      const translatedNames = await translateCategoryNames(
+        categories.map((category) => category.name),
+        detectedLanguage,
+      )
+
+      // Výber, ktorý už majiteľka spravila, sa pri opätovnom načítaní
+      // NESMIE stratiť — spáruje sa podľa adresy.
+      const previous = new Map(categoryMap.map((entry) => [entry.url, entry.selected]))
+
+      const nextMap: CategoryMapEntry[] = categories.map((category, index) => ({
+        name: category.name,
+        productCountEstimate: category.productCountEstimate,
+        selected: previous.get(category.url) ?? false,
+        translatedName: translatedNames[index] || category.name,
+        url: category.url,
+      }))
+
+      logLines.push(`Načítaných ${nextMap.length} kategórií, názvy preložené.`)
+
+      await payload.update({
+        collection: 'scraper-jobs',
+        id: jobId,
+        data: {
+          categoryMap: nextMap,
+          detectedLanguage,
+          log: appendLog(job.log, logLines),
+          status: 'categories_ready',
+        },
+        overrideAccess: true,
+      })
+
+      return json({ categories: nextMap, ok: true, status: 'categories_ready' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      await payload
+        .update({
+          collection: 'scraper-jobs',
+          id: jobId,
+          data: { log: appendLog(job.log, [...logLines, `CHYBA: ${message}`]) },
+          overrideAccess: true,
+        })
+        .catch(() => undefined)
+
+      return json({ message, ok: false }, 500)
+    }
+  }
+
+  // --- brzdy reťaze ---------------------------------------------------------
+  //
+  // Všetky sa vyhodnocujú PRED akoukoľvek prácou, aby zastavená či zdvojená
+  // reťaz nestihla siahnuť von na cudzí server ani na model.
+  if (mode === 'batch') {
+    if (isChainCall) {
+      if (job.status !== 'importing') {
+        return json({ halted: 'status', ok: true, status: job.status })
+      }
+
+      if (expectCursor !== null && (job.cursor ?? 0) !== expectCursor) {
+        return json({ halted: 'cursor', ok: true, status: job.status })
+      }
+
+      if ((job.chainCount ?? 0) >= CHAIN_LIMIT) {
+        await payload.update({
+          collection: 'scraper-jobs',
+          id: jobId,
+          data: {
+            log: appendLog(job.log, [
+              `Dosiahnutý strop ${CHAIN_LIMIT} zreťazených dávok — import je zastavený. Pokračovať sa dá tlačidlom „Pokračovať“.`,
+            ]),
+            status: 'stopped',
+          },
+          overrideAccess: true,
+        })
+
+        return json({ halted: 'limit', ok: true, status: 'stopped' })
+      }
+    } else if (job.status === 'importing' && !isHeartbeatStale(job.heartbeatAt)) {
+      // Kopnutie zvonku do bežiacej reťaze by vyrobilo druhú reťaz na tej
+      // istej fronte. Úloha už beží — netreba robiť nič.
+      return json({ alreadyRunning: true, counters, ok: true, status: 'importing' })
+    }
+  }
 
   /**
    * Stav prehľadávania (fronta adries + ešte neprejdené kategórie).
@@ -163,7 +355,21 @@ export async function POST(request: Request): Promise<Response> {
         strategy: 'shoper',
       })
 
-  let detectedLanguage = job.detectedLanguage ?? null
+  // Vybrané kategórie (Z14): prehľadávanie sa nimi NAPLNÍ, takže `discover`
+  // ide rovno do vetvy „pokračuj v známych kategóriách" a na nič iné v obchode
+  // sa nepozrie. Prázdny výber = celý obchod, presne ako pred Z14.
+  const selectedCategories = categoryMap.filter((entry) => entry.selected).map((entry) => entry.url)
+
+  if (!state.productUrls.length && !state.categories.length && selectedCategories.length) {
+    state = {
+      categories: selectedCategories,
+      complete: false,
+      productUrls: [],
+      strategy: strategyForCategories(selectedCategories),
+    }
+
+    logLines.push(`Prehľadávajú sa len vybrané kategórie (${selectedCategories.length}).`)
+  }
 
   try {
     // --- naplnenie fronty + rozpoznanie jazyka ----------------------------
@@ -282,37 +488,106 @@ export async function POST(request: Request): Promise<Response> {
     )
     const slice = queue.slice(cursor, cursor + Math.min(batchSize, roomForBatch))
 
+    // Kopnutie zvonku (nie z reťaze) je zároveň „začni / pokračuj": vtedy sa
+    // počítadlo reťazenia nuluje, ale len ak úloha naozaj nebežala. Kopnutie
+    // do zaseknutej reťaze (starý tep, stav „importuje sa") ho necháva tak,
+    // aby sa strop nedal obísť opakovaným klikaním.
+    const chainCount = !isChainCall && job.status !== 'importing' ? 0 : job.chainCount ?? 0
+    const endpoint = runEndpointFrom(request)
+    const heartbeatAt = new Date().toISOString()
+
+    /**
+     * Uloží stav dávky a keď je čo robiť ďalej, objedná si ďalšiu dávku.
+     *
+     * Objednávka ide cez `after()`, teda AŽ po odoslaní odpovede: kým beží
+     * `fetch` na seba samého, toto volanie by inak držalo otvorené spojenie s
+     * prehliadačom a zbytočne mu blokovalo `keep-alive`.
+     */
+    const finish = async (result: {
+      done: boolean
+      extraLog: string[]
+      nextCursor: number
+      processed: number
+    }): Promise<Response> => {
+      // Stav sa musí prečítať ZNOVA: tlačidlo „Zastaviť" mohlo prepnúť úlohu,
+      // kým dávka bežala, a zápis nižšie by ho prepísal späť na „importuje sa".
+      const fresh = (await payload.findByID({
+        collection: 'scraper-jobs',
+        id: jobId,
+        depth: 0,
+        overrideAccess: true,
+      })) as ScraperJob
+
+      const stopped = fresh.status === 'stopped'
+      const status = result.done ? 'done' : stopped ? 'stopped' : 'importing'
+      const willChain = !result.done && !stopped && chainCount < CHAIN_LIMIT
+      const lines = [...logLines, ...result.extraLog]
+
+      if (stopped) lines.push('Reťaz zastavená na žiadosť.')
+      if (!result.done && !stopped && !internalToken()) {
+        lines.push('POZOR: SCRAPER_INTERNAL_TOKEN nie je nastavený — import ďalej sám nepokračuje.')
+      }
+
+      await payload.update({
+        collection: 'scraper-jobs',
+        id: jobId,
+        data: {
+          chainCount: willChain ? chainCount + 1 : chainCount,
+          counters,
+          cursor: result.nextCursor,
+          detectedLanguage,
+          heartbeatAt,
+          log: appendLog(fresh.log ?? job.log, lines),
+          productLinks: state,
+          status,
+        },
+        overrideAccess: true,
+      })
+
+      if (willChain) {
+        after(async () => {
+          const outcome = await kickBatch({
+            endpoint,
+            expectCursor: result.nextCursor,
+            jobId,
+            onError: (message) => payload.logger.error(`[scraper] ${message}`),
+          })
+
+          if (outcome === 'disabled') {
+            payload.logger.warn(
+              '[scraper] SCRAPER_INTERNAL_TOKEN nie je nastavený — reťaz dávok sa nespustila.',
+            )
+          }
+        })
+      }
+
+      return json({
+        chained: willChain,
+        counters,
+        done: result.done,
+        ok: true,
+        processed: result.processed,
+        remaining: Math.max(0, queue.length - result.nextCursor),
+        status,
+        total: queue.length,
+      })
+    }
+
     if (!slice.length) {
       // Prázdna fronta ešte nemusí znamenať koniec: keď sa zoznam produktov
       // stále dopĺňa (veľký katalóg, prerušené prehľadávanie), ďalšie volanie
       // najprv dohľadá ďalšie kategórie a až potom sa importuje.
       const finished = state.complete
 
-      await payload.update({
-        collection: 'scraper-jobs',
-        id: jobId,
-        data: {
-          counters,
-          detectedLanguage,
-          log: appendLog(job.log, [
-            ...logLines,
-            finished
-              ? 'Fronta je prázdna — import je hotový.'
-              : 'Fronta je dočasne prázdna, pokračuje sa v prehľadávaní zdroja.',
-          ]),
-          productLinks: state,
-          status: finished ? 'done' : 'importing',
-        },
-        overrideAccess: true,
-      })
-
-      return json({
-        counters,
+      return finish({
         done: finished,
-        ok: true,
+        extraLog: [
+          finished
+            ? 'Fronta je prázdna — import je hotový.'
+            : 'Fronta je dočasne prázdna, pokračuje sa v prehľadávaní zdroja.',
+        ],
+        nextCursor: cursor,
         processed: 0,
-        status: finished ? 'done' : 'importing',
-        total: queue.length,
       })
     }
 
@@ -333,10 +608,11 @@ export async function POST(request: Request): Promise<Response> {
      * idempotentný a druhýkrát ho len preskočí.
      */
     const handled = new Set<string>()
+    const batchLog: string[] = []
 
     for (const failure of result.failures) {
       handled.add(failure.url)
-      logLines.push(`Nepodarilo sa načítať ${failure.url}: ${failure.message}`)
+      batchLog.push(`Nepodarilo sa načítať ${failure.url}: ${failure.message}`)
     }
 
     // Sťahovanie fotiek (sekunda na fotku, až osem na produkt) je tá časť
@@ -344,7 +620,7 @@ export async function POST(request: Request): Promise<Response> {
     // každým ďalším produktom pozerá na hodiny.
     for (const [index, item] of result.items.entries()) {
       if (index > 0 && Date.now() - startedAt > IMPORT_DEADLINE_MS) {
-        logLines.push(
+        batchLog.push(
           `Zvyšok dávky (${result.items.length - index}) sa odkladá do ďalšieho kroku — dochádza čas volania.`,
         )
         break
@@ -353,11 +629,15 @@ export async function POST(request: Request): Promise<Response> {
       const outcome = await importProduct(payload, item)
 
       if (outcome.status === 'created') counters.imported++
-      else if (outcome.status === 'skipped') counters.skipped++
-      else counters.failed++
+      else if (outcome.status === 'skipped') {
+        // Rozlíšenie, ktoré si vyžiadala majiteľka: „už sme to sťahovali"
+        // (idempotencia) vs. „taký produkt už predávam" (Z14).
+        if (outcome.reason === 'existing') counters.skippedExisting++
+        else counters.skipped++
+      } else counters.failed++
 
       handled.add(item.scraped.sourceUrl)
-      logLines.push(outcome.message)
+      batchLog.push(outcome.message)
     }
 
     let processed = 0
@@ -375,35 +655,13 @@ export async function POST(request: Request): Promise<Response> {
     // inak by sa import vyhlásil za dokončený uprostred katalógu.
     const done = nextCursor >= queue.length && state.complete
 
-    logLines.push(
+    batchLog.push(
       `Dávka ${cursor + 1}–${nextCursor} z ${queue.length}${
         state.complete ? '' : ' (zoznam sa ešte dopĺňa)'
       }${done ? ' — hotovo.' : '.'}`,
     )
 
-    await payload.update({
-      collection: 'scraper-jobs',
-      id: jobId,
-      data: {
-        counters,
-        cursor: nextCursor,
-        detectedLanguage,
-        log: appendLog(job.log, logLines),
-        productLinks: state,
-        status: done ? 'done' : 'importing',
-      },
-      overrideAccess: true,
-    })
-
-    return json({
-      counters,
-      done,
-      ok: true,
-      processed,
-      remaining: Math.max(0, queue.length - nextCursor),
-      status: done ? 'done' : 'importing',
-      total: queue.length,
-    })
+    return finish({ done, extraLog: batchLog, nextCursor, processed })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
 

@@ -66,6 +66,28 @@ export type ProductPreview = {
   title: string
 }
 
+/**
+ * Jedna položka výberu kategórií (Z14) — presný tvar poľa
+ * `scraper-jobs.categoryMap` (json).
+ *
+ * Výber sa drží PRIAMO v položke (`selected`), nie v samostatnom zozname
+ * adries: zoznam kategórií a zoznam zaškrtnutých by boli dve pravdy o tom
+ * istom, ktoré sa dajú rozísť (kategória zmizne zo zdroja, adresa ostane vo
+ * výbere). Takto je vždy jasné, čo je zaškrtnuté a ako sa to volá.
+ *
+ * Prázdny výber (nič zaškrtnuté) znamená „celý obchod" — je to prirodzený
+ * východiskový stav a v admine je to napísané nad zoznamom.
+ */
+export type CategoryMapEntry = {
+  name: string
+  /** Koľko produktov kategória podľa navigácie má; `null`, keď to nehovorí. */
+  productCountEstimate: null | number
+  selected: boolean
+  /** Slovenský názov z jedného prekladového volania; pri zlyhaní `= name`. */
+  translatedName: string
+  url: string
+}
+
 /** Nastavenia jednej úlohy, ktoré engine potrebuje. */
 export type ScraperJobSettings = {
   batchSize?: null | number

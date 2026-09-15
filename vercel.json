@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/scraper/tick",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

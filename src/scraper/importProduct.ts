@@ -17,7 +17,7 @@
  * Každý z týchto hookov už má vlastný časovač a vlastný pád, takže import
  * nemusí riešiť ich zlyhanie — stačí ich nechať bežať.
  */
-import type { Payload, PayloadRequest, RequiredDataFromCollectionSlug } from 'payload'
+import type { Payload, PayloadRequest, RequiredDataFromCollectionSlug, Where } from 'payload'
 
 import type { PreparedProduct, ScrapedProduct, TranslatedProduct } from './types'
 
@@ -27,11 +27,23 @@ import { fetchBuffer, politeDelay } from './fetchPage'
 import { imageCandidates, MAX_IMAGES } from './extract'
 import { textToLexical } from './lexical'
 
+/**
+ * Prečo bol produkt preskočený (Z14).
+ *
+ * `source` a `external` znamenajú „tento istý produkt z tohto istého obchodu
+ * už v systéme je" — to je pôvodná idempotencia importu. `existing` znamená
+ * „produkt s týmto názvom už v systéme je, nech prišiel odkiaľkoľvek"; ten sa
+ * v úlohe počíta do vlastného počítadla, lebo majiteľku zaujíma niečo iné:
+ * koľko položiek sa nepridalo preto, že ich už predáva.
+ */
+export type SkipReason = 'existing' | 'external' | 'source'
+
 export type ImportOutcome = {
   id?: number | string
   imagesImported?: number
   message: string
   productTitle: string
+  reason?: SkipReason
   status: 'created' | 'failed' | 'skipped'
 }
 
@@ -206,6 +218,96 @@ export const findImportedProduct = async (
   return doc ? { id: doc.id, title: doc.title } : null
 }
 
+/** Doména adresy; pri nezmysle prázdny reťazec. */
+const hostOf = (url: string): string => {
+  try {
+    return new URL(url).host.toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Nájdený duplikát — čo to je a prečo sa zaň považuje.
+ */
+export type DuplicateMatch = {
+  id: number | string
+  reason: SkipReason
+  title: string
+}
+
+/**
+ * Reťaz kontrol, či produkt v systéme už NEJE (Z14).
+ *
+ * Postupuje sa od najistejšieho k najvoľnejšiemu a prvá zhoda vyhráva:
+ *
+ *   (a) **rovnaká zdrojová adresa** — pôvodná idempotencia importu. Adresa je
+ *       to jediné, čo produkt v cudzom obchode jednoznačne určuje.
+ *   (b) **rovnaký identifikátor v zdroji + tá istá doména** — Shoper občas
+ *       zmení tvar adresy (presmerovanie na nový názov v ceste), ale číslo na
+ *       jej konci ostáva. Bez porovnania domény by sa dva rôzne obchody
+ *       hádali o rovnaké nízke čísla, preto je doména v podmienke.
+ *   (c) **kolízia adresy (slug) alebo presne rovnaký názov** — poistka, ktorú
+ *       si vyžiadala majiteľka: keď už taký výrobok v obchode je (založila ho
+ *       ručne alebo prišiel z iného zdroja), import ho NEMÁ zakladať druhýkrát.
+ *       Porovnáva sa cez slug, lebo ten je už zbavený diakritiky, interpunkcie
+ *       aj veľkosti písmen — „Prútené kreslo Regan" a „PRÚTENÉ KRESLO REGAN"
+ *       majú ten istý slug, takže kontrola je automaticky necitlivá na
+ *       veľkosť písmen.
+ *
+ * Existujúci produkt sa NIKDY neprepisuje ani nedopĺňa — import je zámerne
+ * len „pridaj, čo chýba". Prepisovanie by potichu zahodilo ručné úpravy
+ * majiteľky (jej vlastné fotky, jej text, jej cenu).
+ */
+export const findExistingProduct = async (
+  payload: Payload,
+  { externalId, sourceUrl, title }: { externalId: string; sourceUrl: string; title: string },
+  options: ImportOptions = {},
+): Promise<null | DuplicateMatch> => {
+  const bySource = await findImportedProduct(payload, sourceUrl, options)
+
+  if (bySource) return { ...bySource, reason: 'source' }
+
+  const host = hostOf(sourceUrl)
+
+  if (externalId && host) {
+    const { docs } = await payload.find({
+      collection: 'products',
+      depth: 0,
+      draft: true,
+      limit: 10,
+      overrideAccess: true,
+      pagination: false,
+      req: options.req,
+      where: { 'importSource.externalId': { equals: externalId } },
+    })
+
+    const match = docs.find((doc) => hostOf(doc.importSource?.url ?? '') === host)
+
+    if (match) return { id: match.id, reason: 'external', title: match.title }
+  }
+
+  const slug = toSlug(title)
+  const where: Where = slug
+    ? { or: [{ slug: { equals: slug } }, { title: { equals: title } }] }
+    : { title: { equals: title } }
+
+  const { docs } = await payload.find({
+    collection: 'products',
+    depth: 0,
+    draft: true,
+    limit: 1,
+    overrideAccess: true,
+    pagination: false,
+    req: options.req,
+    where,
+  })
+
+  const doc = docs[0]
+
+  return doc ? { id: doc.id, reason: 'existing', title: doc.title } : null
+}
+
 /** Nedostupnosť v zdroji → `inventory: 0`; všetko ostatné → netrackované. */
 const inventoryFromAvailability = (availability: null | string | undefined): null | number =>
   availability && /OutOfStock|SoldOut|Discontinued/i.test(availability) ? 0 : null
@@ -226,13 +328,25 @@ export const importProduct = async (
     }
   }
 
-  const existing = await findImportedProduct(payload, scraped.sourceUrl, options)
+  const existing = await findExistingProduct(
+    payload,
+    { externalId: scraped.externalId, sourceUrl: scraped.sourceUrl, title },
+    options,
+  )
 
   if (existing) {
+    const why =
+      existing.reason === 'source'
+        ? 'už importované z tejto adresy'
+        : existing.reason === 'external'
+          ? 'už importované pod tým istým identifikátorom zdroja'
+          : 'taký produkt už v obchode je'
+
     return {
       id: existing.id,
-      message: `Preskočené (už importované): ${existing.title}`,
+      message: `Preskočené (${why}): ${existing.title}`,
       productTitle: title,
+      reason: existing.reason,
       status: 'skipped',
     }
   }

@@ -1,9 +1,10 @@
 /* =============================================================================
-   ZAPLETANE — import z webu (Z12)
+   ZAPLETANE — import z webu (Z12, doplnené Z14)
 
    Spoločný štýl pre:
-     - src/components/admin/ScraperJobControls  (panel s tlačidlami v sidebare)
-     - src/components/admin/ScraperJobPreviews  (karty náhľadu v hlavnom stĺpci)
+     - src/components/admin/ScraperJobControls    (panel s tlačidlami v sidebare)
+     - src/components/admin/ScraperJobCategories  (výber kategórií)
+     - src/components/admin/ScraperJobPreviews    (karty náhľadu v hlavnom stĺpci)
 
    Rovnaké pravidlo ako v stats.scss: žiadna farba natvrdo — všetko ide cez
    Payloadove `--theme-*` premenné, takže svetlá aj tmavá téma vychádzajú
@@ -55,6 +56,88 @@
     strong {
       color: var(--theme-elevation-900);
     }
+  }
+}
+
+/* --- výber kategórií (Z14) ------------------------------------------------ */
+
+.zap-scraper-categories {
+  &__empty {
+    margin: 0;
+    padding: calc(var(--base) * 0.6);
+    border: 1px dashed var(--theme-elevation-150);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--theme-elevation-600);
+  }
+
+  &__title {
+    margin: 0 0 calc(var(--base) * 0.25);
+    font-size: 1rem;
+  }
+
+  &__hint {
+    margin: 0 0 calc(var(--base) * 0.5);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--theme-elevation-600);
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--base) * 0.3);
+    margin-bottom: calc(var(--base) * 0.5);
+  }
+
+  &__count {
+    font-size: 0.8rem;
+    color: var(--theme-elevation-600);
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: calc(var(--base) * 0.25);
+    margin: 0 0 calc(var(--base) * 0.5);
+    padding: 0;
+    list-style: none;
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--base) * 0.3);
+    padding: calc(var(--base) * 0.3);
+    border: 1px solid var(--theme-elevation-100);
+    border-radius: 4px;
+    background: var(--theme-elevation-0);
+
+    &--on {
+      border-color: var(--theme-elevation-400);
+      background: var(--theme-elevation-50);
+    }
+
+    input {
+      margin-top: 0.2rem;
+      flex: 0 0 auto;
+    }
+  }
+
+  &__label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    cursor: pointer;
+  }
+
+  &__original {
+    font-size: 0.72rem;
+    color: var(--theme-elevation-500);
   }
 }
 

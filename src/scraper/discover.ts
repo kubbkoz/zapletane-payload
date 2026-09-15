@@ -258,6 +258,132 @@ const crawlCategories = async ({
   return []
 }
 
+// --- zoznam kategórií (Z14) ------------------------------------------------
+
+/** Jedna kategória zdrojového e-shopu tak, ako ju vidno v jeho navigácii. */
+export type DiscoveredCategory = {
+  /** Názov v pôvodnom jazyku — tak, ako stojí v odkaze. */
+  name: string
+  /** Počet produktov, ak ho navigácia uvádza v zátvorke. Inak `null`. */
+  productCountEstimate: null | number
+  /** Adresa prvej strany výpisu (`shoperPageUrl(…, 1)`). */
+  url: string
+}
+
+/**
+ * Názov kategórie z adresy — záchrana pre odkazy, ktoré majú namiesto textu
+ * obrázok. `/pl/c/Fotele-wiklinowe/123` → „Fotele wiklinowe".
+ */
+const categoryNameFromUrl = (url: string): string => {
+  try {
+    const segments = new URL(url).pathname.split('/').filter(Boolean)
+    const index = segments.findIndex((segment) => segment === 'c' || segment === 'product-category')
+    const slug = index === -1 ? segments[segments.length - 1] : segments[index + 1]
+
+    return decodeURIComponent(slug ?? '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
+  } catch {
+    return ''
+  }
+}
+
+/** „Fotele wiklinowe (24)" → { name: 'Fotele wiklinowe', count: 24 }. */
+const splitCountSuffix = (label: string): { count: null | number; name: string } => {
+  const match = label.match(/^(.*?)[\s(\[]*\(?(\d{1,5})\)?[\s)\]]*$/)
+
+  if (match && match[1]?.trim() && /\(\s*\d{1,5}\s*\)\s*$/.test(label)) {
+    return { count: Number(match[2]), name: match[1].trim() }
+  }
+
+  return { count: null, name: label }
+}
+
+/**
+ * Prejde JEDNU stránku zdroja a vytiahne z nej zoznam kategórií (Z14).
+ *
+ * Jedna požiadavka, nič viac — presne preto je to samostatná funkcia a nie
+ * vedľajší produkt `discover`: majiteľka najprv chce vidieť, *čo* si môže
+ * vybrať, a až potom sa sťahujú stovky výpisov. Počet produktov sa odhaduje
+ * len z toho, čo navigácia sama píše v zátvorke; nikdy sa kvôli nemu nesťahuje
+ * ďalšia stránka.
+ *
+ * Duplicity (tá istá kategória v hornom menu aj v pätičke) sa spájajú podľa
+ * adresy a ponechá sa dlhší, teda konkrétnejší názov.
+ */
+export const discoverCategories = async (
+  startUrl: string,
+  options: { onProgress?: (message: string) => void } = {},
+): Promise<{ categories: DiscoveredCategory[]; html: string }> => {
+  const base = new URL(startUrl)
+  const entry = await tryFetchPage(startUrl)
+
+  if (!entry) throw new Error(`Stránku ${startUrl} sa nepodarilo stiahnuť.`)
+
+  const $ = cheerio.load(entry.html)
+  const byUrl = new Map<string, DiscoveredCategory>()
+
+  $('a[href]').each((_, node) => {
+    const href = $(node).attr('href')
+
+    if (!href) return
+
+    let absolute: string
+
+    try {
+      absolute = new URL(href, entry.finalUrl || startUrl).toString()
+    } catch {
+      return
+    }
+
+    if (!sameHost(absolute, base)) return
+
+    const normalized = normalize(absolute)
+    const isShoper = isShoperCategory(normalized)
+
+    if (!isShoper && !WOO_CATEGORY.test(normalized)) return
+
+    // Ostránkované odkazy (`/c/Nazov/12/3`) vedú na tú istú kategóriu — do
+    // zoznamu patrí vždy jej prvá strana.
+    const url = isShoper ? shoperPageUrl(normalized, 1) : normalized
+    const label = $(node).text().replace(/\s+/g, ' ').trim()
+    const { count, name } = splitCountSuffix(label)
+    const resolved = name || categoryNameFromUrl(url)
+
+    if (!resolved) return
+
+    const existing = byUrl.get(url)
+
+    if (!existing) {
+      byUrl.set(url, { name: resolved, productCountEstimate: count, url })
+
+      return
+    }
+
+    if (resolved.length > existing.name.length) existing.name = resolved
+    if (existing.productCountEstimate === null && count !== null) {
+      existing.productCountEstimate = count
+    }
+  })
+
+  const categories = [...byUrl.values()].sort((a, b) => a.name.localeCompare(b.name, 'pl'))
+
+  options.onProgress?.(`Na stránke sa našlo ${categories.length} kategórií.`)
+
+  return { categories, html: entry.html }
+}
+
+/**
+ * Akou stratégiou sa má prejsť vybraný zoznam kategórií.
+ *
+ * Adresa kategórie nesie tvar platformy, takže sa to dá určiť z nej — netreba
+ * si pamätať, ako dopadlo prehľadávanie, ktoré zoznam vyrobilo.
+ */
+export const strategyForCategories = (urls: string[]): DiscoverResult['strategy'] =>
+  urls.some((url) => WOO_CATEGORY.test(url)) && !urls.some(isShoperCategory)
+    ? 'woocommerce'
+    : 'shoper'
+
 // --- verejné API -----------------------------------------------------------
 
 export const discover = async (

@@ -1,5 +1,5 @@
 /**
- * Preklad naskenovaných produktov do slovenčiny (Z12).
+ * Preklad naskenovaných produktov do slovenčiny (Z12, prepísané Z14).
  *
  * Vzor volania (priamy `fetch`, žiadna SDK závislosť, obranné parsovanie JSON,
  * tvrdý timeout, pád na použiteľný výsledok) je zámerne rovnaký ako v
@@ -8,15 +8,30 @@
  * pevnými dĺžkovými limitmi, tento modul dávkový preklad celých produktov.
  * Zdieľaný „univerzálny klient" by musel slúžiť obom a ani jednému poriadne.
  *
+ * **Čo sa zmenilo v Z14 a prečo.** Prvá verzia prekladala haiku po šiestich
+ * produktoch naraz a časť importu „nemala hlavu ani pätu": model dostal šesť
+ * kusov textu v jednom balíku, kontext sa mu medzi nimi rozmazal a poľské
+ * slová z remeselníckeho slovníka (wiklina, kokarda, nosidełka) prekladal
+ * doslovne, teda nesprávne. Tri veci to riešia naraz:
+ *
+ *   1. **Model** — predvolene `claude-sonnet-5` namiesto haiku. Za vstup
+ *      platíme 2× a za výstup 2× viac ($2/$10 vs. $1/$5 za milión tokenov),
+ *      čo pri ~2 500 tokenoch na produkt vychádza rádovo na jeden cent za
+ *      produkt navyše. Import stoviek produktov sa robí raz; oprava stoviek
+ *      nezmyselných popisov ručne stojí neporovnateľne viac.
+ *   2. **Dávka 3 produkty** namiesto šiestich — model drží kontext jedného
+ *      výrobku (názov + popis + kategória + parametre) pokope a nemieša ho so
+ *      susedmi.
+ *   3. **Slovník** priamo v systémovom prompte. Poľský nábytkársko-prútikársky
+ *      slovník je dosť úzky na to, aby sa dal vymenovať, a práve na ňom
+ *      všeobecný preklad padal.
+ *
  * Kontrakt:
  *   - `translateBatch` NIKDY nehodí výnimku. Keď model zlyhá, vráti vstup
  *     nepreložený — import potom založí produkt s pôvodným textom a majiteľka
  *     ho opraví, čo je vždy lepšie než spadnutá dávka.
  *   - `fromLang === 'sk'` preklad úplne preskočí (žiadne volanie, žiadne
  *     náklady).
- *   - Dávka je ~6 produktov na jedno volanie: väčšia dávka znamená dlhšiu
- *     odpoveď, väčšiu šancu na orezanie pri `max_tokens` a drahší opakovaný
- *     pokus pri chybe.
  */
 import type { ScrapedAttribute, ScrapedProduct, TranslatedProduct } from './types'
 
@@ -24,13 +39,26 @@ import { htmlToParagraphs } from './extract'
 
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
-const DEFAULT_MODEL = 'claude-haiku-4-5'
+
+/**
+ * Predvolený model prekladu (Z14).
+ *
+ * `ANTHROPIC_SCRAPER_MODEL` ho stále prebije — keby sa majiteľka rozhodla, že
+ * chce lacnejší beh, stačí premenná prostredia a nič sa neprekompilováva.
+ */
+const DEFAULT_MODEL = 'claude-sonnet-5'
 
 /** Tvrdý strop na jedno volanie. Dávka musí dobehnúť v rámci 60 s routy. */
 const AI_TIMEOUT_MS = 45_000
 
-/** Koľko produktov ide do jedného volania. */
-export const TRANSLATION_CHUNK_SIZE = 6
+/**
+ * Koľko produktov ide do jedného volania.
+ *
+ * Tri je kompromis: menej kontextovej kaše než pri šiestich, a stále len dve
+ * volania na štandardnú dávku piatich produktov (teda sa to do 60 s routy
+ * zmestí aj s pauzami na sťahovanie stránok).
+ */
+export const TRANSLATION_CHUNK_SIZE = 3
 
 /** Koľko odsekov popisu sa posiela na preklad (zvyšok sa zahodí). */
 const MAX_PARAGRAPHS = 30
@@ -38,21 +66,52 @@ const MAX_PARAGRAPHS = 30
 /** Koľko znakov jedného odseku sa posiela (ochrana pred „stenou textu"). */
 const MAX_PARAGRAPH_LENGTH = 1_200
 
+/**
+ * Slovník, ktorý sa modelu pripína do systémového promptu.
+ *
+ * Každý riadok je chyba, ktorú predchádzajúca verzia naozaj spravila —
+ * „nosidełka" ako „nositelia" alebo „groszki" ako „puntíky" nie sú
+ * hypotetické príklady. Slovník je kratší než zoznam všetkého, čo katalóg
+ * obsahuje, zámerne: pripínajú sa len slová, kde je doslovný preklad
+ * nebezpečne blízko a model sa doň trafí.
+ */
+const GLOSSARY = [
+  'wiklina, wiklinowy/wiklinowa/wiklinowe → prútie, prútený/prútená/prútené (NIE „vŕbový", NIE „vikliny")',
+  'kokarda → mašľa (NIE „kokarda")',
+  'nosidełka → nosidlá (NIE „nositelia", NIE „nosiče")',
+  'groszki, w groszki → bodky, s bodkami (NIE „puntíky", NIE „hrášky")',
+  'skrzynia, truhla → truhlica',
+  'wózek → kočík',
+  'kołyska → kolíska',
+  'bujany, bujak → hojdací, hojdačka',
+  'fotel → kreslo; pufa → taburetka; kosz → kôš; komplet → súprava',
+  'rattan → ratan; plecionka → výplet; ucho/uchwyt → ucho/držadlo',
+]
+
 const SYSTEM_PROMPT = [
-  'Si prekladateľ produktových textov pre slovenský e-shop s ručne vyrábaným tovarom pre domov.',
-  'Prekladáš do prirodzenej spisovnej slovenčiny.',
-  'Pravidlá:',
-  '- Preklad musí znieť ako text napísaný po slovensky, nie ako doslovný prepis.',
+  'Si slovenský redaktor a prekladateľ produktových textov pre e-shop s ručne pletenými a prútenými výrobkami pre domov a deti.',
+  'Prekladáš VŽDY CELÝ JEDEN PRODUKT NARAZ: názov, popis, kategóriu aj parametre posudzuj spoločne, ako jeden text o jednej veci.',
+  '',
+  'Hlavné pravidlo:',
+  'Preklad musí dávať zmysel v kontexte e-shopu s ručne pletenými/prútenými výrobkami. Ak je zdrojový text nesúrodý alebo zle štruktúrovaný, prepíš ho do zrozumiteľnej, prirodzenej slovenčiny — vecne verný, ale čitateľný. Nikdy neprekladaj doslovne na úkor zmyslu.',
+  '',
+  'Ďalšie pravidlá:',
+  '- NÁZOV produktu vracaj v prirodzenej slovenskej vetnej podobe — prvé slovo s veľkým písmenom, zvyšok malými. NIKDY nie celý názov veľkými písmenami, aj keď taký prišiel na vstupe.',
+  '- Názvy modelov a kolekcií v úvodzovkách („Regan", „Little Cottage") ostávajú s veľkým začiatočným písmenom a neprekladajú sa.',
   '- ČÍSLA, ROZMERY, JEDNOTKY A KÓDY prepisuj DOSLOVNE a bez prepočtu (81 cm ostáva 81 cm).',
   '- Zachovaj členenie na odseky: koľko odsekov príde, toľko odsekov vráť, v rovnakom poradí.',
   '- Neskracuj a nepridávaj marketingové frázy, ktoré v origináli nie sú. Žiadne emoji, žiadne výkričníky navyše.',
-  '- Názvy kategórií prekladaj ako bežné slovenské pomenovania tovaru (napr. „Fotele wiklinowe" → „Prútené kreslá").',
+  '- Názvy kategórií prekladaj ako bežné slovenské pomenovania tovaru („Fotele wiklinowe" → „Prútené kreslá").',
   '- Názvy aj hodnoty vlastností prekladaj rovnako vecne („Kolor: biały" → „Farba: biela").',
   '- Ak je časť textu už po slovensky, nechaj ju tak.',
   // Bez tohto pravidla model k slovenskej dolnej úvodzovke („) dopisuje
   // obyčajnú hornú ("), ktorú v JSON reťazci nezaescapuje a rozbije tým celú
   // odpoveď. `repairJsonQuotes` to síce opraví, ale lepšie je nezaviniť to.
   '- V texte NIKDY nepoužívaj obyčajnú dvojitú úvodzovku ("). Namiesto nej píš slovenské typografické úvodzovky „ a “.',
+  '',
+  'Záväzný slovník (poľština → slovenčina):',
+  ...GLOSSARY.map((entry) => `- ${entry}`),
+  '',
   'Odpovedaj VÝHRADNE jedným JSON objektom bez akéhokoľvek ďalšieho textu, v tvare:',
   '{"products":[{"index":0,"title":"...","paragraphs":["...","..."],"categoryPath":["..."],"attributes":[{"name":"...","value":"..."}]}]}',
 ].join('\n')
@@ -271,7 +330,7 @@ const translateChunk = async (
               fromLang
                 ? `Zdrojový jazyk: ${fromLang}.`
                 : 'Zdrojový jazyk sa nepodarilo určiť — urči ho sám z textu.',
-              'Prelož do slovenčiny nasledujúce produkty. Vráť rovnaký počet položiek s rovnakými hodnotami "index".',
+              `Prelož do slovenčiny nasledujúce produkty (${items.length}). Každý spracuj ako jeden celok — názov, popis, kategóriu aj parametre čítaj spolu, aby preklad dával zmysel. Vráť rovnaký počet položiek s rovnakými hodnotami "index".`,
               JSON.stringify({ products: items }),
             ].join('\n\n'),
             role: 'user',
@@ -279,6 +338,11 @@ const translateChunk = async (
         ],
         model: process.env.ANTHROPIC_SCRAPER_MODEL?.trim() || DEFAULT_MODEL,
         system: SYSTEM_PROMPT,
+        // Preklad nie je úloha na uvažovanie a `claude-sonnet-5` má adaptívne
+        // myslenie predvolene zapnuté — pri dávke v 60 s route by nám zjedlo
+        // čas aj tokeny bez úžitku. Vypnutý stav je na tomto modeli platná
+        // hodnota (na rozdiel od `budget_tokens`, ktorý už vracia 400).
+        thinking: { type: 'disabled' },
       }),
       cache: 'no-store',
       headers: {
@@ -385,4 +449,75 @@ export const translateBatch = async (
   }
 
   return { items: out, usage }
+}
+
+/**
+ * Preklad zoznamu názvov kategórií — JEDNO volanie na celý zoznam (Z14).
+ *
+ * Kategórie sú dvoj- až trojslovné pomenovania tovaru („Fotele wiklinowe"),
+ * nie súvislý text; posielať ich po troch ako produkty by bolo zbytočne drahé
+ * aj pomalé. Zoznam z Shoper navigácie má rádovo desiatky položiek a do jednej
+ * odpovede sa zmestí bez problémov.
+ *
+ * Nikdy nehádže výnimku: pri akomkoľvek probléme vráti pôvodné názvy, takže
+ * majiteľka uvidí v admine aspoň poľský zoznam a môže si vyberať z neho.
+ */
+export const translateCategoryNames = async (
+  names: string[],
+  fromLang: null | string,
+): Promise<string[]> => {
+  const clean = names.map((name) => name.trim())
+
+  if (!clean.length || fromLang === 'sk') return clean
+
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+
+  if (!apiKey) return clean
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(ANTHROPIC_ENDPOINT, {
+      body: JSON.stringify({
+        max_tokens: 4_000,
+        messages: [
+          {
+            content: [
+              fromLang ? `Zdrojový jazyk: ${fromLang}.` : 'Zdrojový jazyk urči sám z textu.',
+              'Prelož názvy kategórií e-shopu do slovenčiny. Sú to bežné pomenovania tovaru, nie vety — prekladaj ich ako názvy kategórií v e-shope („Fotele wiklinowe" → „Prútené kreslá"). Prvé slovo s veľkým písmenom, zvyšok malými.',
+              'Vráť rovnaký počet položiek v rovnakom poradí.',
+              JSON.stringify({ names: clean }),
+              'Odpovedz VÝHRADNE JSON objektom {"names":["...","..."]}.',
+            ].join('\n\n'),
+            role: 'user',
+          },
+        ],
+        model: process.env.ANTHROPIC_SCRAPER_MODEL?.trim() || DEFAULT_MODEL,
+        system: SYSTEM_PROMPT,
+        thinking: { type: 'disabled' },
+      }),
+      cache: 'no-store',
+      headers: {
+        'anthropic-version': ANTHROPIC_VERSION,
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      method: 'POST',
+      signal: controller.signal,
+    })
+
+    if (!response.ok) return clean
+
+    const parsed = extractJson(responseText(await response.json()))
+    const translated = asStringArray(parsed?.names)
+
+    // Keď sa počet nezhoduje, nedá sa spoľahlivo spárovať, ktorý názov patrí
+    // ku ktorej adrese — radšej celý zoznam nepreložený než pomiešaný.
+    return translated.length === clean.length ? translated : clean
+  } catch {
+    return clean
+  } finally {
+    clearTimeout(timer)
+  }
 }

@@ -1308,6 +1308,10 @@ export interface Post {
    */
   publishedAt?: string | null;
   /**
+   * O čom má článok byť, komu je určený a čo v ňom zdôrazniť. Pokojne celými vetami — čím konkrétnejšie zadanie, tým lepší text. Napr.: „Ako vybrať prvú hračku pre bábätko, tipy z vlastnej skúsenosti, spomeň pletené hračky."
+   */
+  aiPrompt?: string | null;
+  /**
    * Zobrazí sa na karte vo výpise aj na začiatku článku.
    */
   heroImage?: (number | null) | Media;
@@ -1518,7 +1522,18 @@ export interface ScraperJob {
   /**
    * Mení sa sám podľa toho, čo práve beží.
    */
-  status?: ('new' | 'preview_running' | 'awaiting_confirm' | 'importing' | 'done' | 'failed') | null;
+  status?:
+    | (
+        | 'new'
+        | 'categories_ready'
+        | 'preview_running'
+        | 'awaiting_confirm'
+        | 'importing'
+        | 'stopped'
+        | 'done'
+        | 'failed'
+      )
+    | null;
   /**
    * Dvojpísmenový kód (pl, cs, de…). Pri „sk“ sa preklad preskočí.
    */
@@ -1543,6 +1558,10 @@ export interface ScraperJob {
     imported?: number | null;
     skipped?: number | null;
     failed?: number | null;
+    /**
+     * Produkty, ktoré sa nepridali preto, že rovnaký názov už v obchode je — nech prišiel odkiaľkoľvek. Existujúci produkt sa nikdy neprepisuje.
+     */
+    skippedExisting?: number | null;
   };
   /**
    * Takto budú produkty vyzerať po importe. Vykresľuje ich panel „Ovládanie importu“ — surové dáta sú tu len na kontrolu.
@@ -1570,6 +1589,17 @@ export interface ScraperJob {
     | boolean
     | null;
   cursor?: number | null;
+  categoryMap?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  heartbeatAt?: string | null;
+  chainCount?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2489,6 +2519,7 @@ export interface FormBlockSelect<T extends boolean = true> {
 export interface PostsSelect<T extends boolean = true> {
   title?: T;
   publishedAt?: T;
+  aiPrompt?: T;
   heroImage?: T;
   excerpt?: T;
   content?: T;
@@ -2644,11 +2675,15 @@ export interface ScraperJobsSelect<T extends boolean = true> {
         imported?: T;
         skipped?: T;
         failed?: T;
+        skippedExisting?: T;
       };
   previews?: T;
   log?: T;
   productLinks?: T;
   cursor?: T;
+  categoryMap?: T;
+  heartbeatAt?: T;
+  chainCount?: T;
   updatedAt?: T;
   createdAt?: T;
 }

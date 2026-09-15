@@ -15,17 +15,32 @@ import { adminOnly } from '@/access/adminOnly'
  * Postup, ktorý si majiteľka odklikáva v bočnom paneli („Ovládanie importu"):
  *
  *   1. „nový" — zadá adresu obchodu a uloží.
- *   2. „Spustiť testovací beh" → route `/api/scraper/run` s `mode: 'preview'`.
- *      Nájde produkty, prvé tri stiahne, preloží a prepočíta ceny, uloží ich
- *      do `previews` a prepne stav na „čaká na potvrdenie". NIČ neimportuje.
- *   3. Majiteľka si náhľady prezrie a buď potvrdí, alebo úlohu zahodí.
- *   4. „Potvrdiť a importovať všetko" → tá istá route s `mode: 'batch'`,
- *      volaná v slučke z prehliadača, kým stav nie je „hotovo" alebo „chyba".
+ *   2. „Načítať kategórie" → route `/api/scraper/run` s `mode: 'categories'`.
+ *      Jednou požiadavkou vytiahne z navigácie zoznam kategórií, jedným
+ *      volaním modelu preloží ich názvy a uloží ich do `categoryMap`.
+ *   3. Majiteľka zaškrtne kategórie, ktoré chce (nič = celý obchod), a uloží
+ *      výber. Prehľadávanie potom chodí LEN po zaškrtnutých adresách.
+ *   4. „Spustiť testovací beh" → `mode: 'preview'`. Nájde produkty, prvé tri
+ *      stiahne, preloží a prepočíta ceny, uloží ich do `previews` a prepne
+ *      stav na „čaká na potvrdenie". NIČ neimportuje.
+ *   5. Náhľady si prezrie a buď potvrdí, alebo úlohu zahodí.
+ *   6. „Potvrdiť a importovať" → `mode: 'batch'`, JEDNO volanie.
  *
- * Prečo slučku riadi prehliadač a nie server: serverless funkcia má strop
- * 60 s, import stoviek produktov trvá desiatky minút. Jedna dávka = jedno
- * volanie, ktoré sa určite stihne; opakovanie je vec klienta, ktorý navyše
- * môže kedykoľvek zastaviť.
+ * **Prečo je stav v dokumente a nie v pamäti procesu (Z12).** Import beží po
+ * dávkach, každá dávka je samostatné volanie API a medzi dvomi dávkami
+ * neexistuje žiadna pamäť procesu — jediné, čo prežije, je tento dokument.
+ *
+ * **Kto slučku riadi (zmena v Z14).** Pôvodne ju točil prehliadač: zatvorená
+ * karta = zastavený import. Teraz si dávku reťazí server sám — po dopočítaní
+ * dávky si cez `after()` zavolá tú istú routu na ďalšiu (interným tokenom).
+ * Prehliadač už len raz kopne a potom sa pozerá. Poistky proti splašenej
+ * reťazi sú tri a všetky žijú tu v dokumente:
+ *
+ *   - `status` — „zastavené" reťaz na začiatku ďalšej dávky zastaví,
+ *   - `chainCount` — tvrdý strop na počet zreťazených dávok jednej úlohy,
+ *   - `heartbeatAt` — kedy naposledy dávka dobehla; keď je starší než pár
+ *     minút a stav je stále „importuje sa", reťaz padla a dá sa znova kopnúť
+ *     (tlačidlom „Pokračovať" alebo denným behom `/api/scraper/tick`).
  */
 export const ScraperJobs: CollectionConfig = {
   slug: 'scraper-jobs',
@@ -72,9 +87,11 @@ export const ScraperJobs: CollectionConfig = {
           index: true,
           options: [
             { label: 'Nový', value: 'new' },
+            { label: 'Kategórie načítané', value: 'categories_ready' },
             { label: 'Testovací beh', value: 'preview_running' },
             { label: 'Čaká na potvrdenie', value: 'awaiting_confirm' },
             { label: 'Importuje sa', value: 'importing' },
+            { label: 'Zastavené', value: 'stopped' },
             { label: 'Hotovo', value: 'done' },
             { label: 'Chyba', value: 'failed' },
           ],
@@ -177,6 +194,17 @@ export const ScraperJobs: CollectionConfig = {
             },
           ],
         },
+        {
+          name: 'skippedExisting',
+          type: 'number',
+          label: 'Preskočené (už v obchode)',
+          defaultValue: 0,
+          admin: {
+            description:
+              'Produkty, ktoré sa nepridali preto, že rovnaký názov už v obchode je — nech prišiel odkiaľkoľvek. Existujúci produkt sa nikdy neprepisuje.',
+            readOnly: true,
+          },
+        },
       ],
     },
     {
@@ -189,6 +217,16 @@ export const ScraperJobs: CollectionConfig = {
         position: 'sidebar',
       },
       label: 'Ovládanie importu',
+    },
+    {
+      name: 'categoryPicker',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@/components/admin/ScraperJobCategories#ScraperJobCategories',
+        },
+      },
+      label: 'Výber kategórií',
     },
     {
       name: 'previewCards',
@@ -234,6 +272,33 @@ export const ScraperJobs: CollectionConfig = {
       name: 'cursor',
       type: 'number',
       label: 'Pozícia vo fronte',
+      defaultValue: 0,
+      admin: { hidden: true },
+    },
+    {
+      // Tvar položky je `CategoryMapEntry` zo `src/scraper/types.ts`.
+      // Vykresľuje ho `ScraperJobCategories`; ako surový JSON je v editore len
+      // na obtiaž (desiatky položiek), preto skryté.
+      name: 'categoryMap',
+      type: 'json',
+      label: 'Kategórie zdroja',
+      admin: { hidden: true },
+    },
+    {
+      // Kedy dobehla posledná dávka. Podľa toho sa pozná padnutá reťaz:
+      // stav „importuje sa" + starý tep = nikto na úlohe nerobí.
+      name: 'heartbeatAt',
+      type: 'date',
+      label: 'Posledná dávka',
+      admin: { hidden: true },
+    },
+    {
+      // Koľko dávok si už úloha zreťazila sama. Tvrdý strop proti splašenej
+      // reťazi — chyba v podmienke ukončenia nesmie vedieť volať samu seba do
+      // nekonečna.
+      name: 'chainCount',
+      type: 'number',
+      label: 'Počet zreťazených dávok',
       defaultValue: 0,
       admin: { hidden: true },
     },

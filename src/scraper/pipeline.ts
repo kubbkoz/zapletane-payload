@@ -15,6 +15,7 @@ import type { PreparedProduct, ScrapedProduct } from './types'
 import { extractProduct } from './extract'
 import { fetchPage, politeDelay, POLITE_DELAY_MS } from './fetchPage'
 import { convertPrice } from './price'
+import { normalizeTitle, properNounHints } from './titleCase'
 import { translateBatch, type TranslationUsage } from './translate'
 
 export type ScrapeOptions = {
@@ -97,15 +98,32 @@ export const scrapeAndPrepare = async (
       rateSource = conversion.source
     }
 
+    const base = translated[index] ?? {
+      attributes: product.attributes,
+      categoryPath: product.categoryPath,
+      descriptionParagraphs: [],
+      title: product.title,
+    }
+
+    /**
+     * Druhá vrstva opravy KRIČANÝCH názvov (Z14).
+     *
+     * Prvou je prompt prekladača, ktorý má vracať prirodzenú vetnú podobu.
+     * Táto vrstva beží aj tak — keď preklad zlyhal, keď je zdroj už po
+     * slovensky, aj keď model pravidlo prehliadol. Nápovedy na vlastné mená
+     * sa zbierajú z textov, ktoré kapitálkami písané nie sú (popis produktu),
+     * takže „REGAN" prežije ako „Regan" a nie ako „regan".
+     */
+    const hints = properNounHints([
+      ...base.descriptionParagraphs,
+      product.descriptionText,
+      ...base.categoryPath,
+    ])
+
     items.push({
       priceInEUR: conversion?.eurocents ?? null,
       scraped: product,
-      translated: translated[index] ?? {
-        attributes: product.attributes,
-        categoryPath: product.categoryPath,
-        descriptionParagraphs: [],
-        title: product.title,
-      },
+      translated: { ...base, title: normalizeTitle(base.title, hints) || base.title },
     })
   }
 
