@@ -17,6 +17,92 @@ type Props = {
 }
 
 /**
+ * Pozadie jednej snímky — fotka, alebo video, keď ho snímka má (Z9).
+ *
+ * Obmedzenie pohybu (`prefers-reduced-motion: reduce`) rieši dvojicou:
+ *
+ *   1. CSS (`motion-reduce:hidden` / `motion-reduce:block`) prehodí video za
+ *      fotku okamžite, už pri prvom vykreslení — bez bliknutia, ktoré by
+ *      priniesla výmena až po hydratácii, a funguje aj bez JavaScriptu.
+ *   2. Efekt nižšie video naozaj zastaví a zoberie mu `autoplay`, aby sa
+ *      skryté video ani nesťahovalo. Ten istý efekt pauzuje aj snímky, ktoré
+ *      práve nie sú na rade — v slideri bežia inak všetky naraz.
+ *
+ * Fotka zostáva pod videom ako `poster` aj ako záloha pre prehliadač, ktorý
+ * formát neprehrá; `<video>` samo o sebe nepotrebuje JavaScript (autoplay,
+ * muted, loop, playsInline stačia aj na iOS).
+ */
+const SlideMedia: React.FC<{ active: boolean; priority: boolean; slide: HeroSlide }> = ({
+  active,
+  priority,
+  slide,
+}) => {
+  const videoRef = React.useRef<HTMLVideoElement>(null)
+  const poster = slide.videoPoster || slide.image
+
+  React.useEffect(() => {
+    const video = videoRef.current
+
+    if (!video) return
+
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+    const sync = () => {
+      if (query.matches || !active) {
+        video.removeAttribute('autoplay')
+        video.pause()
+        return
+      }
+
+      void video.play().catch(() => undefined)
+    }
+
+    sync()
+    query.addEventListener('change', sync)
+
+    return () => query.removeEventListener('change', sync)
+  }, [active])
+
+  if (!slide.video) {
+    return (
+      <Image
+        alt={slide.title}
+        className="object-cover"
+        fill
+        priority={priority}
+        sizes="(max-width: 1024px) 100vw, 55vw"
+        src={slide.image}
+      />
+    )
+  }
+
+  return (
+    <React.Fragment>
+      <video
+        aria-hidden="true"
+        autoPlay
+        className="absolute inset-0 size-full object-cover motion-reduce:hidden"
+        loop
+        muted
+        playsInline
+        poster={poster}
+        preload="metadata"
+        ref={videoRef}
+      >
+        <source src={slide.video} type={slide.videoMimeType || 'video/mp4'} />
+      </video>
+      <Image
+        alt={slide.title}
+        className="hidden object-cover motion-reduce:block"
+        fill
+        sizes="(max-width: 1024px) 100vw, 55vw"
+        src={poster}
+      />
+    </React.Fragment>
+  )
+}
+
+/**
  * Homepage hero — DESIGN-SPEC §3.1.
  *
  * `bg-brand-50` band, `container-editorial`, two columns on lg
@@ -107,14 +193,7 @@ export const HomeHero: React.FC<Props> = ({ perks = HERO_PERKS, slides = HERO_SL
                 )}
                 key={item.id}
               >
-                <Image
-                  alt={item.title}
-                  className="object-cover"
-                  fill
-                  priority={index === 0}
-                  sizes="(max-width: 1024px) 100vw, 55vw"
-                  src={item.image}
-                />
+                <SlideMedia active={index === current} priority={index === 0} slide={item} />
               </div>
             ))}
 

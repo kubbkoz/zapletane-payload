@@ -396,6 +396,8 @@ export interface Product {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * Obrázky sa pri nahraní automaticky prekódujú na WebP (max 2560 px) a videá na MP4 H.264 (max 1920 px, bez zvuku). SVG a GIF zostávajú nedotknuté.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media".
  */
@@ -3289,6 +3291,18 @@ export interface Homepage {
            * Napr. /assets/images/hero/hero-kolekcia.webp
            */
           imageUrl?: string | null;
+          /**
+           * Pri voľbe „Video“ sa namiesto fotky prehrá video. Obrázok vyššie zostáva ako záloha, keď video chýba alebo návštevník má zapnuté obmedzenie pohybu.
+           */
+          mediaType?: ('image' | 'video') | null;
+          /**
+           * Krátke video do ~20 s, ideálne bez zvuku — zvuková stopa sa pri nahraní aj tak odstráni a video sa prehráva stlmené. Nahrané video sa automaticky skomprimuje na MP4 (H.264, max 1920 px). Väčšie súbory nahrávajte už skomprimované, do ~4 MB: produkčný server (Vercel) väčšie telo požiadavky odmietne.
+           */
+          video?: (number | null) | Media;
+          /**
+           * Zobrazí sa, kým sa video načíta, a nahradí video pri zapnutom obmedzení pohybu (šetrenie dát a pohybová citlivosť). Keď je prázdny, použije sa obrázok snímky.
+           */
+          videoPoster?: (number | null) | Media;
           eyebrow?: string | null;
           title?: string | null;
           text?: string | null;
@@ -3707,6 +3721,9 @@ export interface HomepageSelect<T extends boolean = true> {
           | {
               image?: T;
               imageUrl?: T;
+              mediaType?: T;
+              video?: T;
+              videoPoster?: T;
               eyebrow?: T;
               title?: T;
               text?: T;

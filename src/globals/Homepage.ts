@@ -75,6 +75,42 @@ export const Homepage: GlobalConfig = {
               },
             },
             {
+              name: 'mediaType',
+              type: 'select',
+              label: 'Pozadie hera',
+              defaultValue: 'image',
+              options: [
+                { label: 'Obrázok', value: 'image' },
+                { label: 'Video', value: 'video' },
+              ],
+              admin: {
+                description:
+                  'Pri voľbe „Video“ sa namiesto fotky prehrá video. Obrázok vyššie zostáva ako záloha, keď video chýba alebo návštevník má zapnuté obmedzenie pohybu.',
+              },
+            },
+            {
+              name: 'video',
+              type: 'upload',
+              relationTo: 'media',
+              label: 'Video',
+              admin: {
+                condition: (_data, siblingData) => siblingData?.mediaType === 'video',
+                description:
+                  'Krátke video do ~20 s, ideálne bez zvuku — zvuková stopa sa pri nahraní aj tak odstráni a video sa prehráva stlmené. Nahrané video sa automaticky skomprimuje na MP4 (H.264, max 1920 px). Väčšie súbory nahrávajte už skomprimované, do ~4 MB: produkčný server (Vercel) väčšie telo požiadavky odmietne.',
+              },
+            },
+            {
+              name: 'videoPoster',
+              type: 'upload',
+              relationTo: 'media',
+              label: 'Náhľadový obrázok videa',
+              admin: {
+                condition: (_data, siblingData) => siblingData?.mediaType === 'video',
+                description:
+                  'Zobrazí sa, kým sa video načíta, a nahradí video pri zapnutom obmedzení pohybu (šetrenie dát a pohybová citlivosť). Keď je prázdny, použije sa obrázok snímky.',
+              },
+            },
+            {
               name: 'eyebrow',
               type: 'text',
               label: 'Eyebrow (malý štítok nad nadpisom)',

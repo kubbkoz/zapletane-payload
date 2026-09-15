@@ -37,7 +37,20 @@ const nextConfig: NextConfig = {
           protocol: url.protocol.replace(':', '') as 'http' | 'https',
         }
       }),
+      // Media uploaded through @payloadcms/storage-vercel-blob is served from
+      // the blob store's public host — without this pattern next/image would
+      // refuse every production upload (hero, gallery, blog).
+      {
+        hostname: '**.public.blob.vercel-storage.com',
+        protocol: 'https',
+      },
     ],
+  },
+  // ffmpeg-static resolves its ~80MB binary via __dirname at runtime, so Next's
+  // file tracing never bundles it into the serverless function on its own and
+  // the video-transcode hook would silently no-op in production.
+  outputFileTracingIncludes: {
+    '/api/**': ['./node_modules/ffmpeg-static/ffmpeg'],
   },
   reactStrictMode: true,
   redirects,

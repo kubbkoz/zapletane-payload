@@ -55,6 +55,28 @@ function imageSrc(image: unknown, imageUrl: null | string | undefined, fallback:
   return pick(imageUrl, fallback)
 }
 
+/**
+ * Adresa nahraného média (`depth: 1` ho vracia ako objekt). Nevyplnené pole,
+ * nerozbalené id aj prázdna adresa dajú `undefined` — volajúci potom vie, že
+ * médium nie je k dispozícii, a drží sa fotky.
+ */
+function mediaUrl(value: unknown): string | undefined {
+  if (value && typeof value === 'object' && 'url' in value) {
+    return optional((value as { url?: null | string }).url)
+  }
+
+  return undefined
+}
+
+/** MIME typ nahraného média — ide do `<source type>`, aby prehliadač vedel, čo sťahuje. */
+function mediaMimeType(value: unknown): string | undefined {
+  if (value && typeof value === 'object' && 'mimeType' in value) {
+    return optional((value as { mimeType?: null | string }).mimeType)
+  }
+
+  return undefined
+}
+
 function resolveHotspots(
   rows: NonNullable<NonNullable<Homepage['hero']>['slides']>[number]['hotspots'],
   slideIndex: number,
@@ -92,12 +114,19 @@ export function resolveHeroSlides(homepage?: Homepage | null): HeroSlide[] {
     .map((row, index) => {
       const fallback = HERO_SLIDES[index] || HERO_SLIDES[0]
 
+      // Video sa berie do úvahy len pri režime „Video“ a len keď je naozaj
+      // nahrané — inak snímka zostáva presne tým, čím bola: fotkou (Z9).
+      const video = row.mediaType === 'video' ? mediaUrl(row.video) : undefined
+
       return {
         id: row.id || `slide-${index + 1}`,
         badge: optional(row.eyebrow),
         title: row.title as string,
         subtitle: pick(row.text, ''),
         image: imageSrc(row.image, row.imageUrl, fallback?.image ?? ''),
+        video,
+        videoMimeType: video ? mediaMimeType(row.video) : undefined,
+        videoPoster: video ? mediaUrl(row.videoPoster) : undefined,
         cta: pick(row.ctaLabel, fallback?.cta ?? 'Objaviť ponuku'),
         ctaLink: optional(row.ctaHref) || fallback?.ctaLink,
         secondaryCta: optional(row.secondaryCtaLabel),

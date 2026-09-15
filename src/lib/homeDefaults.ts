@@ -32,7 +32,17 @@ export type HeroSlide = {
   badge?: string
   title: string
   subtitle: string
+  /**
+   * Fotka snímky. Zostáva povinná aj pri videu — slúži ako poster a ako
+   * náhrada pre návštevníka so zapnutým obmedzením pohybu (Z9).
+   */
   image: string
+  /** Adresa videa; keď je vyplnená, snímka sa prehráva ako video (Z9). */
+  video?: string
+  /** MIME typ videa pre `<source type>` (predvolene `video/mp4`). */
+  videoMimeType?: string
+  /** Poster videa; keď chýba, použije sa `image`. */
+  videoPoster?: string
   cta: string
   ctaLink?: string
   secondaryCta?: string
