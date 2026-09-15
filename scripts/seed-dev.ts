@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+import type { Post } from '@/payload-types'
+
 import { CONTACT } from '@/lib/contact'
 import { FOOTER_DEFAULTS } from '@/lib/footerDefaults'
 import { homepageDefaultData } from '@/lib/homeDefaults'
@@ -41,6 +43,50 @@ const paragraph = (text: string) => ({
         ],
       },
     ],
+  },
+})
+
+/** Textový uzol Lexicalu — základný stavebný kameň nasledujúcich pomocníkov. */
+const textNode = (text: string) => ({
+  mode: 'normal',
+  text,
+  type: 'text',
+  style: '',
+  detail: 0,
+  format: 0,
+  version: 1,
+})
+
+const paragraphNode = (text: string) => ({
+  type: 'paragraph',
+  format: '' as const,
+  indent: 0,
+  version: 1,
+  direction: null,
+  textStyle: '',
+  textFormat: 0,
+  children: [textNode(text)],
+})
+
+const headingNode = (text: string, tag: 'h2' | 'h3' = 'h2') => ({
+  type: 'heading',
+  tag,
+  format: '' as const,
+  indent: 0,
+  version: 1,
+  direction: null,
+  children: [textNode(text)],
+})
+
+/** Viacodsekový dokument pre blog — `paragraph()` vyššie zvládne len jeden. */
+const richTextDoc = (children: unknown[]) => ({
+  root: {
+    type: 'root',
+    format: '' as const,
+    indent: 0,
+    version: 1,
+    direction: null,
+    children,
   },
 })
 
@@ -780,6 +826,89 @@ const seedDemoCustomer = async (payload: Awaited<ReturnType<typeof getPayload>>)
   console.log(`seeded ${demoOrders.length} demo orders for ${DEMO_CUSTOMER.email}`)
 }
 
+/**
+ * Dva ukážkové články (Z7), aby `/blog` nebolo prázdne a dalo sa na ňom hneď
+ * vidieť, ako karta aj detail vyzerajú s reálnym textom.
+ *
+ * Idempotentné: ak už nejaký článok existuje, nerobí nič — opakované spustenie
+ * seedu teda nevytvorí štvoricu duplikátov s príponami `-2`.
+ *
+ * Adresy (`slug`) sa zámerne nevypĺňajú: majú vzniknúť tým istým hookom, ktorý
+ * ich vyrába v admine, takže seed je zároveň najlacnejšia kontrola, že prevod
+ * názvu na adresu (vrátane diakritiky) funguje.
+ */
+const seedBlogPosts = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+  const existing = await payload.find({ collection: 'posts', limit: 1 })
+
+  if (existing.totalDocs > 0) {
+    console.log('blog posts already seeded:', existing.totalDocs)
+    return
+  }
+
+  // Ak už máme nahraný nejaký obrázok, prvý poslúži ako úvodný — karta blogu
+  // tak nie je len sivý obdĺžnik.
+  const media = await payload.find({ collection: 'media', depth: 0, limit: 1 })
+  const heroImage = media.docs[0]?.id
+
+  const posts = [
+    {
+      title: 'Ako vzniká ručne pletená deka',
+      excerpt:
+        'Od klbka po hotový kus: koľko priadze deka spotrebuje, prečo pleteniu trvá týždne a čo sa stane, keď sa pomýlime v jednom oku.',
+      content: richTextDoc([
+        paragraphNode(
+          'Každá deka sa začína výberom priadze. Pracujeme s vlnou, ktorá je dosť hrubá na to, aby držala tvar, a zároveň dosť mäkká na to, aby sa pod ňou dalo zaspať.',
+        ),
+        headingNode('Prvé oká'),
+        paragraphNode(
+          'Nahodenie okien je najpomalšia časť celej práce. Ich počet určuje šírku deky a už sa nedá zmeniť — preto sa ráta dvakrát a pletie až potom.',
+        ),
+        headingNode('Týždne, nie hodiny'),
+        paragraphNode(
+          'Na jednu veľkú deku padne aj tridsať hodín práce rozložených do niekoľkých týždňov. Nie preto, že by to inak nešlo, ale preto, že pletenie v zhone je na výsledku vidieť.',
+        ),
+      ]),
+      publishedAt: new Date('2026-08-18T09:00:00.000Z').toISOString(),
+    },
+    {
+      title: 'Starostlivosť o vlnené kúsky',
+      excerpt:
+        'Vlna nepotrebuje časté pranie — potrebuje vzduch, chlad a trochu trpezlivosti. Zhrnuli sme, čo jej prospieva a čo ju zničí.',
+      content: richTextDoc([
+        paragraphNode(
+          'Vlnená deka vydrží roky, ak s ňou zaobchádzate ako s vlnou, nie ako s bavlnou. Najdôležitejšie pravidlo znie: menej prania, viac vetrania.',
+        ),
+        headingNode('Pranie'),
+        paragraphNode(
+          'Ručne, vo vlažnej vode do tridsiatich stupňov, s prípravkom na vlnu. Nikdy nedrhnúť a nežmýkať — vlna sa tým plstnatí a späť sa už nedostane.',
+        ),
+        headingNode('Sušenie'),
+        paragraphNode(
+          'Vodu jemne vytlačte v uteráku a deku sušte rozloženú naplocho, mimo priameho slnka a radiátora. Zavesená deka sa vytiahne vlastnou váhou.',
+        ),
+      ]),
+      publishedAt: new Date('2026-09-02T09:00:00.000Z').toISOString(),
+    },
+  ]
+
+  for (const post of posts) {
+    const created = await payload.create({
+      collection: 'posts',
+      data: {
+        ...post,
+        content: post.content as Post['content'],
+        ...(heroImage ? { heroImage } : {}),
+        // Prázdne = hook `slugField` doplní adresu z názvu. Typ ho vyžaduje
+        // (pole je `required`), hodnota sa ale vždy prepíše.
+        slug: '',
+        _status: 'published',
+      },
+    })
+
+    console.log(`seeded blog post "${post.title}" -> /blog/${created.slug}`)
+  }
+}
+
 const run = async () => {
   const payload = await getPayload({ config })
 
@@ -789,6 +918,7 @@ const run = async () => {
   await seedDiscountsAndFilters(payload)
   await seedProductPropertiesAndRelations(payload)
   await seedContentGlobals(payload)
+  await seedBlogPosts(payload)
   await seedDemoCustomer(payload)
 
   await payload.destroy()

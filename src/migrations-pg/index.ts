@@ -19,6 +19,8 @@ import * as migration_20260915_090322_z1_search_recommended from './20260915_090
 import * as migration_20260915_101312_z2_address_kind from './20260915_101312_z2_address_kind';
 import * as migration_20260915_101404_z3_push_subscriptions from './20260915_101404_z3_push_subscriptions';
 import * as migration_20260915_102926_z5_topbar from './20260915_102926_z5_topbar';
+import * as migration_20260915_113059_z7_blog_slugs_redirects from './20260915_113059_z7_blog_slugs_redirects';
+import * as migration_20260915_113500_z7_mcp_blog_redirect_grants from './20260915_113500_z7_mcp_blog_redirect_grants';
 
 export const migrations = [
   {
@@ -124,6 +126,16 @@ export const migrations = [
   {
     up: migration_20260915_102926_z5_topbar.up,
     down: migration_20260915_102926_z5_topbar.down,
-    name: '20260915_102926_z5_topbar'
+    name: '20260915_102926_z5_topbar',
+  },
+  {
+    up: migration_20260915_113059_z7_blog_slugs_redirects.up,
+    down: migration_20260915_113059_z7_blog_slugs_redirects.down,
+    name: '20260915_113059_z7_blog_slugs_redirects'
+  },
+  {
+    up: migration_20260915_113500_z7_mcp_blog_redirect_grants.up,
+    down: migration_20260915_113500_z7_mcp_blog_redirect_grants.down,
+    name: '20260915_113500_z7_mcp_blog_redirect_grants',
   },
 ];

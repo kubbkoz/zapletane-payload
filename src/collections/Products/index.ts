@@ -1,7 +1,8 @@
 import { CallToAction } from '@/blocks/CallToAction/config'
 import { Content } from '@/blocks/Content/config'
 import { MediaBlock } from '@/blocks/MediaBlock/config'
-import { slugField } from 'payload'
+import { slugField } from '@/fields/slug'
+import { createSlugRedirectHook } from '@/lib/redirects'
 import { generatePreviewPath } from '@/utilities/generatePreviewPath'
 import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
 import type {
@@ -139,7 +140,13 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
   ...defaultCollection,
   hooks: {
     ...defaultCollection?.hooks,
-    afterChange: [...(defaultCollection?.hooks?.afterChange ?? []), revalidateFeedsOnChange],
+    // Z7: premenovanie produktu prepíše `slug`, takže stará adresa
+    // `/products/<starý-slug>` musí dostať 301 na tú novú.
+    afterChange: [
+      ...(defaultCollection?.hooks?.afterChange ?? []),
+      revalidateFeedsOnChange,
+      createSlugRedirectHook('products'),
+    ],
     afterDelete: [...(defaultCollection?.hooks?.afterDelete ?? []), revalidateFeedsOnDelete],
     beforeChange: [...(defaultCollection?.hooks?.beforeChange ?? []), autofillProductMeta],
   },
@@ -466,6 +473,6 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
         },
       ],
     },
-    slugField(),
+    slugField({ retainLegacyCheckbox: true }),
   ],
 })

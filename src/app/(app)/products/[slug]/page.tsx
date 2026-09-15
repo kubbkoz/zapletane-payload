@@ -9,7 +9,7 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { draftMode } from 'next/headers'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import React, { cache, Suspense } from 'react'
 import { ChevronLeftIcon } from 'lucide-react'
 import { Metadata } from 'next'
@@ -18,7 +18,21 @@ import { JsonLd } from '@/seo/JsonLd'
 import { buildTemplateMeta } from '@/seo/generate'
 import { buildBreadcrumbJsonLd, buildProductJsonLd, productImages } from '@/seo/jsonLd'
 import { toSeoProductInput } from '@/seo/productInput'
+import { resolveRedirect } from '@/lib/redirects'
 import { getServerSideURL } from '@/utilities/getURL'
+
+/**
+ * Premenovaný produkt (Z7): `/products/<starý-slug>` už nič nenájde, ale stará
+ * adresa môže byť v Google aj v záložkách — než sa ohlási 404, pozrieme sa do
+ * tabuľky presmerovaní. Volá sa z oboch vstupných bodov (metadáta aj samotná
+ * stránka), lebo Next.js ich pripravuje súbežne a ktorýkoľvek z nich by inak
+ * stihol vyhlásiť 404 skôr.
+ */
+const redirectIfRenamed = async (slug: string): Promise<void> => {
+  const redirectTo = await resolveRedirect(`/products/${slug}`)
+
+  if (redirectTo) permanentRedirect(redirectTo)
+}
 
 const SITE_NAME = process.env.SITE_NAME || 'ZAPLETANE'
 
@@ -40,7 +54,11 @@ export async function generateMetadata({ params }: Args): Promise<Metadata> {
   const { slug } = await params
   const product = await queryProductBySlug({ slug })
 
-  if (!product) return notFound()
+  if (!product) {
+    await redirectIfRenamed(slug)
+
+    return notFound()
+  }
 
   const siteUrl = getServerSideURL().replace(/\/$/, '')
   const url = `${siteUrl}/products/${product.slug}`
@@ -95,7 +113,11 @@ export default async function ProductPage({ params }: Args) {
   const { slug } = await params
   const product = await queryProductBySlug({ slug })
 
-  if (!product) return notFound()
+  if (!product) {
+    await redirectIfRenamed(slug)
+
+    return notFound()
+  }
 
   const gallery =
     product.gallery

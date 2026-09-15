@@ -3,6 +3,8 @@ import { PayloadRequest, CollectionSlug } from 'payload'
 
 const collectionPrefixMap: Partial<Record<CollectionSlug, string>> = {
   pages: '',
+  // Z7 — články blogu majú rovnaký náhľad konceptu ako stránky.
+  posts: '/blog',
   products: '/products',
 }
 

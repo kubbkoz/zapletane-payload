@@ -97,6 +97,10 @@ async function main() {
     products: fullCrud,
     categories: fullCrud,
     pages: fullCrud,
+    // Z7 — blog a presmerovania. Rovnaký strop ako `pages`: je to editovateľný
+    // obsah, resp. tabuľka presmerovaní, ktorú treba vedieť aj opraviť.
+    posts: fullCrud,
+    redirects: fullCrud,
     media: fullCrud,
     variants: fullCrud,
     variantOptions: fullCrud,

@@ -229,6 +229,80 @@ export const buildBreadcrumbJsonLd = (
   ])
 }
 
+/** Domov → Obchod → kategória (pre `/kategoria/<slug>`, Z7). */
+export const buildCategoryBreadcrumbJsonLd = (
+  category: { slug?: null | string; title: string },
+  siteUrl: string,
+): Record<string, unknown> => {
+  const base = siteUrl.replace(/\/$/, '')
+
+  return breadcrumbList([
+    { name: 'Domov', url: `${base}/` },
+    { name: 'Obchod', url: `${base}/shop` },
+    { name: category.title, url: `${base}/kategoria/${category.slug ?? ''}` },
+  ])
+}
+
+/** Domov → Blog → článok (pre `/blog/<slug>`, Z7). */
+export const buildPostBreadcrumbJsonLd = (
+  post: { slug?: null | string; title: string },
+  siteUrl: string,
+): Record<string, unknown> => {
+  const base = siteUrl.replace(/\/$/, '')
+
+  return breadcrumbList([
+    { name: 'Domov', url: `${base}/` },
+    { name: 'Blog', url: `${base}/blog` },
+    { name: post.title, url: `${base}/blog/${post.slug ?? ''}` },
+  ])
+}
+
+/**
+ * `Article` pre článok blogu (Z7).
+ *
+ * Rovnaká úvaha ako pri produkte: čo je v JSON-LD, to si vyhľadávač aj
+ * generatívny model prečíta ako fakt — nadpis, dátum vydania a poslednej
+ * úpravy, obrázok, autor a vydavateľ. Autorom aj vydavateľom je značka, nie
+ * osoba: články píše dielňa, nie redakcia s menami.
+ */
+export const buildArticleJsonLd = (
+  post: {
+    excerpt?: null | string
+    images?: string[]
+    meta?: { description?: null | string } | null
+    publishedAt?: null | string
+    slug?: null | string
+    title: string
+    updatedAt?: null | string
+  },
+  siteUrl: string,
+): Record<string, unknown> => {
+  const base = siteUrl.replace(/\/$/, '')
+  const url = `${base}/blog/${post.slug ?? ''}`
+
+  const description = (post.excerpt?.trim() || post.meta?.description?.trim() || post.title).slice(
+    0,
+    MAX_JSONLD_DESCRIPTION,
+  )
+
+  const images = (post.images ?? []).map((image) => absoluteUrl(image, base))
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    author: { '@type': 'Organization', name: BRAND, url: `${base}/` },
+    description,
+    headline: post.title,
+    ...(images.length ? { image: images } : {}),
+    inLanguage: 'sk-SK',
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    ...(post.publishedAt ? { datePublished: post.publishedAt } : {}),
+    ...(post.updatedAt ? { dateModified: post.updatedAt } : {}),
+    publisher: { '@type': 'Organization', name: BRAND, url: `${base}/` },
+    url,
+  }
+}
+
 /** Domov → Obchod (pre výpis obchodu). */
 export const buildShopBreadcrumbJsonLd = (siteUrl: string): Record<string, unknown> => {
   const base = siteUrl.replace(/\/$/, '')

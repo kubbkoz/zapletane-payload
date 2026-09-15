@@ -10,7 +10,9 @@ import { homeStaticData } from '@/endpoints/seed/home-static'
 import React from 'react'
 
 import type { Page } from '@/payload-types'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
+
+import { resolveRedirect } from '@/lib/redirects'
 
 export async function generateStaticParams() {
   try {
@@ -62,6 +64,12 @@ export default async function Page({ params }: Args) {
   }
 
   if (!page) {
+    // Adresa stránky sa mohla zmeniť premenovaním (Z7) — než ohlásime 404,
+    // pozrieme sa do tabuľky presmerovaní.
+    const redirectTo = await resolveRedirect(url)
+
+    if (redirectTo) permanentRedirect(redirectTo)
+
     return notFound()
   }
 

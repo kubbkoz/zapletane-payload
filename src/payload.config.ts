@@ -24,6 +24,7 @@ import { DiscountCodes } from '@/collections/DiscountCodes'
 import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
 import { PaymentMethods } from '@/collections/PaymentMethods'
+import { Posts } from '@/collections/Posts'
 import { ProductFilters } from '@/collections/ProductFilters'
 import { ProductProperties } from '@/collections/ProductProperties'
 import { PushSubscriptions } from '@/collections/PushSubscriptions'
@@ -116,6 +117,8 @@ export default buildConfig({
   collections: [
     Users,
     Pages,
+    // Blog (Z7) — rovnaký tvar ako Pages, len s vlastnou adresou /blog/<slug>.
+    Posts,
     Categories,
     Media,
     ShippingMethods,

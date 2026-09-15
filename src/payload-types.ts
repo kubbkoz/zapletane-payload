@@ -75,6 +75,7 @@ export interface Config {
   collections: {
     users: User;
     pages: Page;
+    posts: Post;
     categories: Category;
     media: Media;
     'shipping-methods': ShippingMethod;
@@ -83,6 +84,7 @@ export interface Config {
     'product-filters': ProductFilter;
     'product-properties': ProductProperty;
     'push-subscriptions': PushSubscription;
+    redirects: Redirect;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -115,6 +117,7 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
+    posts: PostsSelect<false> | PostsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'shipping-methods': ShippingMethodsSelect<false> | ShippingMethodsSelect<true>;
@@ -123,6 +126,7 @@ export interface Config {
     'product-filters': ProductFiltersSelect<false> | ProductFiltersSelect<true>;
     'product-properties': ProductPropertiesSelect<false> | ProductPropertiesSelect<true>;
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
+    redirects: RedirectsSelect<false> | RedirectsSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -426,10 +430,14 @@ export interface Product {
       }[]
     | null;
   /**
-   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   * Časť adresy za lomkou. Prázdne = doplní sa z názvu (bez diakritiky). Pri zmene názvu sa prepíše automaticky a na starú adresu vznikne presmerovanie.
    */
-  generateSlug?: boolean | null;
   slug: string;
+  /**
+   * Zapni, ak si adresu chceš napísať sama — potom ju premenovanie názvu už nikdy neprepíše.
+   */
+  slugLock?: boolean | null;
+  generateSlug?: boolean | null;
   updatedAt: string;
   createdAt: string;
   deletedAt?: string | null;
@@ -611,10 +619,14 @@ export interface Page {
     description?: string | null;
   };
   /**
-   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   * Časť adresy za lomkou. Prázdne = doplní sa z názvu (bez diakritiky). Pri zmene názvu sa prepíše automaticky a na starú adresu vznikne presmerovanie.
    */
-  generateSlug?: boolean | null;
   slug: string;
+  /**
+   * Zapni, ak si adresu chceš napísať sama — potom ju premenovanie názvu už nikdy neprepíše.
+   */
+  slugLock?: boolean | null;
+  generateSlug?: boolean | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -709,6 +721,8 @@ export interface ArchiveBlock {
   blockType: 'archive';
 }
 /**
+ * Kategórie produktov. Každá má vlastnú stránku /kategoria/<url-adresa>.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "categories".
  */
@@ -716,10 +730,14 @@ export interface Category {
   id: number;
   title: string;
   /**
-   * When enabled, the slug will auto-generate from the title field on save and autosave.
+   * Časť adresy za lomkou. Prázdne = doplní sa z názvu (bez diakritiky). Pri zmene názvu sa prepíše automaticky a na starú adresu vznikne presmerovanie.
    */
-  generateSlug?: boolean | null;
   slug: string;
+  /**
+   * Zapni, ak si adresu chceš napísať sama — potom ju premenovanie názvu už nikdy neprepíše.
+   */
+  slugLock?: boolean | null;
+  generateSlug?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1250,6 +1268,62 @@ export interface Address {
   createdAt: string;
 }
 /**
+ * Články na blogu. Každý článok má vlastnú adresu /blog/<url-adresa>; tá sa dopĺňa z názvu sama.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: number;
+  title: string;
+  /**
+   * Podľa neho sa články radia na /blog — najnovší hore.
+   */
+  publishedAt?: string | null;
+  /**
+   * Zobrazí sa na karte vo výpise aj na začiatku článku.
+   */
+  heroImage?: (number | null) | Media;
+  /**
+   * Voliteľné. Krátke zhrnutie (1–2 vety) pod názvom vo výpise článkov.
+   */
+  excerpt?: string | null;
+  content: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  meta?: {
+    title?: string | null;
+    /**
+     * Maximum upload file size: 12MB. Recommended file size for images is <500KB.
+     */
+    image?: (number | null) | Media;
+    description?: string | null;
+  };
+  /**
+   * Časť adresy za lomkou. Prázdne = doplní sa z názvu (bez diakritiky). Pri zmene názvu sa prepíše automaticky a na starú adresu vznikne presmerovanie.
+   */
+  slug: string;
+  /**
+   * Zapni, ak si adresu chceš napísať sama — potom ju premenovanie názvu už nikdy neprepíše.
+   */
+  slugLock?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
  * Spôsoby platby ponúkané v pokladni. Príplatok je v eurocentoch (1.50 € = 150). Vypnutý spôsob sa v pokladni nezobrazí.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1437,6 +1511,45 @@ export interface PushSubscription {
   createdAt: string;
 }
 /**
+ * Stará adresa → nová adresa (301). Väčšina záznamov tu vznikne sama pri premenovaní produktu, článku, stránky alebo kategórie; dopísať sa dá aj ručne.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects".
+ */
+export interface Redirect {
+  id: number;
+  /**
+   * Cesta vrátane lomky na začiatku, napr. /blog/stary-nazov.
+   */
+  from: string;
+  to?: {
+    type?: ('custom' | 'reference') | null;
+    reference?:
+      | ({
+          relationTo: 'pages';
+          value: number | Page;
+        } | null)
+      | ({
+          relationTo: 'posts';
+          value: number | Post;
+        } | null)
+      | ({
+          relationTo: 'products';
+          value: number | Product;
+        } | null)
+      | ({
+          relationTo: 'categories';
+          value: number | Category;
+        } | null);
+    /**
+     * Cesta vrátane lomky na začiatku, napr. /blog/novy-nazov.
+     */
+    url?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
@@ -1524,6 +1637,42 @@ export interface PayloadMcpApiKey {
     update?: boolean | null;
     /**
      * Allow clients to delete pages.
+     */
+    delete?: boolean | null;
+  };
+  posts?: {
+    /**
+     * Allow clients to find posts.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create posts.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update posts.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete posts.
+     */
+    delete?: boolean | null;
+  };
+  redirects?: {
+    /**
+     * Allow clients to find redirects.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to create redirects.
+     */
+    create?: boolean | null;
+    /**
+     * Allow clients to update redirects.
+     */
+    update?: boolean | null;
+    /**
+     * Allow clients to delete redirects.
      */
     delete?: boolean | null;
   };
@@ -1825,6 +1974,10 @@ export interface PayloadLockedDocument {
         value: number | Page;
       } | null)
     | ({
+        relationTo: 'posts';
+        value: number | Post;
+      } | null)
+    | ({
         relationTo: 'categories';
         value: number | Category;
       } | null)
@@ -1855,6 +2008,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'push-subscriptions';
         value: number | PushSubscription;
+      } | null)
+    | ({
+        relationTo: 'redirects';
+        value: number | Redirect;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2029,8 +2186,9 @@ export interface PagesSelect<T extends boolean = true> {
         image?: T;
         description?: T;
       };
-  generateSlug?: T;
   slug?: T;
+  slugLock?: T;
+  generateSlug?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -2155,12 +2313,36 @@ export interface FormBlockSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  publishedAt?: T;
+  heroImage?: T;
+  excerpt?: T;
+  content?: T;
+  meta?:
+    | T
+    | {
+        title?: T;
+        image?: T;
+        description?: T;
+      };
+  slug?: T;
+  slugLock?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "categories_select".
  */
 export interface CategoriesSelect<T extends boolean = true> {
   title?: T;
-  generateSlug?: T;
   slug?: T;
+  slugLock?: T;
+  generateSlug?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2288,6 +2470,22 @@ export interface PushSubscriptionsSelect<T extends boolean = true> {
       };
   userAgent?: T;
   lastSeenAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redirects_select".
+ */
+export interface RedirectsSelect<T extends boolean = true> {
+  from?: T;
+  to?:
+    | T
+    | {
+        type?: T;
+        reference?: T;
+        url?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2561,8 +2759,9 @@ export interface ProductsSelect<T extends boolean = true> {
         tag?: T;
         id?: T;
       };
-  generateSlug?: T;
   slug?: T;
+  slugLock?: T;
+  generateSlug?: T;
   updatedAt?: T;
   createdAt?: T;
   deletedAt?: T;
@@ -2730,6 +2929,22 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         delete?: T;
       };
   pages?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  posts?:
+    | T
+    | {
+        find?: T;
+        create?: T;
+        update?: T;
+        delete?: T;
+      };
+  redirects?:
     | T
     | {
         find?: T;
@@ -3651,6 +3866,17 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CodeBlock".
+ */
+export interface CodeBlock {
+  language?: ('typescript' | 'javascript' | 'css') | null;
+  code: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'code';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

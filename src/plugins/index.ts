@@ -1,6 +1,7 @@
 import { formBuilderPlugin } from '@payloadcms/plugin-form-builder'
+import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { seoPlugin } from '@payloadcms/plugin-seo'
-import { Plugin } from 'payload'
+import { Field, Plugin } from 'payload'
 import { GenerateDescription, GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { FixedToolbarFeature, HeadingFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import { ecommercePlugin, EUR } from '@payloadcms/plugin-ecommerce'
@@ -21,6 +22,8 @@ import { customerOnlyFieldAccess } from '@/access/customerOnlyFieldAccess'
 import { isAdmin } from '@/access/isAdmin'
 import { isDocumentOwner } from '@/access/isDocumentOwner'
 import { notifyOrderStatusChange } from '@/push/notifyOrderStatus'
+import { adminOnly } from '@/access/adminOnly'
+import { REDIRECT_COLLECTIONS, revalidateRedirects, revalidateRedirectsOnDelete } from '@/lib/redirects'
 import { globalConfigs } from '@/globals'
 import { generateProductMeta } from '@/seo/generate'
 import { toSeoProductInput } from '@/seo/productInput'
@@ -99,11 +102,134 @@ const redactUserSecrets: NonNullable<MCPCollectionEntry['overrideResponse']> = (
   return response
 }
 
+/**
+ * Slovenské popisky pre kolekciu `redirects` (Z7).
+ *
+ * `@payloadcms/plugin-redirects` slovenský preklad nemá, takže by sa v admine
+ * ukázali holé kľúče („plugin-redirects:fromUrl"). Zároveň sa tu uvoľňuje
+ * povinnosť oboch polovíc cieľa: automatické presmerovania ukladajú vždy
+ * hotovú cestu (`to.type === 'custom'`), takže odkaz na dokument nesmie byť
+ * povinný — a naopak. Kontrolu preberajú dve podmienené validácie.
+ *
+ * `as Field` je tu vedome: rozprestretie poľa a prepísanie `label`/`admin`
+ * rozšíri typ tak, že TypeScript už nevie zložiť späť diskriminovanú úniu
+ * `Field`, hoci tvar je nezmenený.
+ */
+const requiredWhenType =
+  (type: string, message: string) =>
+  (value: unknown, options: unknown): string | true =>
+    (options as { siblingData?: { type?: string } })?.siblingData?.type === type && !value
+      ? message
+      : true
+
+const localizeRedirectField = (field: Field): Field => {
+  if ('name' in field && field.name === 'from') {
+    return {
+      ...field,
+      admin: {
+        ...('admin' in field ? field.admin : {}),
+        description: 'Cesta vrátane lomky na začiatku, napr. /blog/stary-nazov.',
+      },
+      label: 'Stará adresa',
+    } as Field
+  }
+
+  if ('name' in field && field.name === 'to' && field.type === 'group') {
+    return {
+      ...field,
+      fields: field.fields.map((subField): Field => {
+        if (!('name' in subField)) return subField
+
+        if (subField.name === 'type') {
+          return {
+            ...subField,
+            defaultValue: 'custom',
+            label: 'Typ cieľa',
+            options: [
+              { label: 'Vlastná adresa', value: 'custom' },
+              { label: 'Dokument v administrácii', value: 'reference' },
+            ],
+          } as Field
+        }
+
+        if (subField.name === 'reference') {
+          return {
+            ...subField,
+            label: 'Dokument',
+            required: false,
+            validate: requiredWhenType('reference', 'Vyber dokument, na ktorý sa má presmerovať.'),
+          } as Field
+        }
+
+        if (subField.name === 'url') {
+          return {
+            ...subField,
+            admin: {
+              ...('admin' in subField ? subField.admin : {}),
+              description: 'Cesta vrátane lomky na začiatku, napr. /blog/novy-nazov.',
+            },
+            label: 'Nová adresa',
+            required: false,
+            validate: requiredWhenType('custom', 'Zadaj cieľovú adresu.'),
+          } as Field
+        }
+
+        return subField
+      }),
+      label: 'Kam presmerovať',
+    } as Field
+  }
+
+  return field
+}
+
 export const plugins: Plugin[] = [
   seoPlugin({
     generateDescription,
     generateTitle,
     generateURL,
+  }),
+  // --- Presmerovania (Z7) -------------------------------------------------
+  // Oficiálny `@payloadcms/plugin-redirects` (peer `payload: 3.89.0`, presne
+  // naša verzia) pridáva kolekciu `redirects` s unikátnym `from` — presne to,
+  // čo `src/lib/redirects.ts` potrebuje na „upsert" pri premenovaní adresy.
+  // Vlastnú kolekciu sme nepísali práve preto, že by robila to isté, len bez
+  // možnosti mieriť presmerovanie na *dokument* (a bez údržby od Payloadu).
+  //
+  // Prepísané sú len popisky (plugin nemá slovenský preklad) a povinnosť
+  // `to.reference` — automatické presmerovania vždy ukladajú hotovú cestu
+  // (`to.type === 'custom'`), takže odkaz na dokument musí zostať voliteľný.
+  redirectsPlugin({
+    collections: [...REDIRECT_COLLECTIONS],
+    overrides: {
+      access: {
+        create: adminOnly,
+        delete: adminOnly,
+        // Verejné čítanie = predvolené nastavenie pluginu, ponechané zámerne.
+        // Storefront ho nepotrebuje (`src/lib/redirects.ts` číta cez Local API
+        // s `overrideAccess`), ale zoznam „stará adresa → nová adresa" nie je
+        // tajný a je to najmenej prekvapivá voľba pre kohokoľvek, kto by
+        // presmerovania neskôr čítal cez REST.
+        read: () => true,
+        update: adminOnly,
+      },
+      admin: {
+        defaultColumns: ['from', 'to.url', 'updatedAt'],
+        description:
+          'Stará adresa → nová adresa (301). Väčšina záznamov tu vznikne sama pri premenovaní produktu, článku, stránky alebo kategórie; dopísať sa dá aj ručne.',
+        group: 'Content',
+        useAsTitle: 'from',
+      },
+      fields: ({ defaultFields }) => defaultFields.map(localizeRedirectField),
+      hooks: {
+        afterChange: [revalidateRedirects],
+        afterDelete: [revalidateRedirectsOnDelete],
+      },
+      labels: {
+        plural: 'Presmerovania',
+        singular: 'Presmerovanie',
+      },
+    },
   }),
   formBuilderPlugin({
     fields: {
@@ -332,10 +458,10 @@ export const plugins: Plugin[] = [
   // --- Model Context Protocol (MCP) server -------------------------------
   // Approved scope (project owner sign-off, do not widen without new
   // sign-off — see MCP-PLAN.md):
-  //   - full CRUD  : products, categories, pages, media, variants,
-  //                  variantOptions, shipping-methods, payment-methods,
-  //                  discount-codes, product-filters, product-properties, and
-  //                  every registered global.
+  //   - full CRUD  : products, categories, pages, posts, redirects, media,
+  //                  variants, variantOptions, shipping-methods,
+  //                  payment-methods, discount-codes, product-filters,
+  //                  product-properties, and every registered global.
   //   - find+update: orders, transactions, carts, addresses (no create/delete
   //                  — these are financial/checkout records, not
   //                  agent-authored content).
@@ -400,6 +526,20 @@ export const plugins: Plugin[] = [
       },
       pages: {
         description: 'CMS content pages (non-catalog site content).',
+        enabled: mcpFullCrud,
+      },
+      // Z7 — blog. Same ceiling as `pages`: it is the same kind of
+      // agent-authorable editorial content, just on /blog/<slug>.
+      posts: {
+        description:
+          'Blog articles published at /blog/<slug> (title, slug, hero image, excerpt, rich-text content, publishedAt, SEO meta, drafts).',
+        enabled: mcpFullCrud,
+      },
+      // Z7 — presmerovania. Admin-managed 301 table (from -> to). Agent-
+      // editable so a botched rename can be repaired without a deploy.
+      redirects: {
+        description:
+          'Permanent (301) redirects from an old public path to a new one. Rows are created automatically when a product/post/page/category slug changes; they can also be authored and cleaned up by hand.',
         enabled: mcpFullCrud,
       },
       media: {

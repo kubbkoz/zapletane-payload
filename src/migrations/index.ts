@@ -11,6 +11,7 @@ import * as migration_20260915_090333_z1_search_recommended from './20260915_090
 import * as migration_20260915_101321_z2_address_kind from './20260915_101321_z2_address_kind';
 import * as migration_20260915_101412_z3_push_subscriptions from './20260915_101412_z3_push_subscriptions';
 import * as migration_20260915_102919_z5_topbar from './20260915_102919_z5_topbar';
+import * as migration_20260915_113107_z7_blog_slugs_redirects from './20260915_113107_z7_blog_slugs_redirects';
 
 export const migrations = [
   {
@@ -76,6 +77,11 @@ export const migrations = [
   {
     up: migration_20260915_102919_z5_topbar.up,
     down: migration_20260915_102919_z5_topbar.down,
-    name: '20260915_102919_z5_topbar'
+    name: '20260915_102919_z5_topbar',
+  },
+  {
+    up: migration_20260915_113107_z7_blog_slugs_redirects.up,
+    down: migration_20260915_113107_z7_blog_slugs_redirects.down,
+    name: '20260915_113107_z7_blog_slugs_redirects'
   },
 ];

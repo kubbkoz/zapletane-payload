@@ -11,7 +11,8 @@ import { Content } from '@/blocks/Content/config'
 import { FormBlock } from '@/blocks/Form/config'
 import { MediaBlock } from '@/blocks/MediaBlock/config'
 import { hero } from '@/fields/hero'
-import { slugField } from 'payload'
+import { slugField } from '@/fields/slug'
+import { createSlugRedirectHook } from '@/lib/redirects'
 import { adminOrPublishedStatus } from '@/access/adminOrPublishedStatus'
 import {
   MetaDescriptionField,
@@ -131,10 +132,13 @@ export const Pages: CollectionConfig = {
         },
       ],
     },
-    slugField(),
+    slugField({ retainLegacyCheckbox: true }),
   ],
   hooks: {
-    afterChange: [revalidatePage],
+    // Poradie je zámerné: najprv sa vyprázdni cache starej aj novej cesty,
+    // až potom vznikne presmerovanie — inak by si návštevník mohol vypýtať
+    // starú adresu skôr, než ju Next.js prestal považovať za platnú.
+    afterChange: [revalidatePage, createSlugRedirectHook('pages')],
     afterDelete: [revalidateDelete],
   },
   versions: {
