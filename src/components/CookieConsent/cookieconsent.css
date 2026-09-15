@@ -1,0 +1,190 @@
+/*
+ * ZAPLETANE skin for vanilla-cookieconsent v3.
+ *
+ * Imported *after* `vanilla-cookieconsent/dist/cookieconsent.css` in
+ * `index.client.tsx` — that order is what lets these rules win.
+ *
+ * Almost everything is done by redefining the plugin's own custom properties
+ * (the real names, read from the installed `dist/css-components/light-scheme.css`)
+ * on `#cc-main`, which is the plugin's single root element. Scoping them there
+ * instead of `:root` keeps the tokens out of the rest of the page, and still
+ * works because every consumer sits inside `#cc-main`.
+ *
+ * The plugin's dark scheme is opt-in (`.cc--darkmode`, never added here), so
+ * the modal is light-only — matching the storefront, which has no dark theme.
+ *
+ * Token source: `src/app/(app)/globals.css` (@theme). Values are inlined
+ * rather than referenced through `var(--color-*)` only where the plugin needs
+ * a colour it can also darken/blend; everything else uses the exact hex from
+ * the palette so a future token rename is a visible, greppable change.
+ */
+
+#cc-main {
+  /* Above the fixed mobile bottom bar (z-40) and the header/nav (z-50). The
+     plugin's default is 2147483647 — deliberately lowered so nothing in the
+     app can end up unreachable behind a dialog we control. */
+  --cc-z-index: 60;
+
+  /* DM Sans, inherited from the storefront's own token. */
+  --cc-font-family: var(--font-sans, 'DM Sans', system-ui, -apple-system, sans-serif);
+
+  /* Surfaces: white card on the espresso-tinted overlay, cream for the
+     grouped blocks. */
+  --cc-bg: #ffffff;
+  --cc-primary-color: #241917;
+  --cc-secondary-color: #5a423d;
+
+  /* Primary action = brand brown. */
+  --cc-btn-primary-bg: #755650;
+  --cc-btn-primary-color: #ffffff;
+  --cc-btn-primary-border-color: #755650;
+  --cc-btn-primary-hover-bg: #5a423d;
+  --cc-btn-primary-hover-color: #ffffff;
+  --cc-btn-primary-hover-border-color: #5a423d;
+
+  /* Secondary action = outlined, gray-300 border on white. */
+  --cc-btn-secondary-bg: #ffffff;
+  --cc-btn-secondary-color: #241917;
+  --cc-btn-secondary-border-color: #d3b7ae;
+  --cc-btn-secondary-hover-bg: #faf7f5;
+  --cc-btn-secondary-hover-color: #241917;
+  --cc-btn-secondary-hover-border-color: #bc9a92;
+
+  --cc-separator-border-color: #f2e9e5;
+
+  /* Toggles: brand when on, muted warm neutral when off, cream when locked. */
+  --cc-toggle-on-bg: #755650;
+  --cc-toggle-off-bg: #bc9a92;
+  --cc-toggle-on-knob-bg: #ffffff;
+  --cc-toggle-off-knob-bg: #ffffff;
+  --cc-toggle-enabled-icon-color: #ffffff;
+  --cc-toggle-disabled-icon-color: #ffffff;
+  --cc-toggle-readonly-bg: #e4d2cb;
+  --cc-toggle-readonly-knob-bg: #ffffff;
+  --cc-toggle-readonly-knob-icon-color: #e4d2cb;
+
+  /* Category blocks in the preferences dialog. */
+  --cc-cookie-category-block-bg: #faf7f5;
+  --cc-cookie-category-block-border: #f2e9e5;
+  --cc-cookie-category-block-hover-bg: #f2e9e5;
+  --cc-cookie-category-block-hover-border: #e4d2cb;
+  --cc-cookie-category-expanded-block-bg: transparent;
+  --cc-cookie-category-expanded-block-hover-bg: #e4d2cb;
+  --cc-section-category-border: #f2e9e5;
+
+  /* Espresso ink overlay (#241917) rather than neutral black. */
+  --cc-overlay-bg: rgba(36, 25, 23, 0.55);
+
+  --cc-webkit-scrollbar-bg: #e4d2cb;
+  --cc-webkit-scrollbar-hover-bg: #bc9a92;
+
+  --cc-footer-bg: #faf7f5;
+  --cc-footer-color: #5a423d;
+  --cc-footer-border-color: #f2e9e5;
+
+  --cc-link-color: #755650;
+
+  /* Shape: the storefront's near-square corners (rounded-default = 3px).
+     Never pill-shaped buttons. The toggle knob keeps its own pill radius —
+     it is a switch, not a button. */
+  --cc-modal-border-radius: 6px;
+  --cc-btn-border-radius: 3px;
+}
+
+/* Titles in Unbounded, like every other heading on the site. Unbounded has no
+   italic cut, so style is locked to normal exactly as in globals.css. */
+#cc-main .cm__title,
+#cc-main .pm__title {
+  font-family: var(--font-display, 'Unbounded Variable', 'Unbounded', sans-serif);
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+#cc-main .cm__desc,
+#cc-main .pm__section-desc {
+  line-height: 1.6;
+}
+
+/* Buttons read like the site's own CTAs: uppercase, wide tracking, square. */
+#cc-main .cm__btn,
+#cc-main .pm__btn {
+  font-size: 0.7em;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/*
+ * „Odmietnuť" / „Odmietnuť všetko" (data-role="necessary") is given the
+ * outlined treatment while „Prijať všetko" stays filled brand.
+ *
+ * `equalWeightButtons: true` in the config keeps the two buttons identical in
+ * size, position and number of clicks — which is what the GDPR requirement is
+ * about — while this makes the accept path the visually primary one, as
+ * briefed. The close "X" (also an accept-necessary control) matches.
+ */
+#cc-main .cm__btn[data-role='necessary'],
+#cc-main .pm__btn[data-role='necessary'] {
+  background: var(--cc-btn-secondary-bg);
+  border-color: var(--cc-btn-secondary-border-color);
+  color: var(--cc-btn-secondary-color);
+}
+
+#cc-main .cm__btn[data-role='necessary']:hover,
+#cc-main .pm__btn[data-role='necessary']:hover {
+  background: var(--cc-btn-secondary-hover-bg);
+  border-color: var(--cc-btn-secondary-hover-border-color);
+  color: var(--cc-btn-secondary-hover-color);
+}
+
+#cc-main .cm__btn--close {
+  background: transparent;
+  border-color: transparent;
+}
+
+#cc-main .cm__btn--close svg,
+#cc-main .cm__btn--close:hover svg {
+  stroke: #241917;
+}
+
+#cc-main .cm__btn--close:hover {
+  background: #faf7f5;
+}
+
+/* Section headers in the preferences dialog: site label typography. */
+#cc-main .pm__section-title {
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Soft brand-tinted shadow instead of the plugin's cool black one. */
+#cc-main .cm,
+#cc-main .pm {
+  box-shadow: 0 20px 50px rgba(36, 25, 23, 0.16);
+}
+
+/*
+ * Below `md` (48rem) a fixed 60px tab bar (+ home-indicator inset) owns the
+ * bottom of the screen. The banner has to sit above it — same offset the
+ * storefront uses for toasts and `.mobile-nav-offset`, plus 12px of air.
+ * From `md` up the plugin's own `--cc-modal-margin` applies unchanged.
+ */
+@media (max-width: 47.999rem) {
+  #cc-main .cm--bottom {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+
+  /* The preferences dialog goes full-screen under 640px and covers the bar
+     (z-60 over z-40), so only its footer needs the home-indicator inset. */
+  #cc-main .pm__footer {
+    padding-bottom: calc(0.9em + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

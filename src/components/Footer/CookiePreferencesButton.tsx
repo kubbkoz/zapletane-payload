@@ -2,16 +2,22 @@
 
 import React from 'react'
 
+import { OpenPreferencesButton } from '@/components/CookieConsent/OpenPreferencesButton'
+import { COOKIE_PREFERENCES_EVENT } from '@/components/CookieConsent/consent'
+
 /**
  * "Nastavenia cookies" in the footer's bottom bar.
  *
- * The Nuxt original called `$cc?.showPreferences()` (vanilla-cookieconsent),
- * which this port does not ship yet. Rather than render a dead control or drop
- * the row, the button dispatches a documented DOM event — whatever consent
- * layer lands later listens for it and opens its own preferences dialog, with
- * no change needed here.
+ * The Nuxt original called `$cc?.showPreferences()` (vanilla-cookieconsent);
+ * this now does the same thing through
+ * `src/components/CookieConsent/OpenPreferencesButton`, keeping the footer's
+ * own typography.
+ *
+ * The event constant is re-exported from its new home so the documented
+ * `window.dispatchEvent(new CustomEvent(COOKIE_PREFERENCES_EVENT))` contract
+ * (which the banner still listens for) keeps resolving from this path.
  */
-export const COOKIE_PREFERENCES_EVENT = 'zapletane:cookie-preferences'
+export { COOKIE_PREFERENCES_EVENT }
 
 type Props = {
   /** Editable in the `footer` global; defaults to the original label. */
@@ -20,14 +26,9 @@ type Props = {
 
 export function CookiePreferencesButton({ label = 'Nastavenia cookies' }: Props) {
   return (
-    <button
+    <OpenPreferencesButton
       className="cursor-pointer border-none bg-transparent p-0 text-[10px] font-normal uppercase tracking-wider text-white/55 transition-colors hover:text-white/80"
-      onClick={() => {
-        window.dispatchEvent(new CustomEvent(COOKIE_PREFERENCES_EVENT))
-      }}
-      type="button"
-    >
-      {label}
-    </button>
+      label={label}
+    />
   )
 }

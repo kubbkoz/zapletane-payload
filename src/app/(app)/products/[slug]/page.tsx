@@ -79,7 +79,9 @@ export async function generateMetadata({ params }: Args): Promise<Metadata> {
       },
       index: canIndex,
     },
-    title,
+    // `absolute`, lebo koreňový layout pridáva šablónu „%s | ZAPLETANE" a meta
+    // titulok značku už obsahuje — inak by v `<title>` bola dvakrát.
+    title: { absolute: title },
     twitter: {
       card: 'summary_large_image',
       description,
