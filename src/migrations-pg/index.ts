@@ -13,6 +13,8 @@ import * as migration_20260915_060000_x1_grants_and_search_defaults from './2026
 import * as migration_20260915_061452_x3_oauth_identity from './20260915_061452_x3_oauth_identity';
 import * as migration_20260915_070141_y1_product_data from './20260915_070141_y1_product_data';
 import * as migration_20260915_071500_y1_mcp_property_grants from './20260915_071500_y1_mcp_property_grants';
+import * as migration_20260915_072320_y2_feeds_tracking from './20260915_072320_y2_feeds_tracking';
+import * as migration_20260915_072600_y2_feed_grants from './20260915_072600_y2_feed_grants';
 
 export const migrations = [
   {
@@ -83,11 +85,21 @@ export const migrations = [
   {
     up: migration_20260915_070141_y1_product_data.up,
     down: migration_20260915_070141_y1_product_data.down,
-    name: '20260915_070141_y1_product_data'
+    name: '20260915_070141_y1_product_data',
   },
   {
     up: migration_20260915_071500_y1_mcp_property_grants.up,
     down: migration_20260915_071500_y1_mcp_property_grants.down,
     name: '20260915_071500_y1_mcp_property_grants',
+  },
+  {
+    up: migration_20260915_072320_y2_feeds_tracking.up,
+    down: migration_20260915_072320_y2_feeds_tracking.down,
+    name: '20260915_072320_y2_feeds_tracking'
+  },
+  {
+    up: migration_20260915_072600_y2_feed_grants.up,
+    down: migration_20260915_072600_y2_feed_grants.down,
+    name: '20260915_072600_y2_feed_grants',
   },
 ];

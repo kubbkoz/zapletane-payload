@@ -122,6 +122,9 @@ async function main() {
     // W2 — editable homepage content (hero, slogan, value cards, tabs, gift CTA).
     homepage: globalFullAccess,
     siteSettings: globalFullAccess,
+    // Y2 — produktové feedy (zapnutie feedov, predvolené hodnoty, mapovanie
+    // atribútov). Same find+update ceiling as every other global.
+    feedSettings: globalFullAccess,
   }
 
   // 3. Create, or rotate the existing dev key in place (idempotent re-runs).

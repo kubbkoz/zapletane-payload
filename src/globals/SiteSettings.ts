@@ -291,5 +291,44 @@ export const SiteSettings: GlobalConfig = {
         },
       ],
     },
+    // --- Marketing a meranie (Y2) -----------------------------------------
+    // A deliberate trust boundary. Whatever is stored here is parsed into real
+    // <script>/<noscript>/<meta>/<link> elements and rendered into every
+    // storefront page, so it can do anything a first-party script can do. The
+    // global's `update` access is `adminOnly` (see above) — that is the only
+    // thing standing between this field and stored XSS, and it must stay that
+    // way. See src/components/TrackingScripts for what is parsed and what is
+    // ignored.
+    {
+      name: 'marketing',
+      type: 'group',
+      label: 'Marketing a meranie',
+      admin: {
+        description:
+          'Kódy tretích strán (Meta Pixel, Google Tag Manager, Google Analytics, overenie vlastníctva domény). POZOR: obsah sa vloží do stránky doslovne a spustí sa v prehliadači každého návštevníka — vkladaj sem len kód z dôveryhodného zdroja. Polia smie meniť iba administrátor.',
+      },
+      fields: [
+        {
+          name: 'headScripts',
+          type: 'textarea',
+          label: 'Skripty v <head> — Meta Pixel, GTM, Google Analytics…',
+          admin: {
+            description:
+              'Vlož celý úryvok aj so značkami <script>…</script>. Spracujú sa značky <script>, <noscript>, <meta> a <link>; ostatný text sa ignoruje. Prázdne = nič sa nevkladá.',
+            rows: 10,
+          },
+        },
+        {
+          name: 'bodyStartScripts',
+          type: 'textarea',
+          label: 'Hneď za <body> — napr. GTM noscript',
+          admin: {
+            description:
+              'Druhá časť kódu Google Tag Managera (<noscript> s iframe) patrí sem. Spracujú sa rovnaké značky ako vyššie.',
+            rows: 6,
+          },
+        },
+      ],
+    },
   ],
 }

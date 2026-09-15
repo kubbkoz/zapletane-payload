@@ -4,6 +4,9 @@ import { MediaBlock } from '@/blocks/MediaBlock/config'
 import { slugField } from 'payload'
 import { generatePreviewPath } from '@/utilities/generatePreviewPath'
 import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
+import type { CollectionAfterChangeHook, CollectionAfterDeleteHook } from 'payload'
+
+import { revalidateFeedsTag } from '@/lib/feeds/cache'
 import {
   MetaDescriptionField,
   MetaImageField,
@@ -43,8 +46,34 @@ const excludeSelf: RelationshipField['filterOptions'] = ({ id }) => {
   }
 }
 
+/**
+ * Produktové feedy (Y2): every catalog write purges the rendered feeds, so
+ * `/feeds/*` is never more than one edit behind the shop.
+ *
+ * Fires for the admin UI, the REST/GraphQL API, MCP tool calls and any Local
+ * API write inside a request — and is a silent no-op where `revalidateTag`
+ * cannot run (seed script, migration, `payload` CLI), which the 1h cache
+ * ceiling in `getFeedPayload` covers.
+ */
+const revalidateFeedsOnChange: CollectionAfterChangeHook = ({ doc, req }) => {
+  if (!req.context.disableRevalidate) revalidateFeedsTag(req.payload)
+
+  return doc
+}
+
+const revalidateFeedsOnDelete: CollectionAfterDeleteHook = ({ doc, req }) => {
+  if (!req.context.disableRevalidate) revalidateFeedsTag(req.payload)
+
+  return doc
+}
+
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
+  hooks: {
+    ...defaultCollection?.hooks,
+    afterChange: [...(defaultCollection?.hooks?.afterChange ?? []), revalidateFeedsOnChange],
+    afterDelete: [...(defaultCollection?.hooks?.afterDelete ?? []), revalidateFeedsOnDelete],
+  },
   admin: {
     ...defaultCollection?.admin,
     defaultColumns: ['title', 'enableVariants', '_status', 'variants.variants'],

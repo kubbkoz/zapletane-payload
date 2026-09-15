@@ -146,12 +146,14 @@ export interface Config {
     footer: Footer;
     homepage: Homepage;
     'site-settings': SiteSetting;
+    'feed-settings': FeedSetting;
   };
   globalsSelect: {
     header: HeaderSelect<false> | HeaderSelect<true>;
     footer: FooterSelect<false> | FooterSelect<true>;
     homepage: HomepageSelect<false> | HomepageSelect<true>;
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    'feed-settings': FeedSettingsSelect<false> | FeedSettingsSelect<true>;
   };
   locale: null;
   widgets: {
@@ -1733,6 +1735,16 @@ export interface PayloadMcpApiKey {
      */
     update?: boolean | null;
   };
+  feedSettings?: {
+    /**
+     * Allow clients to find feed-settings global.
+     */
+    find?: boolean | null;
+    /**
+     * Allow clients to update feed-settings global.
+     */
+    update?: boolean | null;
+  };
   updatedAt: string;
   createdAt: string;
   enableAPIKey?: boolean | null;
@@ -2787,6 +2799,12 @@ export interface PayloadMcpApiKeysSelect<T extends boolean = true> {
         find?: T;
         update?: T;
       };
+  feedSettings?:
+    | T
+    | {
+        find?: T;
+        update?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   enableAPIKey?: T;
@@ -3134,6 +3152,109 @@ export interface SiteSetting {
      */
     variableSymbolNote?: string | null;
   };
+  /**
+   * Kódy tretích strán (Meta Pixel, Google Tag Manager, Google Analytics, overenie vlastníctva domény). POZOR: obsah sa vloží do stránky doslovne a spustí sa v prehliadači každého návštevníka — vkladaj sem len kód z dôveryhodného zdroja. Polia smie meniť iba administrátor.
+   */
+  marketing?: {
+    /**
+     * Vlož celý úryvok aj so značkami <script>…</script>. Spracujú sa značky <script>, <noscript>, <meta> a <link>; ostatný text sa ignoruje. Prázdne = nič sa nevkladá.
+     */
+    headScripts?: string | null;
+    /**
+     * Druhá časť kódu Google Tag Managera (<noscript> s iframe) patrí sem. Spracujú sa rovnaké značky ako vyššie.
+     */
+    bodyStartScripts?: string | null;
+  };
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * Nastavenia exportov katalógu pre Google Merchant Center a Meta (Facebook/Instagram) katalóg. Feedy: /feeds/google-merchant.xml, /feeds/meta-catalog.xml, /feeds/meta-catalog.csv. Aktualizujú sa automaticky pri každej zmene produktu (najneskôr do hodiny).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "feed-settings".
+ */
+export interface FeedSetting {
+  id: number;
+  /**
+   * VYPNUTÉ = všetky tri adresy feedov vrátia 404. Feed je verejný a bez hesla — obsahuje celý publikovaný katalóg s cenami, preto sa zapína vedome.
+   */
+  enabled?: boolean | null;
+  /**
+   * Hodnoty, ktoré sa do feedu zapíšu ku každému produktu rovnako. Značka a stav sú pre Google povinné.
+   */
+  defaults?: {
+    /**
+     * Povinný údaj pre Google Merchant Center.
+     */
+    brand?: string | null;
+    condition?: ('new' | 'refurbished' | 'used') | null;
+    /**
+     * ID alebo celá cesta z taxonómie Google, napr. „6552“ alebo „Home & Garden > Decor > Baskets“. Prázdne = atribút sa do feedu nezapíše a kategóriu si odvodí Google sám.
+     */
+    googleProductCategory?: string | null;
+    /**
+     * Napr. SK. Používa sa v atribúte g:shipping.
+     */
+    shippingCountry?: string | null;
+    /**
+     * Napr. 390 = 3,90 €. Prázdne = atribút g:shipping sa vôbec nezapíše a cenu dopravy si Google/Meta vypočíta z nastavení v ich rozhraní.
+     */
+    shippingPriceOverride?: number | null;
+  };
+  /**
+   * Určuje, čo sa zapíše do nepovinných atribútov feedu. Jeden riadok = jeden atribút. Ak produkt zdrojovú hodnotu nemá, atribút sa pre daný produkt jednoducho vynechá.
+   */
+  attributeMappings?:
+    | {
+        /**
+         * Názov poľa tak, ako ho očakáva Google/Meta.
+         */
+        feedAttribute:
+          | 'g:material'
+          | 'g:color'
+          | 'g:size'
+          | 'g:pattern'
+          | 'g:age_group'
+          | 'g:gender'
+          | 'g:custom_label_0'
+          | 'g:custom_label_1'
+          | 'g:custom_label_2'
+          | 'g:custom_label_3'
+          | 'g:custom_label_4'
+          | 'g:product_length'
+          | 'g:product_width'
+          | 'g:product_height'
+          | 'g:product_weight'
+          | 'g:mpn'
+          | 'g:gtin'
+          | 'custom';
+        /**
+         * Odkiaľ sa hodnota pre každý produkt načíta.
+         */
+        source:
+          | 'property'
+          | 'dimensions.width'
+          | 'dimensions.height'
+          | 'dimensions.depth'
+          | 'dimensions.weight'
+          | 'filterTags'
+          | 'static';
+        /**
+         * Napr. „g:size_type“. Zapíše sa presne takto, vrátane predpony g:. Povolené sú len písmená, číslice, dvojbodka a podtržník.
+         */
+        customAttribute?: string | null;
+        /**
+         * Napr. „Materiál“. Hodnota sa berie z produktu — z tabuľky vlastností na záložke „Vlastnosti“. Jednotka vlastnosti (ak je zadaná) sa pripojí za hodnotu.
+         */
+        property?: (number | null) | ProductProperty;
+        /**
+         * Zapíše sa ku každému produktu rovnaká, napr. „unisex“ alebo „adult“.
+         */
+        staticValue?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -3388,6 +3509,41 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         swift?: T;
         bankName?: T;
         variableSymbolNote?: T;
+      };
+  marketing?:
+    | T
+    | {
+        headScripts?: T;
+        bodyStartScripts?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "feed-settings_select".
+ */
+export interface FeedSettingsSelect<T extends boolean = true> {
+  enabled?: T;
+  defaults?:
+    | T
+    | {
+        brand?: T;
+        condition?: T;
+        googleProductCategory?: T;
+        shippingCountry?: T;
+        shippingPriceOverride?: T;
+      };
+  attributeMappings?:
+    | T
+    | {
+        feedAttribute?: T;
+        source?: T;
+        customAttribute?: T;
+        property?: T;
+        staticValue?: T;
+        id?: T;
       };
   updatedAt?: T;
   createdAt?: T;
