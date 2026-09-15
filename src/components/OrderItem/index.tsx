@@ -33,7 +33,8 @@ export const OrderItem: React.FC<Props> = ({ order }) => {
               dateTime={order.createdAt}
               className="font-sans text-xs font-medium text-gray-600"
             >
-              {formatDateTime({ date: order.createdAt, format: 'MMMM dd, yyyy' })}
+              {/* Numeric: date-fns formats month names in English by default. */}
+              {formatDateTime({ date: order.createdAt, format: 'd. M. yyyy' })}
             </time>
             {order.status && <OrderStatus status={order.status} />}
           </div>

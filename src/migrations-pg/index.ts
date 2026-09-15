@@ -16,6 +16,8 @@ import * as migration_20260915_071500_y1_mcp_property_grants from './20260915_07
 import * as migration_20260915_072320_y2_feeds_tracking from './20260915_072320_y2_feeds_tracking';
 import * as migration_20260915_072600_y2_feed_grants from './20260915_072600_y2_feed_grants';
 import * as migration_20260915_090322_z1_search_recommended from './20260915_090322_z1_search_recommended';
+import * as migration_20260915_101312_z2_address_kind from './20260915_101312_z2_address_kind';
+import * as migration_20260915_101404_z3_push_subscriptions from './20260915_101404_z3_push_subscriptions';
 
 export const migrations = [
   {
@@ -106,6 +108,16 @@ export const migrations = [
   {
     up: migration_20260915_090322_z1_search_recommended.up,
     down: migration_20260915_090322_z1_search_recommended.down,
-    name: '20260915_090322_z1_search_recommended'
+    name: '20260915_090322_z1_search_recommended',
+  },
+  {
+    up: migration_20260915_101312_z2_address_kind.up,
+    down: migration_20260915_101312_z2_address_kind.down,
+    name: '20260915_101312_z2_address_kind',
+  },
+  {
+    up: migration_20260915_101404_z3_push_subscriptions.up,
+    down: migration_20260915_101404_z3_push_subscriptions.down,
+    name: '20260915_101404_z3_push_subscriptions'
   },
 ];

@@ -1,20 +1,34 @@
 import type { Metadata } from 'next'
 
+import { AccountCard } from '@/components/account/AccountCard'
+import { getAccountAddresses } from '@/components/account/queries'
+import { AddressSlot } from '@/components/addresses/AddressSlot'
+import { UnassignedAddressCard } from '@/components/addresses/UnassignedAddressCard'
+import {
+  addressForKind,
+  addressKinds,
+  addressSlotMeta,
+  unassignedAddresses,
+  type AddressKind,
+} from '@/components/addresses/slots'
 import { mergeOpenGraph } from '@/utilities/mergeOpenGraph'
-import { headers as getHeaders } from 'next/headers.js'
 import configPromise from '@payload-config'
-import { Order } from '@/payload-types'
-import { getPayload } from 'payload'
+import { FileText, Truck } from 'lucide-react'
+import { headers as getHeaders } from 'next/headers.js'
 import { redirect } from 'next/navigation'
-import { AddressListing } from '@/components/addresses/AddressListing'
-import { CreateAddressModal } from '@/components/addresses/CreateAddressModal'
+import { getPayload } from 'payload'
+
+export const dynamic = 'force-dynamic'
+
+const slotIcons: Record<AddressKind, typeof FileText> = {
+  billing: FileText,
+  shipping: Truck,
+}
 
 export default async function AddressesPage() {
   const headers = await getHeaders()
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers })
-
-  let orders: Order[] | null = null
 
   if (!user) {
     redirect(
@@ -22,51 +36,51 @@ export default async function AddressesPage() {
     )
   }
 
-  try {
-    const ordersResult = await payload.find({
-      collection: 'orders',
-      limit: 5,
-      user,
-      overrideAccess: false,
-      pagination: false,
-      where: {
-        customer: {
-          equals: user?.id,
-        },
-      },
-    })
-
-    orders = ordersResult?.docs || []
-  } catch (error) {
-    // when deploying this template on Payload Cloud, this page needs to build before the APIs are live
-    // so swallow the error here and simply render the page with fallback data where necessary
-    // in production you may want to redirect to a 404  page or at least log the error somewhere
-    // console.error(error)
-  }
+  const addresses = await getAccountAddresses(user)
+  const unassigned = unassignedAddresses(addresses)
+  const takenKinds = addressKinds.filter((kind) => Boolean(addressForKind(addresses, kind)))
 
   return (
     <>
       <div>
         <p className="eyebrow">Môj účet</p>
-        <h1 className="section-h2 mt-3 text-[32px] sm:text-[38px]">Moje adresy</h1>
+        <h1 className="section-h2 mt-3 text-[28px] sm:text-[38px]">Moje adresy</h1>
+        <p className="mt-3 max-w-xl font-sans text-sm leading-relaxed text-gray-600">
+          Uložte si fakturačnú a dodaciu adresu — v pokladni ich potom stačí vybrať jedným klikom.
+        </p>
       </div>
 
-      <div className="rounded-default border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <h2 className="font-sans text-xl font-black uppercase tracking-wide text-black">
-            Uložené adresy
-          </h2>
-          <CreateAddressModal />
-        </div>
-
-        <AddressListing />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {addressKinds.map((kind) => (
+          <AccountCard
+            description={addressSlotMeta[kind].description}
+            icon={slotIcons[kind]}
+            key={kind}
+            title={addressSlotMeta[kind].label}
+          >
+            <AddressSlot address={addressForKind(addresses, kind)} kind={kind} />
+          </AccountCard>
+        ))}
       </div>
+
+      {unassigned.length > 0 && (
+        <AccountCard
+          description="Adresy uložené v pokladni, ktoré zatiaľ nepatria do žiadneho zo slotov vyššie."
+          title="Ostatné uložené adresy"
+        >
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            {unassigned.map((address) => (
+              <UnassignedAddressCard address={address} key={address.id} takenKinds={takenKinds} />
+            ))}
+          </div>
+        </AccountCard>
+      )}
     </>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'Spravujte doručovacie a fakturačné adresy vášho účtu.',
+  description: 'Spravujte fakturačnú a dodaciu adresu vášho účtu.',
   openGraph: mergeOpenGraph({
     title: 'Moje adresy',
     url: '/account/addresses',

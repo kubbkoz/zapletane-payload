@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
 
+import { countryLabels } from '@/components/addresses/slots'
 import { titles } from './constants'
 import { Button } from '@/components/ui/button'
 import { deepMergeSimple } from 'payload/shared'
@@ -63,7 +64,10 @@ export const AddressForm: React.FC<Props> = ({
     formState: { errors, isSubmitting },
     setValue,
   } = useForm<AddressFormValues>({
-    defaultValues: initialData,
+    // Slovak shop: SK is the default country, and it is seeded into the form
+    // *state* (not just the select's visible value) so an untouched select
+    // still submits a country instead of failing the required check.
+    defaultValues: { country: 'SK', ...initialData },
   })
 
   const { createAddress, updateAddress } = useAddresses()
@@ -161,7 +165,7 @@ export const AddressForm: React.FC<Props> = ({
 
           <FormItem className="sm:flex-1">
             <Label htmlFor="company" className={labelClassName}>
-              Spoločnosť
+              Firma (voliteľné)
             </Label>
             <Input
               id="company"
@@ -189,7 +193,7 @@ export const AddressForm: React.FC<Props> = ({
 
         <FormItem>
           <Label htmlFor="addressLine2" className={labelClassName}>
-            Doplňujúce údaje
+            Doplnok adresy
           </Label>
           <Input
             id="addressLine2"
@@ -255,7 +259,7 @@ export const AddressForm: React.FC<Props> = ({
               setValue('country', value, { shouldValidate: true })
             }}
             required
-            defaultValue={initialData?.country || ''}
+            defaultValue={initialData?.country || 'SK'}
           >
             <SelectTrigger id="country" className={selectTriggerClassName}>
               <SelectValue placeholder="Krajina" />
@@ -263,12 +267,15 @@ export const AddressForm: React.FC<Props> = ({
             <SelectContent>
               {supportedCountries.map((country) => {
                 const value = typeof country === 'string' ? country : country.value
-                const label =
+                // The plugin's country list is English-labelled — the codes a
+                // Slovak customer actually picks get a Slovak name.
+                const fallbackLabel =
                   typeof country === 'string'
                     ? country
                     : typeof country.label === 'string'
                       ? country.label
                       : value
+                const label = countryLabels[value] ?? fallbackLabel
 
                 return (
                   <SelectItem key={value} value={value}>

@@ -8,6 +8,8 @@ import * as migration_20260915_061505_x3_oauth_identity from './20260915_061505_
 import * as migration_20260915_070154_y1_product_data from './20260915_070154_y1_product_data';
 import * as migration_20260915_072334_y2_feeds_tracking from './20260915_072334_y2_feeds_tracking';
 import * as migration_20260915_090333_z1_search_recommended from './20260915_090333_z1_search_recommended';
+import * as migration_20260915_101321_z2_address_kind from './20260915_101321_z2_address_kind';
+import * as migration_20260915_101412_z3_push_subscriptions from './20260915_101412_z3_push_subscriptions';
 
 export const migrations = [
   {
@@ -58,6 +60,16 @@ export const migrations = [
   {
     up: migration_20260915_090333_z1_search_recommended.up,
     down: migration_20260915_090333_z1_search_recommended.down,
-    name: '20260915_090333_z1_search_recommended'
+    name: '20260915_090333_z1_search_recommended',
+  },
+  {
+    up: migration_20260915_101321_z2_address_kind.up,
+    down: migration_20260915_101321_z2_address_kind.down,
+    name: '20260915_101321_z2_address_kind',
+  },
+  {
+    up: migration_20260915_101412_z3_push_subscriptions.up,
+    down: migration_20260915_101412_z3_push_subscriptions.down,
+    name: '20260915_101412_z3_push_subscriptions'
   },
 ];

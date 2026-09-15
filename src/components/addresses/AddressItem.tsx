@@ -3,6 +3,7 @@
 import React from 'react'
 import type { Address } from '@/payload-types'
 import { CreateAddressModal } from '@/components/addresses/CreateAddressModal'
+import { countryLabel, formatPostalCode } from '@/components/addresses/slots'
 import { Edit2, MapPin, Phone, Tag } from 'lucide-react'
 
 type Props = {
@@ -64,10 +65,11 @@ export const AddressItem: React.FC<Props> = ({
         {address.addressLine1}
         {address.addressLine2 && <>, {address.addressLine2}</>}
         <br />
-        {address.city}
-        {address.state ? `, ${address.state}` : ''} {address.postalCode}
+        {/* Slovak address order: PSČ before the city. */}
+        {[formatPostalCode(address.postalCode), address.city].filter(Boolean).join(' ')}
+        {address.state ? `, ${address.state}` : ''}
         <br />
-        {address.country}
+        {countryLabel(address.country)}
       </p>
 
       {!hideActions && address.id && (

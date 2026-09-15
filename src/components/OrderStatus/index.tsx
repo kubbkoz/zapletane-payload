@@ -2,45 +2,59 @@ import { OrderStatus as StatusOptions } from '@/payload-types'
 import { cn } from '@/utilities/cn'
 
 type Props = {
-  status: StatusOptions
   className?: string
+  status: StatusOptions
 }
 
-/** Slovak label + ZAPLETANE status-pill tokens per order state (design.md §component anatomy). */
-const statusMeta: Record<
-  NonNullable<StatusOptions>,
-  { label: string; classes: string }
-> = {
-  processing: {
-    label: 'Spracováva sa',
-    classes: 'border-accent-200 bg-accent-50 text-accent-700',
-  },
-  completed: {
-    label: 'Doručená',
-    classes: 'border-success/30 bg-success-light text-success',
-  },
-  cancelled: {
-    label: 'Zrušená',
-    classes: 'border-error/30 bg-error-light text-error',
-  },
-  refunded: {
-    label: 'Vrátená',
-    classes: 'border-gray-200 bg-gray-100 text-gray-600',
-  },
-}
+/**
+ * Slovak label + tinted chip per order state.
+ *
+ * The four states are exactly the `orders.status` enum generated into
+ * payload-types (`processing | completed | cancelled | refunded`) — the plugin
+ * has no "shipped" state, so none is invented here. An unknown value still
+ * renders (gray chip, raw value) rather than disappearing.
+ *
+ * Styling follows the stock-badge recipe in `src/utilities/stockStatus.ts`:
+ * quiet solid tint + status dot, no outline, so an order status and a stock
+ * status read as the same family of signal.
+ */
+const statusMeta: Record<NonNullable<StatusOptions>, { chip: string; dot: string; label: string }> =
+  {
+    processing: {
+      chip: 'bg-brand-100 text-brand',
+      dot: 'bg-brand',
+      label: 'Spracováva sa',
+    },
+    completed: {
+      chip: 'bg-success-light text-success',
+      dot: 'bg-success',
+      label: 'Doručená',
+    },
+    cancelled: {
+      chip: 'bg-error-light text-error',
+      dot: 'bg-error',
+      label: 'Zrušená',
+    },
+    refunded: {
+      chip: 'bg-gray-100 text-gray-600',
+      dot: 'bg-gray-400',
+      label: 'Vrátená',
+    },
+  }
 
-export const OrderStatus: React.FC<Props> = ({ status, className }) => {
+export const OrderStatus: React.FC<Props> = ({ className, status }) => {
   const meta = status ? statusMeta[status] : undefined
 
   return (
-    <div
+    <span
       className={cn(
-        'w-fit rounded-default border px-3 py-1.5 font-sans text-[10px] font-bold uppercase tracking-widest',
-        meta?.classes ?? 'border-gray-200 bg-gray-100 text-gray-600',
+        'inline-flex w-fit items-center gap-2 rounded-default px-3 py-1.5 font-sans text-[10px] font-bold uppercase tracking-widest',
+        meta?.chip ?? 'bg-gray-100 text-gray-600',
         className,
       )}
     >
+      <span className={cn('size-1.5 shrink-0 rounded-full', meta?.dot ?? 'bg-gray-400')} />
       {meta?.label ?? status}
-    </div>
+    </span>
   )
 }

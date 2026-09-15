@@ -550,8 +550,20 @@ const seedContentGlobals = async (payload: Awaited<ReturnType<typeof getPayload>
   // X1 — the search multi-select lives in its own table and so starts empty on a
   // row saved before the field existed; the scalars carry SQL defaults.
   const needsSearchFields = !siteSettings?.search?.searchFields?.length
+  // Z1 — the mobile search overlay's empty state ("Odporúčané kategórie" /
+  // "Odporúčané produkty"). Only filled in when the editor has chosen nothing
+  // yet, so a local pick is never overwritten by a re-seed; an empty shop
+  // simply leaves both lists empty and the overlay shows its hint text.
+  const needsRecommended =
+    !siteSettings?.search?.recommendedProducts?.length &&
+    !siteSettings?.search?.recommendedCategories?.length
 
-  if (needsContact || needsSearchFields) {
+  const recommended = needsRecommended
+    ? await demoSearchRecommendations(payload)
+    : { categories: [], products: [] }
+  const hasRecommended = recommended.products.length > 0 || recommended.categories.length > 0
+
+  if (needsContact || needsSearchFields || hasRecommended) {
     await payload.updateGlobal({
       slug: 'site-settings',
       data: {
@@ -569,11 +581,203 @@ const seedContentGlobals = async (payload: Awaited<ReturnType<typeof getPayload>
           searchFields: siteSettings?.search?.searchFields?.length
             ? siteSettings.search.searchFields
             : ['title', 'description'],
+          ...(hasRecommended
+            ? {
+                recommendedCategories: recommended.categories,
+                recommendedProducts: recommended.products,
+              }
+            : {}),
         },
       },
     })
-    console.log('seeded site settings (contact details + search defaults)')
+    console.log(
+      hasRecommended
+        ? 'seeded site settings (contact details + search defaults + search recommendations)'
+        : 'seeded site settings (contact details + search defaults)',
+    )
   }
+}
+
+/**
+ * Picks what the search overlay recommends locally: the first few published
+ * products and the shop's categories. Reads whatever the database happens to
+ * hold (demo or real), so it works on a freshly seeded DB and on one someone
+ * has already played with.
+ */
+const demoSearchRecommendations = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+  const [products, categories] = await Promise.all([
+    payload.find({
+      collection: 'products',
+      depth: 0,
+      limit: 3,
+      pagination: false,
+      sort: 'title',
+      where: { _status: { equals: 'published' } },
+    }),
+    payload.find({ collection: 'categories', depth: 0, limit: 4, pagination: false }),
+  ])
+
+  return {
+    categories: categories.docs.map((doc) => doc.id),
+    products: products.docs.map((doc) => doc.id),
+  }
+}
+
+/**
+ * Demo customer for the account section (Z2).
+ *
+ * Gives /account, /account/addresses and /orders something real to render in
+ * local development: one customer, both address slots filled, two orders in
+ * different states. Fully idempotent — the user is looked up by e-mail, each
+ * address slot by `kind`, and the orders are only ever created when the demo
+ * customer has none, so a re-seed never duplicates or overwrites anything.
+ *
+ * Dev fixture only: the credentials are deliberately trivial and the e-mail
+ * uses the non-routable `.test` TLD.
+ */
+const DEMO_CUSTOMER = {
+  email: 'demo@zapletane.test',
+  name: 'Demo Zákazníčka',
+  password: 'demo1234',
+}
+
+const seedDemoCustomer = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+  const existingUsers = await payload.find({
+    collection: 'users',
+    limit: 1,
+    where: { email: { equals: DEMO_CUSTOMER.email } },
+  })
+
+  const customer =
+    existingUsers.docs[0] ??
+    (await payload.create({
+      collection: 'users',
+      data: {
+        email: DEMO_CUSTOMER.email,
+        name: DEMO_CUSTOMER.name,
+        password: DEMO_CUSTOMER.password,
+      },
+    }))
+
+  if (!existingUsers.docs[0]) {
+    console.log(`seeded demo customer: ${DEMO_CUSTOMER.email} / ${DEMO_CUSTOMER.password}`)
+  }
+
+  const addresses = [
+    {
+      city: 'Bratislava',
+      company: 'Zapletané s.r.o.',
+      country: 'SK' as const,
+      firstName: 'Demo',
+      kind: 'billing' as const,
+      lastName: 'Zákazníčka',
+      addressLine1: 'Hlavná 12',
+      phone: '+421 915 675 870',
+      postalCode: '83101',
+      title: 'Pani',
+    },
+    {
+      city: 'Žilina',
+      country: 'SK' as const,
+      firstName: 'Demo',
+      kind: 'shipping' as const,
+      lastName: 'Zákazníčka',
+      addressLine1: 'Kvetná 4',
+      addressLine2: '2. poschodie',
+      phone: '+421 915 675 870',
+      postalCode: '01001',
+      title: 'Pani',
+    },
+  ]
+
+  for (const address of addresses) {
+    const existing = await payload.find({
+      collection: 'addresses',
+      limit: 1,
+      where: {
+        and: [{ customer: { equals: customer.id } }, { kind: { equals: address.kind } }],
+      },
+    })
+
+    if (existing.totalDocs > 0) continue
+
+    await payload.create({
+      collection: 'addresses',
+      data: { ...address, customer: customer.id },
+    })
+    console.log(`seeded demo ${address.kind} address`)
+  }
+
+  const existingOrders = await payload.find({
+    collection: 'orders',
+    limit: 1,
+    where: { customer: { equals: customer.id } },
+  })
+
+  if (existingOrders.totalDocs > 0) return
+
+  const products = await payload.find({ collection: 'products', depth: 0, limit: 2 })
+  const [firstProduct, secondProduct] = products.docs
+
+  if (!firstProduct) {
+    console.log('no products yet — skipping demo orders')
+    return
+  }
+
+  const shippingAddress = {
+    city: 'Žilina',
+    country: 'SK' as const,
+    firstName: 'Demo',
+    lastName: 'Zákazníčka',
+    addressLine1: 'Kvetná 4',
+    phone: '+421 915 675 870',
+    postalCode: '01001',
+  }
+
+  // Amounts are in eurocents, exactly like the checkout writes them: the item
+  // subtotal plus the fees, minus the discount — so the order detail's
+  // breakdown adds up to the total it prints.
+  const priceOf = (product: (typeof products.docs)[number]) => product?.priceInEUR ?? 0
+  const firstPrice = priceOf(firstProduct)
+  const secondPrice = secondProduct ? priceOf(secondProduct) : 0
+
+  const demoOrders = [
+    {
+      amount: firstPrice + 450 + 150,
+      codFee: 150,
+      currency: 'EUR' as const,
+      customer: customer.id,
+      customerEmail: DEMO_CUSTOMER.email,
+      items: [{ product: firstProduct.id, quantity: 1 }],
+      paymentType: 'cod' as const,
+      shippingAddress,
+      shippingFee: 450,
+      status: 'processing' as const,
+    },
+    {
+      amount: firstPrice * 2 + secondPrice - 500,
+      codFee: 0,
+      currency: 'EUR' as const,
+      customer: customer.id,
+      customerEmail: DEMO_CUSTOMER.email,
+      discountAmount: 500,
+      discountCode: 'VITAJTE10',
+      items: [
+        { product: firstProduct.id, quantity: 2 },
+        ...(secondProduct ? [{ product: secondProduct.id, quantity: 1 }] : []),
+      ],
+      paymentType: 'bankTransfer' as const,
+      shippingAddress,
+      shippingFee: 0,
+      status: 'completed' as const,
+    },
+  ]
+
+  for (const data of demoOrders) {
+    await payload.create({ collection: 'orders', data })
+  }
+
+  console.log(`seeded ${demoOrders.length} demo orders for ${DEMO_CUSTOMER.email}`)
 }
 
 const run = async () => {
@@ -585,6 +789,7 @@ const run = async () => {
   await seedDiscountsAndFilters(payload)
   await seedProductPropertiesAndRelations(payload)
   await seedContentGlobals(payload)
+  await seedDemoCustomer(payload)
 
   await payload.destroy()
 }

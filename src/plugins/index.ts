@@ -118,6 +118,37 @@ export const plugins: Plugin[] = [
       isAdmin,
       isDocumentOwner,
     },
+    // --- Adresy: dva logické sloty (Z2) ------------------------------------
+    // The account section manages exactly two addresses per customer —
+    // „Fakturačná" and „Dodacia" — so the address needs to say which slot it
+    // belongs to. Added through `addressesCollectionOverride` (not
+    // `addressFields`) on purpose: `addressFields` would also stamp the field
+    // onto every embedded address group (orders.shippingAddress,
+    // transactions…), where the slot has no meaning and would only widen the
+    // schema. Empty value = an address saved before the field existed; the
+    // account UI lists those separately instead of losing them.
+    addresses: {
+      addressesCollectionOverride: ({ defaultCollection }) => ({
+        ...defaultCollection,
+        fields: [
+          ...defaultCollection.fields,
+          {
+            name: 'kind',
+            type: 'select',
+            index: true,
+            label: 'Typ adresy',
+            options: [
+              { label: 'Fakturačná', value: 'billing' },
+              { label: 'Dodacia', value: 'shipping' },
+            ],
+            admin: {
+              description:
+                'Slot, do ktorého adresa patrí v zákazníckom účte. Prázdne = adresa uložená pred zavedením slotov.',
+            },
+          },
+        ],
+      }),
+    },
     // Slovak storefront sells in euros. The plugin derives the price field
     // names from the currency code (priceInEUR), formats via Intl with the
     // EUR symbol, and Stripe intents are created in EUR.

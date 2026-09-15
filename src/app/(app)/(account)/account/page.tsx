@@ -1,23 +1,25 @@
 import type { Metadata } from 'next'
 
-import { Button } from '@/components/ui/button'
+import { AccountCard } from '@/components/account/AccountCard'
+import { AccountEmptyState } from '@/components/account/AccountEmptyState'
+import { AddressPreview } from '@/components/account/AddressPreview'
+import { OrderSummaryRow } from '@/components/account/OrderSummaryRow'
+import { getAccountAddresses, getAccountOrders } from '@/components/account/queries'
+import { addressForKind, addressKinds } from '@/components/addresses/slots'
 import { mergeOpenGraph } from '@/utilities/mergeOpenGraph'
-import { PackageSearch } from 'lucide-react'
-import Link from 'next/link'
-import { headers as getHeaders } from 'next/headers.js'
 import configPromise from '@payload-config'
-import { AccountForm } from '@/components/forms/AccountForm'
-import { Order } from '@/payload-types'
-import { OrderItem } from '@/components/OrderItem'
-import { getPayload } from 'payload'
+import { LogOut, MapPin, PackageSearch, RotateCcw, ShoppingBag, UserRound } from 'lucide-react'
+import { headers as getHeaders } from 'next/headers.js'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getPayload } from 'payload'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AccountPage() {
   const headers = await getHeaders()
   const payload = await getPayload({ config: configPromise })
   const { user } = await payload.auth({ headers })
-
-  let orders: Order[] | null = null
 
   if (!user) {
     redirect(
@@ -25,96 +27,124 @@ export default async function AccountPage() {
     )
   }
 
-  try {
-    const ordersResult = await payload.find({
-      collection: 'orders',
-      limit: 5,
-      user,
-      overrideAccess: false,
-      pagination: false,
-      where: {
-        customer: {
-          equals: user?.id,
-        },
-      },
-    })
-
-    orders = ordersResult?.docs || []
-  } catch (error) {
-    // when deploying this template on Payload Cloud, this page needs to build before the APIs are live
-    // so swallow the error here and simply render the page with fallback data where necessary
-    // in production you may want to redirect to a 404  page or at least log the error somewhere
-    // console.error(error)
-  }
+  const [addresses, orders] = await Promise.all([
+    getAccountAddresses(user),
+    getAccountOrders({ limit: 3, user }),
+  ])
 
   // `user` is a union of every auth-enabled collection (the MCP plugin adds its
-  // own API-key collection, which has no email), so both branches are narrowed.
-  const displayName =
-    user && 'name' in user && user.name
-      ? user.name
-      : user && 'email' in user
-        ? user.email
-        : undefined
+  // own API-key collection, which has no email), so both fields are narrowed.
+  const displayName = 'name' in user && user.name ? user.name : undefined
+  const email = 'email' in user && user.email ? user.email : undefined
 
   return (
     <>
       <div>
         <p className="eyebrow">Môj účet</p>
-        <h1 className="section-h2 mt-3 text-[32px] sm:text-[38px]">Nastavenia účtu</h1>
-        {displayName && (
-          <p className="mt-3 font-sans text-sm font-medium text-gray-600">
-            Vitajte späť, <span className="font-bold text-black">{displayName}</span>
-          </p>
-        )}
+        <h1 className="section-h2 mt-3 text-[28px] sm:text-[38px]">Prehľad účtu</h1>
+        <p className="mt-3 font-sans text-sm font-medium text-gray-600">
+          Vitajte späť
+          {displayName || email ? (
+            <>
+              , <span className="font-bold text-black">{displayName ?? email}</span>
+            </>
+          ) : null}
+          .
+        </p>
       </div>
 
-      <div className="rounded-default border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-        <h2 className="mb-6 font-sans text-xl font-black uppercase tracking-wide text-black">
-          Údaje účtu
-        </h2>
-        <AccountForm />
-      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <AccountCard
+          cta="Upraviť údaje a heslo"
+          description="Meno, e-mail a prihlasovacie heslo."
+          href="/account/settings"
+          icon={UserRound}
+          title="Moje údaje"
+        >
+          <dl className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-default border border-gray-100 bg-gray-50/60 px-4 py-3">
+              <dt className="font-sans text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                Meno
+              </dt>
+              <dd className="font-sans text-sm font-bold text-black">
+                {displayName ?? <span className="font-medium text-gray-400">Nevyplnené</span>}
+              </dd>
+            </div>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-default border border-gray-100 bg-gray-50/60 px-4 py-3">
+              <dt className="font-sans text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                E-mail
+              </dt>
+              <dd className="break-all font-sans text-sm font-bold text-black">{email ?? '—'}</dd>
+            </div>
+          </dl>
+        </AccountCard>
 
-      <div className="rounded-default border border-gray-100 bg-white p-6 shadow-sm md:p-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="font-sans text-xl font-black uppercase tracking-wide text-black">
-            Posledné objednávky
-          </h2>
-        </div>
-
-        {(!orders || !Array.isArray(orders) || orders?.length === 0) && (
-          <div className="flex flex-col items-center gap-3 rounded-default border border-gray-100 bg-gray-50 px-8 py-14 text-center">
-            <PackageSearch className="size-8 text-gray-300" strokeWidth={1.5} />
-            <p className="text-sm text-gray-400">Zatiaľ nemáte žiadne objednávky.</p>
+        <AccountCard
+          cta="Spravovať adresy"
+          description="Fakturačná a dodacia adresa pre rýchlejšiu pokladňu."
+          href="/account/addresses"
+          icon={MapPin}
+          title="Adresy"
+        >
+          <div className="flex flex-col gap-3">
+            {addressKinds.map((kind) => (
+              <AddressPreview address={addressForKind(addresses, kind)} key={kind} kind={kind} />
+            ))}
           </div>
-        )}
+        </AccountCard>
+      </div>
 
-        {orders && orders.length > 0 && (
-          <ul className="mb-8 flex flex-col gap-4">
-            {orders?.map((order, index) => (
+      <AccountCard
+        cta={orders.length > 0 ? 'Všetky objednávky' : undefined}
+        description="Posledné objednávky a ich stav."
+        href={orders.length > 0 ? '/orders' : undefined}
+        icon={PackageSearch}
+        title="Objednávky"
+      >
+        {orders.length === 0 ? (
+          <AccountEmptyState icon={PackageSearch} text="Zatiaľ nemáte žiadne objednávky.">
+            <Link
+              className="mt-1 inline-flex items-center gap-2 font-sans text-[11px] font-bold uppercase tracking-widest text-black transition-colors hover:text-brand"
+              href="/shop"
+            >
+              <ShoppingBag className="size-3.5" />
+              Prejsť do obchodu
+            </Link>
+          </AccountEmptyState>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {orders.map((order) => (
               <li key={order.id}>
-                <OrderItem order={order} />
+                <OrderSummaryRow order={order} />
               </li>
             ))}
           </ul>
         )}
+      </AccountCard>
 
-        {orders && orders.length > 0 && (
-          <Button
-            asChild
-            variant="outline"
-            className="rounded-default border-gray-200 text-[11px] font-bold uppercase tracking-widest hover:border-brand hover:text-brand"
-          >
-            <Link href="/orders">Zobraziť všetky objednávky</Link>
-          </Button>
-        )}
+      <AccountCard
+        cta="Ako postupovať"
+        description="Máte 14 dní na odstúpenie od zmluvy. Pozrite si postup pri reklamácii alebo vrátení tovaru."
+        href="/account/returns"
+        icon={RotateCcw}
+        title="Reklamácia / vrátenie tovaru"
+      />
+
+      <div className="flex justify-start">
+        <Link
+          className="inline-flex items-center gap-2 rounded-default border border-gray-200 bg-white px-5 py-3 font-sans text-[11px] font-bold uppercase tracking-widest text-gray-600 transition-colors hover:border-brand hover:text-brand"
+          href="/logout"
+        >
+          <LogOut className="size-4" />
+          Odhlásiť sa
+        </Link>
       </div>
     </>
   )
 }
 
 export const metadata: Metadata = {
-  description: 'Spravujte svoj zákaznícky účet v ZAPLETANE e-shope.',
+  description: 'Prehľad vášho zákazníckeho účtu v ZAPLETANE e-shope.',
   openGraph: mergeOpenGraph({
     title: 'Môj účet',
     url: '/account',

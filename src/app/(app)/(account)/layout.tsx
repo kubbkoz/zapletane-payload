@@ -17,7 +17,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <RenderParams className="mb-8" />
 
         <div className="flex flex-col items-start gap-8 lg:flex-row lg:gap-10">
-          {user && <AccountNav className="hidden w-full shrink-0 md:block md:w-72" />}
+          {/* Chip row below lg, sticky sidebar from lg — see AccountNav. */}
+          {user && <AccountNav className="min-w-0 shrink-0 lg:w-72" />}
 
           <div className="flex w-full min-w-0 grow flex-col gap-10">{children}</div>
         </div>
