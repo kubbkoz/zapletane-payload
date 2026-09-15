@@ -18,6 +18,13 @@
 - [x] W3 Custom filtre na /shop — HOTOVÉ, nasadené
 - [x] W4 Redizajn mobilného hamburger menu — HOTOVÉ, nasadené
 - [x] Finálna integrácia, build, push, deploy, Playwright verifikácia — HOTOVÉ
+- [x] Fáza 4 (X1–X4): shipping rules, zľavové kódy, search settings, dynamické
+      filtre, OAuth (Google/FB — čaká na klientske kľúče), admin SK + ikony —
+      HOTOVÉ, nasadené
+- [x] Fáza 5 (Y1–Y4): vlastnosti produktov + rozmery/hmotnosť + cross/upsell,
+      Google Merchant + Meta feedy s mapovaním atribútov, tracking scripty
+      (head/body), PDP/cart rendering, mobilný app-shell (bottom bar, hamburger
+      morph, bottom-sheet košík, fullscreen search) — HOTOVÉ, nasadené c0059dc
 
 ## Kľúčové fakty prostredia
 
@@ -247,10 +254,23 @@ zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.
       produktov = automatická aktualizácia; SiteSettings/marketing global:
       headScripts + bodyStartScripts textareas (Meta pixel, GTM) →
       injektované v (app) layoute (adminOnly update = trust boundary).
-- [ ] Y3 PDP/cart frontend (Sonnet, PO Y1, paralelne s Y2): tabuľka
-      vlastností + rozmery/hmotnosť na PDP, sekcia upsell na PDP,
-      cross-sell v košíkovom draweri, súvisiace produkty rendering.
-- [ ] Finále: build, push, deploy, screenshoty, update Stavu.
+- [x] Y3 PDP/cart frontend — HOTOVÉ (lokálne overené na PORT=3001):
+      ProductProperties tabuľka „Vlastnosti" (hodnota+jednotka, rozmery cm,
+      hmotnosť g / kg s čiarkou) na PDP; ProductRail „Mohlo by vás zaujať"
+      (upsell) + „Súvisiace produkty" (related, reuse ProductGridItem);
+      cross-sell „Doplňte k objednávke" v cart draweri cez /api/cross-sell
+      (local API, read access rešpektovaný, exclude položiek v košíku,
+      disabled pri inventory 0).
+- [x] Y4 Mobilný app-shell — HOTOVÉ, nasadené: fixná spodná lišta
+      (Domov/Telefón/E-mail/Hľadať/Účet/Košík s počítadlom, md:hidden,
+      bg-brand-50, 60px + safe-area, .mobile-nav-offset na obsahu),
+      HamburgerButton CSS morph čiary→X (transform/opacity only, zero-CLS,
+      44×44 hit area), cart drawer = bottom sheet na mobile (85dvh,
+      grabber) / right panel na desktope cez CartDrawerProvider,
+      MobileSearchOverlay fullscreen (portál do body, autofocus, Escape);
+      Sonner toasty pod md zdvihnuté nad lištu (globals.css).
+- [x] Finále fázy 5: build OK, push c0059dc, deploy + produkčná
+      verifikácia — pozri Stav hore.
 
 Pozn.: MCP API keys „miznutie" = default pluginu (restrictToOwnKeys +
 hidden kolekcia), nie strata dát — kľúče v DB sú.
