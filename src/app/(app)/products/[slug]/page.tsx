@@ -3,7 +3,8 @@ import type { Media, Product } from '@/payload-types'
 import { RenderBlocks } from '@/blocks/RenderBlocks'
 import { Gallery } from '@/components/product/Gallery'
 import { ProductDescription } from '@/components/product/ProductDescription'
-import { ProductGridItem } from '@/components/ProductGridItem'
+import { ProductProperties } from '@/components/products/ProductProperties'
+import { ProductRail } from '@/components/products/ProductRail'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { draftMode } from 'next/headers'
@@ -105,6 +106,9 @@ export default async function ProductPage({ params }: Args) {
     },
   }
 
+  const upsellProducts =
+    product.upsell?.filter((upsellProduct) => typeof upsellProduct === 'object') ?? []
+
   const relatedProducts =
     product.relatedProducts?.filter((relatedProduct) => typeof relatedProduct === 'object') ?? []
 
@@ -148,36 +152,26 @@ export default async function ProductPage({ params }: Args) {
         </div>
       </div>
 
+      <ProductProperties product={product} />
+
       {product.layout?.length ? <RenderBlocks blocks={product.layout} /> : <></>}
 
-      {relatedProducts.length ? (
-        <RelatedProducts products={relatedProducts as Product[]} />
-      ) : (
-        <></>
-      )}
+      <ProductRail
+        eyebrow="Odporúčame"
+        heading={
+          <>
+            Mohlo by vás <span className="text-brand">zaujať</span>
+          </>
+        }
+        products={upsellProducts as Product[]}
+      />
+
+      <ProductRail
+        eyebrow="Z tej istej dielne"
+        heading="Súvisiace produkty"
+        products={relatedProducts as Product[]}
+      />
     </React.Fragment>
-  )
-}
-
-function RelatedProducts({ products }: { products: Product[] }) {
-  if (!products.length) return null
-
-  return (
-    <section className="section-band border-t border-gray-100 bg-white">
-      <div className="container-editorial">
-        <p className="eyebrow">Z tej istej dielne</p>
-        <h2 className="section-h2 mt-4">
-          Mohlo by sa vám <span className="text-brand">páčiť</span>
-        </h2>
-        <div className="section-decorator mt-6" />
-
-        <div className="mt-10 grid grid-cols-2 gap-x-1 gap-y-8 md:gap-4 lg:grid-cols-4">
-          {products.map((product) => (
-            <ProductGridItem key={product.id} product={product} />
-          ))}
-        </div>
-      </div>
-    </section>
   )
 }
 

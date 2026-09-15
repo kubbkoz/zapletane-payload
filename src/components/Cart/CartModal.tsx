@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useMemo, useState } from 'react'
 
+import { CartCrossSell } from './CartCrossSell'
 import { useCartDrawer } from './CartDrawerProvider'
 import { DeleteItemButton } from './DeleteItemButton'
 import { EditItemQuantityButton } from './EditItemQuantityButton'
@@ -73,6 +74,15 @@ export function CartModal() {
   }, [cart])
 
   const isEmpty = !cart || !cart?.items?.length
+
+  const cartProductIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const item of cart?.items || []) {
+      const id = typeof item.product === 'object' ? item.product?.id : item.product
+      if (typeof id === 'number') ids.add(id)
+    }
+    return Array.from(ids)
+  }, [cart?.items])
 
   return (
     <Sheet onOpenChange={setIsOpen} open={isOpen}>
@@ -136,121 +146,128 @@ export function CartModal() {
         ) : (
           <React.Fragment>
             {/* `min-h-0` lets the list actually scroll inside the capped
-                bottom sheet (a flex child defaults to min-height:auto). */}
-            <ul className="min-h-0 grow overflow-y-auto px-6">
-              {cart?.items?.map((item, i) => {
-                const product = item.product
-                const variant = item.variant
+                bottom sheet (a flex child defaults to min-height:auto). The
+                cross-sell strip lives inside this same scroll container
+                (below the items) so it can never push the capped-height
+                sheet's footer off-screen. */}
+            <div className="min-h-0 grow overflow-y-auto">
+              <ul className="px-6">
+                {cart?.items?.map((item, i) => {
+                  const product = item.product
+                  const variant = item.variant
 
-                if (typeof product !== 'object' || !item || !product || !product.slug)
-                  return <React.Fragment key={i} />
+                  if (typeof product !== 'object' || !item || !product || !product.slug)
+                    return <React.Fragment key={i} />
 
-                const metaImage =
-                  product.meta?.image && typeof product.meta?.image === 'object'
-                    ? product.meta.image
-                    : undefined
+                  const metaImage =
+                    product.meta?.image && typeof product.meta?.image === 'object'
+                      ? product.meta.image
+                      : undefined
 
-                const firstGalleryImage =
-                  typeof product.gallery?.[0]?.image === 'object'
-                    ? product.gallery?.[0]?.image
-                    : undefined
+                  const firstGalleryImage =
+                    typeof product.gallery?.[0]?.image === 'object'
+                      ? product.gallery?.[0]?.image
+                      : undefined
 
-                let image = firstGalleryImage || metaImage
-                let price = product.priceInEUR
+                  let image = firstGalleryImage || metaImage
+                  let price = product.priceInEUR
 
-                const isVariant = Boolean(variant) && typeof variant === 'object'
+                  const isVariant = Boolean(variant) && typeof variant === 'object'
 
-                if (isVariant) {
-                  price = variant?.priceInEUR
+                  if (isVariant) {
+                    price = variant?.priceInEUR
 
-                  const imageVariant = product.gallery?.find((item: GalleryItem) => {
-                    if (!item.variantOption) return false
-                    const variantOptionID =
-                      typeof item.variantOption === 'object'
-                        ? item.variantOption.id
-                        : item.variantOption
+                    const imageVariant = product.gallery?.find((item: GalleryItem) => {
+                      if (!item.variantOption) return false
+                      const variantOptionID =
+                        typeof item.variantOption === 'object'
+                          ? item.variantOption.id
+                          : item.variantOption
 
-                    const hasMatch = variant?.options?.some((option: VariantOptionRef) => {
-                      if (typeof option === 'object') return option.id === variantOptionID
-                      else return option === variantOptionID
+                      const hasMatch = variant?.options?.some((option: VariantOptionRef) => {
+                        if (typeof option === 'object') return option.id === variantOptionID
+                        else return option === variantOptionID
+                      })
+
+                      return hasMatch
                     })
 
-                    return hasMatch
-                  })
-
-                  if (imageVariant && typeof imageVariant.image === 'object') {
-                    image = imageVariant.image
+                    if (imageVariant && typeof imageVariant.image === 'object') {
+                      image = imageVariant.image
+                    }
                   }
-                }
 
-                return (
-                  <li className="border-b border-gray-100 py-4 last:border-b-0" key={i}>
-                    <div className="flex gap-4">
-                      <Link
-                        className="relative h-24 w-20 shrink-0 overflow-hidden rounded-sm bg-gray-50"
-                        href={`/products/${(product as Product)?.slug}`}
-                      >
-                        {image?.url && (
-                          <Image
-                            alt={image?.alt || product?.title || ''}
-                            className="h-full w-full object-contain p-2 mix-blend-multiply"
-                            height={128}
-                            src={image.url}
-                            width={104}
-                          />
-                        )}
-                      </Link>
-
-                      <div className="flex min-w-0 grow flex-col">
-                        <div className="flex items-start justify-between gap-2">
-                          <Link
-                            className="line-clamp-2 font-sans text-[13px] font-medium leading-snug text-black transition-colors hover:text-brand"
-                            href={`/products/${(product as Product)?.slug}`}
-                          >
-                            {product?.title}
-                          </Link>
-                          <DeleteItemButton item={item} />
-                        </div>
-
-                        {isVariant && variant && typeof variant === 'object' ? (
-                          <div className="mt-1.5 flex flex-wrap gap-1">
-                            {variant.options?.map((option: VariantOptionRef, index: number) => {
-                              if (typeof option !== 'object') return null
-                              return (
-                                <span
-                                  className="inline-flex items-center rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 font-tech text-[10px] font-bold uppercase tracking-wider text-gray-600"
-                                  key={index}
-                                >
-                                  {option.label}
-                                </span>
-                              )
-                            })}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-                          <div className="flex h-11 items-center rounded-default border border-gray-200">
-                            <EditItemQuantityButton item={item} type="minus" />
-                            <span className="w-8 text-center font-tech text-sm font-bold text-black">
-                              {item.quantity}
-                            </span>
-                            <EditItemQuantityButton item={item} type="plus" />
-                          </div>
-
-                          {typeof price === 'number' && (
-                            <Price
-                              amount={price * (item.quantity || 1)}
-                              as="span"
-                              className="font-tech text-base font-bold leading-none text-black"
+                  return (
+                    <li className="border-b border-gray-100 py-4 last:border-b-0" key={i}>
+                      <div className="flex gap-4">
+                        <Link
+                          className="relative h-24 w-20 shrink-0 overflow-hidden rounded-sm bg-gray-50"
+                          href={`/products/${(product as Product)?.slug}`}
+                        >
+                          {image?.url && (
+                            <Image
+                              alt={image?.alt || product?.title || ''}
+                              className="h-full w-full object-contain p-2 mix-blend-multiply"
+                              height={128}
+                              src={image.url}
+                              width={104}
                             />
                           )}
+                        </Link>
+
+                        <div className="flex min-w-0 grow flex-col">
+                          <div className="flex items-start justify-between gap-2">
+                            <Link
+                              className="line-clamp-2 font-sans text-[13px] font-medium leading-snug text-black transition-colors hover:text-brand"
+                              href={`/products/${(product as Product)?.slug}`}
+                            >
+                              {product?.title}
+                            </Link>
+                            <DeleteItemButton item={item} />
+                          </div>
+
+                          {isVariant && variant && typeof variant === 'object' ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {variant.options?.map((option: VariantOptionRef, index: number) => {
+                                if (typeof option !== 'object') return null
+                                return (
+                                  <span
+                                    className="inline-flex items-center rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 font-tech text-[10px] font-bold uppercase tracking-wider text-gray-600"
+                                    key={index}
+                                  >
+                                    {option.label}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          ) : null}
+
+                          <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+                            <div className="flex h-11 items-center rounded-default border border-gray-200">
+                              <EditItemQuantityButton item={item} type="minus" />
+                              <span className="w-8 text-center font-tech text-sm font-bold text-black">
+                                {item.quantity}
+                              </span>
+                              <EditItemQuantityButton item={item} type="plus" />
+                            </div>
+
+                            {typeof price === 'number' && (
+                              <Price
+                                amount={price * (item.quantity || 1)}
+                                as="span"
+                                className="font-tech text-base font-bold leading-none text-black"
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              <CartCrossSell productIds={cartProductIds} />
+            </div>
 
             <div
               className={cn(
