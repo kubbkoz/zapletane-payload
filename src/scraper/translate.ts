@@ -451,6 +451,12 @@ export const translateBatch = async (
   return { items: out, usage }
 }
 
+export type CategoryTranslation = {
+  /** Prečo sa nepreložilo; `null` = prešlo. Ide do logu úlohy. */
+  failure: null | string
+  names: string[]
+}
+
 /**
  * Preklad zoznamu názvov kategórií — JEDNO volanie na celý zoznam (Z14).
  *
@@ -460,19 +466,24 @@ export const translateBatch = async (
  * odpovede sa zmestí bez problémov.
  *
  * Nikdy nehádže výnimku: pri akomkoľvek probléme vráti pôvodné názvy, takže
- * majiteľka uvidí v admine aspoň poľský zoznam a môže si vyberať z neho.
+ * majiteľka uvidí v admine aspoň poľský zoznam a môže si vyberať z neho. Dôvod
+ * ale vracia so sebou — nepreložený zoznam a zoznam, ktorý bol po slovensky už
+ * v zdroji, vyzerajú inak úplne rovnako a bez tejto stopy by sa tichá chyba
+ * (vypršaný kredit, 429 z API) nedala od seba odlíšiť.
  */
 export const translateCategoryNames = async (
   names: string[],
   fromLang: null | string,
-): Promise<string[]> => {
+): Promise<CategoryTranslation> => {
   const clean = names.map((name) => name.trim())
 
-  if (!clean.length || fromLang === 'sk') return clean
+  if (!clean.length || fromLang === 'sk') return { failure: null, names: clean }
 
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
 
-  if (!apiKey) return clean
+  if (!apiKey) {
+    return { failure: 'Chýba ANTHROPIC_API_KEY — názvy kategórií ostávajú v pôvodnom jazyku.', names: clean }
+  }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
@@ -507,16 +518,32 @@ export const translateCategoryNames = async (
       signal: controller.signal,
     })
 
-    if (!response.ok) return clean
+    if (!response.ok) {
+      return { failure: `Preklad kategórií: API odpovedalo ${response.status}.`, names: clean }
+    }
 
-    const parsed = extractJson(responseText(await response.json()))
+    const payload = (await response.json()) as { stop_reason?: string }
+    const raw = responseText(payload)
+    const parsed = extractJson(raw)
     const translated = asStringArray(parsed?.names)
 
     // Keď sa počet nezhoduje, nedá sa spoľahlivo spárovať, ktorý názov patrí
     // ku ktorej adrese — radšej celý zoznam nepreložený než pomiešaný.
-    return translated.length === clean.length ? translated : clean
-  } catch {
-    return clean
+    if (translated.length !== clean.length) {
+      return {
+        failure: `Preklad kategórií: odpoveď sa nedala prečítať (stop_reason=${
+          payload.stop_reason ?? '?'
+        }, ${translated.length} z ${clean.length} názvov): ${raw.slice(0, 200).replace(/\s+/g, ' ')}`,
+        names: clean,
+      }
+    }
+
+    return { failure: null, names: translated }
+  } catch (error) {
+    return {
+      failure: `Preklad kategórií zlyhal: ${error instanceof Error ? error.message : String(error)}`,
+      names: clean,
+    }
   } finally {
     clearTimeout(timer)
   }

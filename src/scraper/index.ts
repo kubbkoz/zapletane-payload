@@ -49,7 +49,12 @@ export {
   uppercaseRatio,
   UPPERCASE_RATIO_THRESHOLD,
 } from './titleCase'
-export { translateBatch, translateCategoryNames, TRANSLATION_CHUNK_SIZE } from './translate'
+export {
+  translateBatch,
+  translateCategoryNames,
+  TRANSLATION_CHUNK_SIZE,
+  type CategoryTranslation,
+} from './translate'
 export type {
   CategoryMapEntry,
   PreparedProduct,

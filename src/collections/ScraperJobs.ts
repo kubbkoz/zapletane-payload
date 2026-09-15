@@ -285,8 +285,11 @@ export const ScraperJobs: CollectionConfig = {
       admin: { hidden: true },
     },
     {
-      // Kedy dobehla posledná dávka. Podľa toho sa pozná padnutá reťaz:
-      // stav „importuje sa" + starý tep = nikto na úlohe nerobí.
+      // Kedy sa úloha naposledy ozvala — zapisuje sa na začiatku dávky aj po
+      // jej dobehnutí. Podľa toho sa pozná padnutá reťaz: stav „importuje sa"
+      // + starý tep = nikto na úlohe nerobí. Zápis na ZAČIATKU je tam aj
+      // preto, že dávka trvá desiatky sekúnd a bez neho by sa počas nej dalo
+      // omylom rozbehnúť druhé reťazenie.
       name: 'heartbeatAt',
       type: 'date',
       label: 'Posledná dávka',

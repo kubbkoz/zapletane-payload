@@ -251,10 +251,12 @@ export async function POST(request: Request): Promise<Response> {
         return json({ categories: [], ok: true, status: job.status })
       }
 
-      const translatedNames = await translateCategoryNames(
+      const translation = await translateCategoryNames(
         categories.map((category) => category.name),
         detectedLanguage,
       )
+
+      if (translation.failure) logLines.push(translation.failure)
 
       // Výber, ktorý už majiteľka spravila, sa pri opätovnom načítaní
       // NESMIE stratiť — spáruje sa podľa adresy.
@@ -264,11 +266,13 @@ export async function POST(request: Request): Promise<Response> {
         name: category.name,
         productCountEstimate: category.productCountEstimate,
         selected: previous.get(category.url) ?? false,
-        translatedName: translatedNames[index] || category.name,
+        translatedName: translation.names[index] || category.name,
         url: category.url,
       }))
 
-      logLines.push(`Načítaných ${nextMap.length} kategórií, názvy preložené.`)
+      logLines.push(
+        `Načítaných ${nextMap.length} kategórií${translation.failure ? '' : ', názvy preložené'}.`,
+      )
 
       await payload.update({
         collection: 'scraper-jobs',
@@ -333,6 +337,16 @@ export async function POST(request: Request): Promise<Response> {
       // istej fronte. Úloha už beží — netreba robiť nič.
       return json({ alreadyRunning: true, counters, ok: true, status: 'importing' })
     }
+
+    // Úloha sa označí za bežiacu HNEĎ, nie až po dobehnutí dávky. Bez toho by
+    // medzi kliknutím a koncom prvej dávky (desiatky sekúnd) prešla kontrola
+    // vyššie aj druhému kliknutiu a na tej istej fronte by bežali dve reťaze.
+    await payload.update({
+      collection: 'scraper-jobs',
+      id: jobId,
+      data: { heartbeatAt: new Date().toISOString(), status: 'importing' },
+      overrideAccess: true,
+    })
   }
 
   /**
