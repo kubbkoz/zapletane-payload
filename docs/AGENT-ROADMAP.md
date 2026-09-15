@@ -21,6 +21,26 @@
 - [x] Fáza 4 (X1–X4): shipping rules, zľavové kódy, search settings, dynamické
       filtre, OAuth (Google/FB — čaká na klientske kľúče), admin SK + ikony —
       HOTOVÉ, nasadené
+- [x] Fáza 7 (Z10–Z15) — HOTOVÉ, nasadené (96b1401): Z10 wishlist len pre
+      prihlásených (login modal, zdieľanie cez capability URL
+      /wishlist/zdielane/<token>, účet + navbar heart, users.wishlist +
+      wishlistShareToken, z10), košík so sumou bez podčiarknutia, card CTA
+      add-to-cart/šípka (enableVariants), kompaktný header 1024–1599;
+      Z11 hero+header = presne 100dvh na malých desktopoch
+      (--navbar-height-full, large-desktop variant, fix 67px overflow);
+      Z12 scraper v1 (engine, admin Importy z webu, e2e wiklinowa-wies.pl,
+      z12 + granty); z13 zjednotenie MCP grantov na všetkých kľúčoch (tool
+      listing sa filtruje per kľúč!); Z14 scraper v2 (výber kategórií s
+      prekladom, background reťaz cez after() + SCRAPER_INTERNAL_TOKEN +
+      denný tick cron, sentence-case názvy titleCase.ts, preklady
+      claude-sonnet-5 + glosár, dedupe aj podľa slugu/názvu, z14 — nesie aj
+      posts.ai_prompt pre Z15, NEMAZAŤ!); Z15 AI články (persona Janka,
+      anti-slop gate, /api/posts/generate, len koncepty, bez vlastnej
+      migrácie — stĺpec je v z14). Infra: Coming soon fix (full route cache
+      — revalidatePath('/','layout') pri uložení SiteSettings + tlačidlo
+      „Vymazať cache webu" + /api/admin/purge-cache); Vercel env navyše:
+      SCRAPER_INTERNAL_TOKEN, CRON_SECRET. Prod job id 3 (wiklinowa,
+      status new) čaká na výber kategórií a spustenie majiteľom.
 - [x] Fáza 6 (Z1–Z9) — HOTOVÉ, nasadené (482c2a1): Z1 search overlay (blur,
       centrovaný input, live results, odporúčané produkty/kategórie v search
       settings); Z2 kompletný účet (adresy fakturačná/dodacia cez kind,
