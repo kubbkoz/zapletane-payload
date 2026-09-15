@@ -224,3 +224,30 @@ Payload `getSafeRedirect` (same-origin only).
 nevykreslia a route odmietne. Callback URI do konzol:
 `<NEXT_PUBLIC_SERVER_URL>/api/oauth/<provider>/callback`. Reálne credentials
 zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.
+
+## Fáza 5 (2026-09-15)
+
+- [ ] Y1 Produktové dáta (Opus, schéma solo): kolekcia product-properties
+      („Vlastnosti", admin group Ecommerce — názov + voliteľné predvolené
+      hodnoty); na produkte array properties [{property rel, value}],
+      group dimensions (šírka/výška/hĺbka cm) + weight (g); relationships
+      crossSell + upsell (relatedProducts už existuje). Fix viditeľnosti
+      MCP API keys kolekcie (overrideApiKeyCollection — admini vidia
+      všetky kľúče, kolekcia viditeľná v nav). Migrácie, MCP grants,
+      seed, typy.
+- [ ] Y2 Feedy + tracking (Opus, schéma solo, PO Y1): global feed-settings
+      (enable, brand default, google_product_category, condition default,
+      array mapovania: feedAttribute → zdroj [vlastnosť|pole|statická
+      hodnota]); route handlery /feeds/google-merchant.xml (RSS 2.0 g:
+      namespace) + /feeds/meta-catalog.xml a .csv (Meta akceptuje aj
+      google formát); unstable_cache + revalidateTag pri afterChange
+      produktov = automatická aktualizácia; SiteSettings/marketing global:
+      headScripts + bodyStartScripts textareas (Meta pixel, GTM) →
+      injektované v (app) layoute (adminOnly update = trust boundary).
+- [ ] Y3 PDP/cart frontend (Sonnet, PO Y1, paralelne s Y2): tabuľka
+      vlastností + rozmery/hmotnosť na PDP, sekcia upsell na PDP,
+      cross-sell v košíkovom draweri, súvisiace produkty rendering.
+- [ ] Finále: build, push, deploy, screenshoty, update Stavu.
+
+Pozn.: MCP API keys „miznutie" = default pluginu (restrictToOwnKeys +
+hidden kolekcia), nie strata dát — kľúče v DB sú.
