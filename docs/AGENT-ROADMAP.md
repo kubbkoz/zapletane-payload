@@ -227,7 +227,8 @@ zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.
 
 ## Fáza 5 (2026-09-15)
 
-- [ ] Y1 Produktové dáta (Opus, schéma solo): kolekcia product-properties
+- [x] Y1 Produktové dáta — HOTOVÉ (lokálne overené; build/push robí manažér):
+      kolekcia product-properties
       („Vlastnosti", admin group Ecommerce — názov + voliteľné predvolené
       hodnoty); na produkte array properties [{property rel, value}],
       group dimensions (šírka/výška/hĺbka cm) + weight (g); relationships
@@ -251,6 +252,63 @@ zatiaľ neexistujú, takže celý round-trip s poskytovateľom je neoverený.
 
 Pozn.: MCP API keys „miznutie" = default pluginu (restrictToOwnKeys +
 hidden kolekcia), nie strata dát — kľúče v DB sú.
+
+### Y1 — výsledok
+
+**Nová kolekcia `product-properties`** (`src/collections/ProductProperties.ts`,
+labels „Vlastnosti"/„Vlastnosť", group Ecommerce, useAsTitle `name`,
+defaultSort `sortOrder`): `name` (required, unique), `slug` (required, unique,
+beforeValidate hook = kebab + odstránenie diakritiky; prázdny sa doplní z
+`name`), `unit` (voliteľná, napr. „cm"), `predefinedValues` array `[{value}]`
+(len návrhy — nič sa nevaliduje voči nim), `sortOrder`. Access: `read` verejný
+(PDP je server component aj pre hostí), create/update/delete `adminOnly`.
+
+**Produkt** (`src/collections/Products/index.ts`): nová záložka „Vlastnosti" s
+poľom `properties` array `[{ property → product-properties (required), value
+text (required) }]` a groupom `dimensions` („Rozmery a hmotnosť") s
+`width/height/depth` (cm) **a `weight` (g) vnútri toho istého groupu** →
+v JSON-e `dimensions.weight`, nie top-level `weight`. V záložke „Product
+Details" pribudli `crossSell` („Doplnkové produkty (cross-sell)", košík) a
+`upsell` („Upsell produkty", PDP); `relatedProducts` ostal a dostal slovenský
+label „Súvisiace produkty". Všetky tri používajú spoločný `excludeSelf`
+filterOptions (produkt sa neponúka sám sebe; pri seede, keď `id` ešte nie je,
+degraduje na „ľubovoľný existujúci produkt").
+
+**MCP API kľúče viditeľné:** `mcpPlugin({ overrideApiKeyCollection })`
+v `src/plugins/index.ts` prepisuje access kolekcie `payload-mcp-api-keys`
+z pluginového `restrictToOwnKeys` na `isAdmin` pre create/read/update/delete/
+unlock, pridáva `admin.hidden: false`, slovenské labely („MCP API kľúče") a
+defaultColumns. Pre admina je to rozšírenie (vidí a spravuje VŠETKY kľúče,
+nielen vlastné), pre zákazníka zúženie (403 namiesto vlastných kľúčov).
+Zámerne NEZMENENÉ: `user` pole má v plugine `access.create/update = false`,
+takže kľúč sa nedá prepojiť na iného používateľa ani adminom — nový kľúč patrí
+tomu, kto ho vytvorí. Existujúce dokumenty kľúčov sa nerotovali.
+
+**Migrácie (aditívne):** `src/migrations-pg/20260915_070141_y1_product_data.*`
+(+ sqlite dvojička `src/migrations/20260915_070154_y1_product_data.*`) —
+tabuľky `product_properties`, `product_properties_predefined_values`,
+`products_properties`, `_products_v_version_properties`, stĺpce
+`products.dimensions_*` (+ verzie) a checkboxy
+`payload_mcp_api_keys.product_properties_*`. `crossSell`/`upsell` nepotrebujú
+DDL — idú do existujúcej `products_rels` (rozlišuje ich stĺpec `path`).
+Dátová migrácia `src/migrations-pg/20260915_071500_y1_mcp_property_grants.ts`
+zapne `productProperties` CRUD na „Production MCP key" (vzor
+`20260915_060000_x1_grants_and_search_defaults`); lokálny kľúč rieši
+`scripts/mint-mcp-key.ts` (`productProperties: fullCrud`).
+
+**Seed** (`scripts/seed-dev.ts`, `seedProductPropertiesAndRelations`):
+vlastnosti Materiál (predvolené vlna/bavlna/prútie) a Farba, hodnoty na oboch
+demo produktoch (kôš: prútie/ružová, deka: vlna/béžová), rozmery + hmotnosť na
+oboch, `deka.upsell = [kôš]` a `kôš.crossSell = [deka]`. Idempotentné a
+nedeštruktívne — dopĺňa len to, čo je prázdne.
+
+**Pre Y3 (PDP/košík):** `properties[].property` je vzťah, pri `depth >= 1` sa
+populuje celý dokument vlastnosti (`name`, `slug`, `unit`, `predefinedValues`),
+hodnota je `properties[].value` (string). `dimensions` je plochý objekt
+(`width/height/depth` cm, `weight` g; chýbajúce = `null`). `crossSell`/`upsell`
+sú polia vzťahov na `products` — pri `depth >= 1` sa vracia len podmnožina z
+`defaultPopulate` produktu (title, slug, gallery, priceInEUR, inventory,
+enableVariants, variants, meta), čo na kartu stačí; pri `depth: 0` sú to len ID.
 
 - [ ] Y4 Mobilný app-like shell (Opus, frontend-only, paralelne s Y1;
       Y3 až PO Y4 — kolízia na Cart komponentoch): statická horná lišta
