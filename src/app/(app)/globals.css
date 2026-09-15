@@ -655,3 +655,33 @@ button {
     bottom: calc(76px + env(safe-area-inset-bottom)) !important;
   }
 }
+
+/* ============================================================================
+   Appended by the topbar content-modes pass — new class + keyframes only,
+   nothing above is modified.
+   ============================================================================ */
+@layer components {
+  /* TopBar marquee mode (Header global topBar.mode = 'marquee') — a flex
+     track sized to its own content (`width: max-content`) holding two
+     identical copies of the text (see TopBar.tsx). Animating exactly -50%
+     therefore travels one copy-width, so the second copy lands exactly where
+     the first started — a seamless loop with no visible seam or jump.
+     Duration is set per-row via the --topbar-marquee-duration custom
+     property (slow/normal/fast ≈ 45s/30s/18s); hover-pause and the
+     reduced-motion override live on the element as Tailwind utilities
+     (utilities layer beats this components-layer rule, so they need no
+     `!important` here). */
+  .topbar-marquee {
+    display: flex;
+    width: max-content;
+    animation: topbar-marquee-scroll var(--topbar-marquee-duration, 30s) linear infinite;
+  }
+  @keyframes topbar-marquee-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}

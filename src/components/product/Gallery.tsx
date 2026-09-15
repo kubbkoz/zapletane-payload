@@ -11,6 +11,11 @@ import { Carousel, CarouselApi, CarouselContent, CarouselItem } from '@/componen
 import { DefaultDocumentIDType } from 'payload'
 
 type Props = {
+  /**
+   * Náhradný popis obrázka, keď ho médium samo nemá — na PDP sa posiela názov
+   * produktu, aby fotka nikdy nezostala bez `alt` (prístupnosť aj SEO).
+   */
+  alt?: string
   gallery: NonNullable<Product['gallery']>
 }
 
@@ -23,7 +28,7 @@ type Props = {
  *
  * Variant→image syncing logic below is unchanged from the template.
  */
-export const Gallery: React.FC<Props> = ({ gallery }) => {
+export const Gallery: React.FC<Props> = ({ alt, gallery }) => {
   const searchParams = useSearchParams()
   const [current, setCurrent] = React.useState(0)
   const [api, setApi] = React.useState<CarouselApi>()
@@ -63,6 +68,7 @@ export const Gallery: React.FC<Props> = ({ gallery }) => {
       <div className="relative mb-4 w-full overflow-hidden rounded-sm bg-gray-50">
         <div className="relative aspect-[4/5] w-full">
           <Media
+            alt={alt}
             className="h-full w-full"
             imgClassName="h-full w-full object-contain p-6 mix-blend-multiply"
             priority
@@ -94,6 +100,7 @@ export const Gallery: React.FC<Props> = ({ gallery }) => {
                     type="button"
                   >
                     <Media
+                      alt={alt ? `${alt} — foto ${i + 1}` : undefined}
                       className="h-full w-full"
                       imgClassName="h-full w-full object-contain p-2 mix-blend-multiply"
                       resource={item.image}

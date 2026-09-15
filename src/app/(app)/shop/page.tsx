@@ -10,6 +10,9 @@ import {
 import { Pagination } from '@/components/shop-filters/Pagination'
 import { buildProductSearchClauses, resolveSearchConfig } from '@/lib/search'
 import { getSiteSettings } from '@/utilities/getSiteSettings'
+import { getServerSideURL } from '@/utilities/getURL'
+import { JsonLd } from '@/seo/JsonLd'
+import { buildShopBreadcrumbJsonLd } from '@/seo/jsonLd'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import Link from 'next/link'
@@ -113,6 +116,8 @@ export default async function ShopPage({ searchParams }: Props) {
 
   return (
     <div>
+      {/* Drobček Domov → Obchod v štruktúrovaných dátach (Z4). */}
+      <JsonLd data={buildShopBreadcrumbJsonLd(getServerSideURL())} />
       <ActiveFilterChips categories={categoryOptions} tagFilters={tagFilters} />
 
       {searchTooShort ? (

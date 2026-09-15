@@ -45,7 +45,10 @@ export const Image: React.FC<MediaProps> = (props) => {
 
     width = widthFromProps ?? fullWidth
     height = heightFromProps ?? fullHeight
-    alt = altFromResource
+    // Popis z média má prednosť, ale keď ho médium nemá vyplnený, platí to, čo
+    // poslal volajúci (PDP a karta produktu posielajú názov produktu). Predtým
+    // tu `alt` z props vždy prepadol na prázdny reťazec.
+    alt = altFromResource || altFromProps
 
     const filename = fullFilename
 

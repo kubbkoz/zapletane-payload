@@ -10,9 +10,17 @@ import { getPayload } from 'payload'
 import { draftMode } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import React, { Suspense } from 'react'
+import React, { cache, Suspense } from 'react'
 import { ChevronLeftIcon } from 'lucide-react'
 import { Metadata } from 'next'
+
+import { JsonLd } from '@/seo/JsonLd'
+import { buildTemplateMeta } from '@/seo/generate'
+import { buildBreadcrumbJsonLd, buildProductJsonLd, productImages } from '@/seo/jsonLd'
+import { toSeoProductInput } from '@/seo/productInput'
+import { getServerSideURL } from '@/utilities/getURL'
+
+const SITE_NAME = process.env.SITE_NAME || 'ZAPLETANE'
 
 type Args = {
   params: Promise<{
@@ -20,33 +28,49 @@ type Args = {
   }>
 }
 
+/**
+ * Meta pre stránku produktu (Z4).
+ *
+ * Zdrojom sú uložené `meta.*` polia — tie vznikajú automaticky pri ukladaní
+ * produktu (hook v kolekcii). Ak by predsa len chýbali (starý záznam, import,
+ * produkt uložený mimo hooku), poskladá sa tu tá istá slovenská šablóna —
+ * synchrónne a bez siete, aby vykreslenie stránky nikdy nečakalo na AI.
+ */
 export async function generateMetadata({ params }: Args): Promise<Metadata> {
   const { slug } = await params
   const product = await queryProductBySlug({ slug })
 
   if (!product) return notFound()
 
-  const gallery = product.gallery?.filter((item) => typeof item.image === 'object') || []
+  const siteUrl = getServerSideURL().replace(/\/$/, '')
+  const url = `${siteUrl}/products/${product.slug}`
+  const fallback = buildTemplateMeta(await toSeoProductInput(product))
 
-  const metaImage = typeof product.meta?.image === 'object' ? product.meta?.image : undefined
+  const title = product.meta?.title?.trim() || fallback.metaTitle
+  const description = product.meta?.description?.trim() || fallback.metaDescription
+
+  const images = productImages(product, siteUrl).map((image) => ({
+    alt: product.title,
+    url: image,
+  }))
+
+  // Koncept sa nesmie dostať do indexu, aj keď je cez preview verejne dostupný.
   const canIndex = product._status === 'published'
 
-  const seoImage = metaImage || (gallery.length ? (gallery[0]?.image as Media) : undefined)
-
   return {
-    description: product.meta?.description || '',
-    openGraph: seoImage?.url
-      ? {
-          images: [
-            {
-              alt: seoImage?.alt,
-              height: seoImage.height!,
-              url: seoImage?.url,
-              width: seoImage.width!,
-            },
-          ],
-        }
-      : null,
+    alternates: {
+      canonical: url,
+    },
+    description,
+    openGraph: {
+      description,
+      images,
+      locale: 'sk_SK',
+      siteName: SITE_NAME,
+      title,
+      type: 'website',
+      url,
+    },
     robots: {
       follow: canIndex,
       googleBot: {
@@ -55,7 +79,13 @@ export async function generateMetadata({ params }: Args): Promise<Metadata> {
       },
       index: canIndex,
     },
-    title: product.meta?.title || product.title,
+    title,
+    twitter: {
+      card: 'summary_large_image',
+      description,
+      images: images.map((image) => image.url),
+      title,
+    },
   }
 }
 
@@ -73,38 +103,11 @@ export default async function ProductPage({ params }: Args) {
         image: item.image as Media,
       })) || []
 
-  const metaImage = typeof product.meta?.image === 'object' ? product.meta?.image : undefined
-  const hasStock = product.enableVariants
-    ? product?.variants?.docs?.some((variant) => {
-        if (typeof variant !== 'object') return false
-        return variant.inventory && variant?.inventory > 0
-      })
-    : product.inventory! > 0
-
-  let price = product.priceInEUR
-
-  if (product.enableVariants && product?.variants?.docs?.length) {
-    price = product?.variants?.docs?.reduce((acc, variant) => {
-      if (typeof variant === 'object' && variant?.priceInEUR && acc && variant?.priceInEUR > acc) {
-        return variant.priceInEUR
-      }
-      return acc
-    }, price)
-  }
-
-  const productJsonLd = {
-    name: product.title,
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    description: product.description,
-    image: metaImage?.url,
-    offers: {
-      '@type': 'AggregateOffer',
-      availability: hasStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-      price: price,
-      priceCurrency: 'usd',
-    },
-  }
+  // Štruktúrované dáta (SEO + GEO): `Product` so všetkými faktami, ktoré o
+  // produkte vieme, a `BreadcrumbList` s cestou Domov → Obchod → produkt.
+  const siteUrl = getServerSideURL()
+  const productJsonLd = buildProductJsonLd(product, siteUrl)
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(product, siteUrl)
 
   const upsellProducts =
     product.upsell?.filter((upsellProduct) => typeof upsellProduct === 'object') ?? []
@@ -114,12 +117,8 @@ export default async function ProductPage({ params }: Args) {
 
   return (
     <React.Fragment>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productJsonLd),
-        }}
-        type="application/ld+json"
-      />
+      <JsonLd data={productJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <div className="bg-brand-50">
         <div className="container-editorial pb-16 pt-8 lg:pb-24">
           <Link
@@ -138,7 +137,8 @@ export default async function ProductPage({ params }: Args) {
                 }
               >
                 {Boolean(gallery?.length) ? (
-                  <Gallery gallery={gallery} />
+                  // Náhradný `alt` pre fotky bez popisu v médiách (Z4).
+                  <Gallery alt={product.title} gallery={gallery} />
                 ) : (
                   <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm bg-gray-100" />
                 )}
@@ -175,7 +175,11 @@ export default async function ProductPage({ params }: Args) {
   )
 }
 
-const queryProductBySlug = async ({ slug }: { slug: string }) => {
+/**
+ * `cache()` = jeden dopyt na request: `generateMetadata` aj samotná stránka
+ * potrebujú ten istý produkt, React im vráti ten istý výsledok.
+ */
+const queryProductBySlug = cache(async ({ slug }: { slug: string }) => {
   const { isEnabled: draft } = await draftMode()
 
   const payload = await getPayload({ config: configPromise })
@@ -208,4 +212,4 @@ const queryProductBySlug = async ({ slug }: { slug: string }) => {
   })
 
   return result.docs?.[0] || null
-}
+})

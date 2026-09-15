@@ -4,9 +4,15 @@ import { MediaBlock } from '@/blocks/MediaBlock/config'
 import { slugField } from 'payload'
 import { generatePreviewPath } from '@/utilities/generatePreviewPath'
 import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
-import type { CollectionAfterChangeHook, CollectionAfterDeleteHook } from 'payload'
+import type {
+  CollectionAfterChangeHook,
+  CollectionAfterDeleteHook,
+  CollectionBeforeChangeHook,
+} from 'payload'
 
 import { revalidateFeedsTag } from '@/lib/feeds/cache'
+import { generateProductMeta } from '@/seo/generate'
+import { toSeoProductInput } from '@/seo/productInput'
 import {
   MetaDescriptionField,
   MetaImageField,
@@ -67,12 +73,75 @@ const revalidateFeedsOnDelete: CollectionAfterDeleteHook = ({ doc, req }) => {
   return doc
 }
 
+/**
+ * Automatické SEO/GEO meta (Z4): po pridaní produktu nemusí nikto písať meta
+ * title ani popis — doplnia sa samé, v slovenčine, z toho, čo o produkte vieme.
+ *
+ * Kedy sa spustí:
+ *   - `create` — vždy, keď je čo generovať (produkt už má názov);
+ *   - `update` — len keď sú OBE meta polia prázdne. Čokoľvek, čo majiteľka
+ *     napísala ručne, je nedotknuteľné; polovičný stav (vyplnený titulok,
+ *     prázdny popis) sa tiež nechá tak — od toho sú tlačidlá „Generovať".
+ *
+ * Prečo sa preskakuje autosave: produkty majú `versions.drafts.autosave`, takže
+ * počas písania odchádza uloženie každých pár sekúnd. Bez tejto poistky by meta
+ * vznikli z rozpísaného názvu („Ple…") a už by sa nikdy neprepísali — a pri
+ * zapnutom AI motore by to znamenalo hromadu zbytočných volaní. Publikovanie
+ * (aj ručné „Uložiť koncept") autosave príznak nenesie, takže tam hook bežne
+ * dobehne — s finálnym názvom a popisom.
+ *
+ * Nikdy neblokuje uloženie: generátor má vlastný časovač a pri akejkoľvek chybe
+ * padá na deterministickú šablónu; prípadná výnimka sa tu ešte raz odchytí.
+ */
+const autofillProductMeta: CollectionBeforeChangeHook = async ({
+  data,
+  operation,
+  originalDoc,
+  req,
+}) => {
+  const meta = data?.meta as null | undefined | { description?: null | string; title?: null | string }
+  const hasTitle = Boolean(meta?.title?.trim())
+  const hasDescription = Boolean(meta?.description?.trim())
+
+  if (hasTitle && hasDescription) return data
+  if (operation === 'update' && (hasTitle || hasDescription)) return data
+
+  const autosave = (req?.query as undefined | { autosave?: unknown })?.autosave
+
+  if (autosave === true || autosave === 'true') return data
+
+  // `data` je pri PATCH-i len to, čo sa mení — fakty o produkte treba čítať z
+  // uloženého dokumentu doplneného o prichádzajúce zmeny.
+  const merged = { ...(originalDoc ?? {}), ...(data ?? {}) }
+
+  if (!String(merged.title ?? '').trim()) return data
+
+  try {
+    const generated = await generateProductMeta(await toSeoProductInput(merged, req?.payload))
+
+    data.meta = {
+      ...(meta ?? {}),
+      ...(hasTitle ? {} : { title: generated.metaTitle }),
+      ...(hasDescription ? {} : { description: generated.metaDescription }),
+    }
+  } catch (error) {
+    req?.payload?.logger?.warn?.(
+      `[seo] Nepodarilo sa vygenerovať meta pre produkt „${String(merged.title)}": ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+
+  return data
+}
+
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
   hooks: {
     ...defaultCollection?.hooks,
     afterChange: [...(defaultCollection?.hooks?.afterChange ?? []), revalidateFeedsOnChange],
     afterDelete: [...(defaultCollection?.hooks?.afterDelete ?? []), revalidateFeedsOnDelete],
+    beforeChange: [...(defaultCollection?.hooks?.beforeChange ?? []), autofillProductMeta],
   },
   admin: {
     ...defaultCollection?.admin,
@@ -346,7 +415,11 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               relationTo: 'media',
             }),
 
-            MetaDescriptionField({}),
+            // `hasGenerateFn` zapína tlačidlo „Generovať" aj nad popisom —
+            // generátor pre oba texty je nastavený v `seoPlugin` (src/plugins).
+            MetaDescriptionField({
+              hasGenerateFn: true,
+            }),
             PreviewField({
               // if the `generateUrl` function is configured
               hasGenerateFn: true,

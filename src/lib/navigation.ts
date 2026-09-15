@@ -42,6 +42,41 @@ export const TOP_BAR_LINKS: TopBarLink[] = [
   { id: 'o-nas', label: 'O nás', href: '/o-nas', icon: 'none', highlight: false },
 ]
 
+// --- Top bar content mode ----------------------------------------------------
+
+export type TopBarMode = 'contact' | 'marquee'
+export type TopBarSpeed = 'fast' | 'normal' | 'slow'
+
+export type TopBarSettings = {
+  enabled: boolean
+  mode: TopBarMode
+  marqueeText: string
+  marqueeSpeed: TopBarSpeed
+}
+
+/** Seeded via `defaultValue` on `topBar.marqueeText` in the Header global. */
+export const DEFAULT_MARQUEE_TEXT = 'Remeselná práca s láskou — doprava po celom Slovensku'
+
+/**
+ * Master on/off switch + content mode for the top bar (`topBar.enabled` /
+ * `topBar.mode` on the Header global). `enabled` defaults to `true` and
+ * `mode` to `'contact'` so an older saved global (columns not yet backfilled)
+ * renders exactly what it rendered before these fields existed.
+ */
+export function resolveTopBarSettings(header?: Header | null): TopBarSettings {
+  const topBar = header?.topBar
+
+  return {
+    enabled: topBar?.enabled ?? true,
+    mode: topBar?.mode === 'marquee' ? 'marquee' : 'contact',
+    marqueeText: topBar?.marqueeText?.trim() || DEFAULT_MARQUEE_TEXT,
+    marqueeSpeed:
+      topBar?.marqueeSpeed === 'slow' || topBar?.marqueeSpeed === 'fast'
+        ? topBar.marqueeSpeed
+        : 'normal',
+  }
+}
+
 export function resolveTopBarLinks(header?: Header | null): TopBarLink[] {
   const rows = header?.topBar?.links
 

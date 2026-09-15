@@ -1,7 +1,7 @@
 import { formBuilderPlugin } from '@payloadcms/plugin-form-builder'
 import { seoPlugin } from '@payloadcms/plugin-seo'
 import { Plugin } from 'payload'
-import { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
+import { GenerateDescription, GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { FixedToolbarFeature, HeadingFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import { ecommercePlugin, EUR } from '@payloadcms/plugin-ecommerce'
 import { mcpPlugin } from '@payloadcms/plugin-mcp'
@@ -22,11 +22,49 @@ import { isAdmin } from '@/access/isAdmin'
 import { isDocumentOwner } from '@/access/isDocumentOwner'
 import { notifyOrderStatusChange } from '@/push/notifyOrderStatus'
 import { globalConfigs } from '@/globals'
+import { generateProductMeta } from '@/seo/generate'
+import { toSeoProductInput } from '@/seo/productInput'
 
 const SITE_NAME = process.env.SITE_NAME || 'ZAPLETANE'
 
-const generateTitle: GenerateTitle<Product | Page> = ({ doc }) => {
+/**
+ * Tlačidlá „Generovať" nad meta poľami (Z4).
+ *
+ * Pri produkte idú cez `generateProductMeta` — teda cez Claude, keď je
+ * `ANTHROPIC_API_KEY` nastavený, inak cez deterministickú slovenskú šablónu.
+ * Pri stránkach zostáva pôvodné jednoduché správanie: názov + značka.
+ *
+ * `doc` je stav formulára, nie uložený dokument, takže vzťahy prídu ako holé
+ * id — `toSeoProductInput` si názvy vlastností dotiahne cez `req.payload`.
+ */
+const generateTitle: GenerateTitle<Product | Page> = async ({ collectionSlug, doc, req }) => {
+  if (collectionSlug === 'products' && doc) {
+    const { metaTitle } = await generateProductMeta(
+      await toSeoProductInput(doc as Product, req?.payload),
+    )
+
+    return metaTitle
+  }
+
   return doc?.title ? `${doc.title} | ${SITE_NAME}` : SITE_NAME
+}
+
+const generateDescription: GenerateDescription<Product | Page> = async ({
+  collectionSlug,
+  doc,
+  req,
+}) => {
+  if (collectionSlug === 'products' && doc) {
+    const { metaDescription } = await generateProductMeta(
+      await toSeoProductInput(doc as Product, req?.payload),
+    )
+
+    return metaDescription
+  }
+
+  // Stránky nemajú jednotné textové pole, z ktorého by sa dal popis odvodiť —
+  // ponechá sa, čo už v poli je, inak aspoň názov stránky.
+  return doc?.meta?.description?.trim() || (doc?.title ? `${doc.title} — ${SITE_NAME}.` : '')
 }
 
 const generateURL: GenerateURL<Product | Page> = ({ doc }) => {
@@ -63,6 +101,7 @@ const redactUserSecrets: NonNullable<MCPCollectionEntry['overrideResponse']> = (
 
 export const plugins: Plugin[] = [
   seoPlugin({
+    generateDescription,
     generateTitle,
     generateURL,
   }),

@@ -23,6 +23,9 @@ import {
   resolveSlogan,
 } from '@/lib/homeContent'
 import { getHomepage } from '@/utilities/getHomepage'
+import { JsonLd } from '@/seo/JsonLd'
+import { buildWebsiteJsonLd } from '@/seo/jsonLd'
+import { getServerSideURL } from '@/utilities/getURL'
 
 /**
  * ZAPLETANE homepage.
@@ -127,6 +130,10 @@ export default async function HomePage() {
 
   return (
     <React.Fragment>
+      {/* `WebSite` + `SearchAction` (Z4): vyhľadávačom povie, že obchod má
+          vlastné vyhľadávanie, a dá im tvar adresy, ktorý môžu ponúknuť priamo
+          vo výsledkoch. Patrí na domovskú stránku, teda sem. */}
+      <JsonLd data={buildWebsiteJsonLd(getServerSideURL())} />
       <HomeHero perks={resolveHeroPerks(homepage)} slides={resolveHeroSlides(homepage)} />
       <HomeSlogan slogan={resolveSlogan(homepage)} />
       <HomeFeatures content={resolveFeatures(homepage)} />

@@ -2954,9 +2954,25 @@ export interface Header {
       }[]
     | null;
   /**
-   * Odkazy vpravo v tenkej krémovej lište nad hlavičkou. Rovnaký zoznam sa zobrazuje aj v mobilnom menu.
+   * Tenká krémová lišta nad hlavičkou — vypnutie, prepnutie obsahu a odkazy nižšie.
    */
   topBar?: {
+    /**
+     * Hlavný vypínač. Vypnuté = horná lišta sa vôbec nevykreslí (hlavička sa posunie hore, žiadny prázdny priestor).
+     */
+    enabled?: boolean | null;
+    /**
+     * Kontaktné informácie = telefón, e-mail a odkazy nižšie (dnešný vzhľad). Pohyblivý text = vlastný text plynulo sa posúvajúci v jednom riadku.
+     */
+    mode?: ('contact' | 'marquee') | null;
+    /**
+     * Opakuje sa v plynulej slučke zľava doprava.
+     */
+    marqueeText?: string | null;
+    marqueeSpeed?: ('slow' | 'normal' | 'fast') | null;
+    /**
+     * Platí len pre režim „Kontaktné informácie" — v režime „Pohyblivý text" sa nezobrazujú.
+     */
     links?:
       | {
           label: string;
@@ -3365,6 +3381,10 @@ export interface HeaderSelect<T extends boolean = true> {
   topBar?:
     | T
     | {
+        enabled?: T;
+        mode?: T;
+        marqueeText?: T;
+        marqueeSpeed?: T;
         links?:
           | T
           | {

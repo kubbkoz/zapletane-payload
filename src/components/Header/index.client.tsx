@@ -2,7 +2,7 @@
 
 import type { Header } from '@/payload-types'
 import type { ResolvedContact } from '@/lib/contact'
-import type { SocialLink, TopBarLink } from '@/lib/navigation'
+import type { SocialLink, TopBarLink, TopBarSettings } from '@/lib/navigation'
 
 import { Logo } from '@/components/Logo'
 import { cn } from '@/utilities/cn'
@@ -20,6 +20,7 @@ type Props = {
   header: Header
   searchPlaceholder?: string
   socialLinks: SocialLink[]
+  topBar: TopBarSettings
   topBarLinks: TopBarLink[]
 }
 
@@ -39,7 +40,7 @@ type Props = {
  * reserves its own space without CLS (169px desktop fallback, as in the
  * original's critical CSS).
  */
-export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, topBarLinks }: Props) {
+export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, topBar, topBarLinks }: Props) {
   const navItems = header?.navItems || []
   const pathname = usePathname()
 
@@ -132,7 +133,15 @@ export function HeaderClient({ contact, header, searchPlaceholder, socialLinks, 
         )}
       >
         <div ref={navbarInnerRef}>
-          <TopBar contact={contact} isHidden={shouldHideTopBar} links={topBarLinks} />
+          <TopBar
+            contact={contact}
+            enabled={topBar.enabled}
+            isHidden={shouldHideTopBar}
+            links={topBarLinks}
+            marqueeSpeed={topBar.marqueeSpeed}
+            marqueeText={topBar.marqueeText}
+            mode={topBar.mode}
+          />
 
           {/* Owner's call: the bar is always fully opaque — no translucent
               scrolled state, no blur (content must never shimmer through). */}
