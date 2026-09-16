@@ -7,6 +7,32 @@
 
 ## Stav (aktualizuj priebežne)
 
+- [x] Fáza 8 (Z16–Z19 + hotfixy) — HOTOVÉ, nasadené (02c5a72): Z16 fix importu
+      (504 → 202 + after(), jeden deadline BATCH_BUDGET_MS 40 s, preklad
+      ok/failed/deferred BEZ fallbacku na poľštinu, retry 3×, batch default 3);
+      Z17 blog sekcia na homepage (posledné 3, unstable_cache 300 s), storefront
+      pripnutý na light (Theme/shared + InitTheme), RichText explicitné farby
+      (čierne nadpisy/tmavý text) + srdiečko z loga pred h2
+      (.richtext-heading-mark, enableHeadingMark); Z18 PDP purchase panel
+      (QuantityStepper zdieľaný s cart drawerom, StockCounter „Skladom: N ks"
+      + bar / <5 warning / Vypredané / „Na objednávku" pri nesledovanom sklade,
+      wishlist button vedľa add-to-cart, AddToCart s natívnym quantity,
+      GooglePayButton → /checkout?platba=karta s predvolenou kartou); Z18b GPay
+      gate zrkadlí checkout filter (karta sa ukáže až s reálnymi Comgate/Stripe
+      kredenciálmi — na prode je zapnutý card riadok bez credov!); Z19 generátor
+      článkov píše aj „Návrhy obrázkov (AI)" (posts.aiImagePrompts textarea,
+      z19 migrácia — nesie aj scraper_jobs.batch_size default 3 drift zo Z16;
+      2–4 bloky: umiestnenie pod sekciou + reálny produkt číslom z katalógu
+      (server-side rezolúcia, nevymyslí si) + anglický prompt s klauzulou
+      „priložená fotka produktu nezmenená", anti-slop gate sa na prompty
+      neaplikuje, AI_TIMEOUT 150 s, maxDuration 180, max_tokens 8000,
+      repairJson fallback na neescapované úvodzovky, zákaz rovných úvodzoviek
+      v texte). Hotfix search: description field ILIKEoval jsonb na Postgrese
+      (42883) → clauses idú na meta.description (text; SQLite to maskoval
+      TEXT serializáciou — e2e na sqlite NEdokazuje Postgres!). Chybová
+      hranica (app)/error.tsx po slovensky. Pozn.: kúpny panel ukáže counter
+      len pri produkte s vyplneným Inventory; importované produkty ho nemajú
+      → „Na objednávku".
 - [x] Fáza 1+2 hotové a NASADENÉ: design port 1:1, coming-soon gate
       (SiteSettings global + MCP), EUR mena, opravený košík/checkout,
       nové stock badge, brandovaný admin (light+dark), MCP server
