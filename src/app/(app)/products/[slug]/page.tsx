@@ -19,6 +19,7 @@ import { buildTemplateMeta } from '@/seo/generate'
 import { buildBreadcrumbJsonLd, buildProductJsonLd, productImages } from '@/seo/jsonLd'
 import { toSeoProductInput } from '@/seo/productInput'
 import { resolveRedirect } from '@/lib/redirects'
+import { isComgateConfigured } from '@/payments/comgate/api'
 import { getServerSideURL } from '@/utilities/getURL'
 
 /**
@@ -242,12 +243,19 @@ const queryProductBySlug = cache(async ({ slug }: { slug: string }) => {
 })
 
 /**
- * GPay express-button visibility gate (Z18) — a plain existence check, not
- * the checkout page's stricter gateway-credential filter
- * (`checkout/page.tsx`'s `getCheckoutMethods`): the owner spec only asks
- * "does an enabled `payment-methods` row of type `card` exist", so that is
- * all this resolves. `cache()` per request, same as `queryProductBySlug`.
+ * GPay express-button visibility gate (Z18/Z18b) — MUSÍ zrkadliť filter
+ * checkoutu (`checkout/page.tsx` → `getCheckoutMethods`): zapnutý riadok
+ * `payment-methods` typu `card` sám osebe nestačí, lebo checkout kartu bez
+ * kredenciálov brány server-side odfiltruje. Bez tejto druhej podmienky by
+ * tlačidlo „Kúpiť cez Google Pay" viedlo na checkout, kde sa kartou zaplatiť
+ * nedá (presne to sa stalo na prode: zapnutý card riadok + chýbajúce
+ * COMGATE_MERCHANT/SECRET). `cache()` per request, ako `queryProductBySlug`.
  */
+const stripeConfigured = Boolean(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY &&
+    !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.includes('dummy'),
+)
+
 const queryCardPaymentEnabled = cache(async (): Promise<boolean> => {
   try {
     const payload = await getPayload({ config: configPromise })
@@ -255,14 +263,16 @@ const queryCardPaymentEnabled = cache(async (): Promise<boolean> => {
     const result = await payload.find({
       collection: 'payment-methods',
       depth: 0,
-      limit: 1,
+      limit: 50,
       pagination: false,
       where: {
         and: [{ type: { equals: 'card' } }, { enabled: { equals: true } }],
       },
     })
 
-    return result.docs.length > 0
+    return result.docs.some((method) =>
+      method.gateway === 'stripe' ? stripeConfigured : isComgateConfigured(),
+    )
   } catch (error) {
     console.error('[pdp] Could not resolve card payment method availability:', error)
     return false
