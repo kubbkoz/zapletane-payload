@@ -14,6 +14,12 @@
  *
  * Model: `claude-sonnet-5`, prepísateľné cez `ANTHROPIC_ARTICLE_MODEL`.
  *
+ * Okrem textu článku vzniká v tom istom volaní aj sada **promptov na obrázky**
+ * (Z19). Každý prompt sa viaže na jeden skutočný produkt z katalógu, lebo
+ * majiteľka k nemu v generátore obrázkov priloží jeho fotku ako referenciu —
+ * vymyslený produkt by znamenal prompt, ku ktorému neexistuje fotka. Prompty
+ * sú doplnok: keď sa ich nepodarí prečítať, článok sa uloží aj tak.
+ *
  * Pozor na `temperature`: rodina Sonnet 5 / Opus 4.6+ ju už neprijíma
  * (`400 — temperature is deprecated for this model`), takže sa posiela len
  * modelom, ktoré ju ešte podporujú, a keď ju API aj tak odmietne, volanie sa
@@ -28,8 +34,13 @@ const DEFAULT_MODEL = 'claude-sonnet-5'
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
 
-/** Strop na dĺžku odpovede. Článok 600–900 slov + meta sa zmestí s rezervou. */
-const MAX_TOKENS = 6000
+/**
+ * Strop na dĺžku odpovede. Článok 600–900 slov + meta + prompty na obrázky.
+ * Z 6000 na 8000 práve kvôli promptom (Z19): štyri anglické pasáže po 40–80
+ * slovách sú ďalších ~600 tokenov a bez rezervy by sa odpoveď useknutá
+ * uprostred JSON-u nedala prečítať vôbec.
+ */
+const MAX_TOKENS = 8000
 
 /** Nepovinná kreativita pre staršie modely; novšie ju odmietajú (viď hlavičku). */
 const TEMPERATURE = 0.8
@@ -46,8 +57,29 @@ const SAMPLING_FREE_MODEL = /^claude-(fable|mythos)-|^claude-opus-(4-6|4-7|4-8|5
  */
 const AI_TIMEOUT_MS = 100_000
 
-/** Koľko produktov ide modelu do kontextu. Viac = viac šumu, nie viac vkusu. */
-export const MAX_PRODUCTS_IN_CONTEXT = 8
+/**
+ * Koľko produktov ide modelu do kontextu.
+ *
+ * Pôvodne osem („viac = viac šumu, nie viac vkusu"). Od Z19 dvadsaťpäť: z toho
+ * istého zoznamu sa vyberajú aj produkty do promptov na obrázky a pri ôsmich
+ * najnovšie upravených položkách by sa k téme článku často nehodil ani jeden.
+ * Do textu článku aj tak smú ísť najviac dve zmienky — o tom rozhoduje systémový
+ * prompt, nie dĺžka zoznamu.
+ */
+export const MAX_PRODUCTS_IN_CONTEXT = 25
+
+/** Koľko obrázkov navrhnúť k jednému článku. */
+const MIN_IMAGE_PROMPTS = 2
+const MAX_IMAGE_PROMPTS = 4
+
+/**
+ * Strop na jeden prompt a na celé pole `aiImagePrompts`.
+ *
+ * Musí sedieť s `maxLength` poľa v `src/collections/Posts.ts` — dlhší text by
+ * `payload.update` odmietol a spadol by s ním zápis celého (hotového) článku.
+ */
+const MAX_IMAGE_PROMPT_CHARS = 700
+export const MAX_IMAGE_PROMPTS_CHARS = 4000
 
 /** Rozumné hranice pre text, ktorý má byť blogový článok. */
 const MIN_WORDS = 350
@@ -63,6 +95,23 @@ export type ArticleProduct = {
   title: string
 }
 
+/**
+ * Jeden návrh obrázka (Z19).
+ *
+ * `product` je vždy presný názov z katalógu — majiteľka podľa neho nájde fotku
+ * v galérii produktu a priloží ju k promptu. `prompt` je po anglicky, lebo
+ * obrazové modely (Midjourney, DALL·E, Higgsfield) rozumejú angličtine
+ * najspoľahlivejšie; slovenské ostávajú len popisné riadky okolo neho.
+ */
+export type ArticleImagePrompt = {
+  /** Podnadpis sekcie článku, pod ktorú obrázok patrí (presne ako v texte). */
+  heading: string
+  /** Presný názov produktu z katalógu. */
+  product: string
+  /** Samotný prompt pre obrazový model — po anglicky. */
+  prompt: string
+}
+
 export type ArticleWriterInput = {
   /** Reálne publikované produkty e-shopu (názov + slug). */
   products?: ArticleProduct[]
@@ -72,6 +121,8 @@ export type ArticleWriterInput = {
 
 export type GeneratedArticle = {
   excerpt: string
+  /** Návrhy obrázkov. Prázdne pole je legitímny výsledok, nie chyba. */
+  imagePrompts: ArticleImagePrompt[]
   metaDescription: string
   metaTitle: string
   sections: ArticleSection[]
@@ -141,6 +192,18 @@ const SYSTEM_PROMPT = [
   '- NIKDY si nevymysli ďalší ručne robený výrobok, ktorý v zozname nie je — ani ako vec z vlastnej domácnosti. Vymyslený „prútený kočík pre bábiky" alebo „pletený kôš na plienky" vyzerá ako ponuka e-shopu a zákazníčka si ho potom pýta. Keď v texte potrebuješ takú vec spomenúť, napíš ju všeobecne a bez materiálu („kôš na hračky", „debnička pod poličkou").',
   '- Nikdy si nevymýšľaj ceny, rozmery, farby ani materiály, ktoré nie sú v zozname.',
   '',
+  'OBRÁZKY DO ČLÁNKU',
+  `- K článku navrhni ${MIN_IMAGE_PROMPTS} až ${MAX_IMAGE_PROMPTS} obrázkov — prompty pre generátor obrázkov (Midjourney, DALL·E, Higgsfield).`,
+  '- Každý obrázok stojí na JEDNOM skutočnom produkte zo zoznamu vyššie. Majiteľka k promptu priloží fotku toho produktu ako referenciu, takže vymyslený produkt = prompt, ku ktorému neexistuje fotka.',
+  '- `product` je presný názov zo zoznamu, znak po znaku — neskracuj ho, neprekladaj, neohýbaj do vety (na rozdiel od textu článku). Produkt, ktorý v zozname nie je, nesmieš použiť ani náhodou.',
+  '- Každý obrázok pod inú sekciu. `heading` je presný podnadpis (h2) z tvojho článku, skopírovaný znak po znaku.',
+  '- `prompt` píš PO ANGLICKY, 40 až 80 slov, súvislý popis bez odrážok: scéna, kompozícia, svetlo, nálada.',
+  '  Štýl značky: cozy handmade wicker and knitted aesthetic, warm natural daylight, soft shadows, muted natural palette, editorial lifestyle photography, realistic photo.',
+  '  V každom prompte výslovne napíš, že priložený referenčný produkt je na zábere nezmenený a dobre viditeľný — napríklad „the attached reference product shown exactly as in the reference photo, unchanged, prominently in frame".',
+  '  Na konci promptu vždy: „no text overlays, no logos, no watermarks".',
+  '- Prompt opisuje scénu okolo produktu, nie katalógovú fotku na bielom pozadí. Žiadne ceny, nápisy ani tváre v detaile.',
+  '- Ak zoznam produktov nedostaneš, je prázdny alebo sa k téme nehodí ani jeden, vráť `imagePrompts` ako prázdne pole `[]`. Prázdny zoznam je správna odpoveď, vymyslený produkt nikdy.',
+  '',
   'VÝSTUP',
   'Odpovedaj VÝHRADNE jedným JSON objektom, bez sprievodného textu a bez ```-blokov, presne v tomto tvare:',
   '{',
@@ -148,7 +211,8 @@ const SYSTEM_PROMPT = [
   '  "excerpt": "1–2 vety, ktoré článok predstavia vo výpise blogu",',
   '  "sections": [{ "heading": "podnadpis h2 (v prvej sekcii vynechaj)", "paragraphs": ["odsek", "odsek"] }],',
   `  "metaTitle": "maximálne 60 znakov vrátane prípony ' | ${BRAND}', ktorou musí končiť",`,
-  `  "metaDescription": "${MIN_DESCRIPTION} až ${MAX_DESCRIPTION} znakov — spočítaj si ich, kratší popis je chyba; celé vety, vecne o čom článok je"`,
+  `  "metaDescription": "${MIN_DESCRIPTION} až ${MAX_DESCRIPTION} znakov — spočítaj si ich, kratší popis je chyba; celé vety, vecne o čom článok je",`,
+  '  "imagePrompts": [{ "heading": "presný podnadpis sekcie z tohto článku", "product": "presný názov produktu zo zoznamu", "prompt": "image prompt in English" }]',
   '}',
   'Prvá sekcia je úvod — nechaj jej `heading` prázdny. Každá ďalšia sekcia má `heading` aj `paragraphs`.',
   'Text v `paragraphs` je čistý text bez HTML a bez markdownu (žiadne **, ##, -).',
@@ -157,7 +221,9 @@ const SYSTEM_PROMPT = [
 const buildUserPrompt = ({ products, prompt }: ArticleWriterInput): string => {
   const lines: string[] = ['Téma a pokyny od majiteľky e-shopu:', prompt.trim()]
 
-  const list = (products ?? []).filter((product) => product?.title)
+  const list = (products ?? [])
+    .filter((product) => product?.title)
+    .slice(0, MAX_PRODUCTS_IN_CONTEXT)
 
   if (list.length) {
     // Do promptu ide len názov. `slug` sa načítava a nesie ďalej kvôli
@@ -165,9 +231,12 @@ const buildUserPrompt = ({ products, prompt }: ArticleWriterInput): string => {
     // text bez odkazov a adresa v strede vety by z neho urobila katalóg.
     lines.push(
       '',
-      `Produkty, ktoré práve predávaš (spomeň len tie, ktoré sa k téme naozaj hodia — pokojne aj žiadny):`,
+      `Produkty, ktoré práve predávaš (spomeň len tie, ktoré sa k téme naozaj hodia — pokojne aj žiadny). Z tohto zoznamu vyberáš aj produkty do promptov na obrázky, a to presným názvom:`,
       ...list.map((product) => `- ${product.title}`),
     )
+  } else {
+    // Bez katalógu nie je ku ktorej fotke prompt priložiť.
+    lines.push('', 'Zoznam produktov teraz nie je k dispozícii — vráť `imagePrompts` ako prázdne pole.')
   }
 
   lines.push('', 'Napíš článok podľa zadania a vráť ho ako JSON.')
@@ -284,6 +353,166 @@ export const countWords = (sections: ArticleSection[]): number =>
     0,
   )
 
+// --- návrhy obrázkov (Z19) ------------------------------------------------
+
+/** Kratší „prompt" je preklep alebo pozostatok, nie zadanie pre obrazový model. */
+const MIN_IMAGE_PROMPT_CHARS = 40
+
+/**
+ * Kľúč na porovnávanie názvov.
+ *
+ * Model názov produktu občas prepíše bez úvodzoviek, s inou veľkosťou písmen
+ * alebo bez diakritiky. To nie je vymyslený produkt, len iný zápis toho istého,
+ * takže sa porovnáva zjednodušený tvar — a do výstupu ide vždy názov
+ * z katalógu, nie ten modelov.
+ */
+const foldKey = (value: string): string =>
+  squash(deconfuse(value))
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+    .trim()
+
+/**
+ * Nájde produkt v katalógu. Keď taký neexistuje, vráti `null` — a blok padá.
+ *
+ * Toto je jediná poistka proti tomu, aby majiteľka dostala prompt na „prútený
+ * kočík pre bábiky", ku ktorému v obchode neexistuje fotka. Systémový prompt to
+ * zakazuje, tu sa to kontroluje.
+ */
+const matchProduct = (claimed: string, catalogue: Map<string, string>): null | string => {
+  const key = foldKey(claimed)
+
+  if (!key) return null
+
+  const exact = catalogue.get(key)
+
+  if (exact) return exact
+
+  // Zhoda „na obsah" len pri dosť dlhom názve: „deka" by sedela na čokoľvek.
+  if (key.length < 6) return null
+
+  for (const [candidateKey, title] of catalogue) {
+    if (candidateKey.includes(key) || key.includes(candidateKey)) return title
+  }
+
+  return null
+}
+
+/**
+ * Priradí obrázok k skutočnej sekcii článku.
+ *
+ * Nadpis sa berie z článku, nie z odpovede modelu: majiteľka podľa neho hľadá
+ * miesto v texte a nesedel by jej tam preklep ani voľný prepis. Keď sa
+ * nepodarí spárovať nič, obrázok sa priradí prvej nepoužitej sekcii — dva
+ * návrhy pod tú istú sekciu vyzerajú ako chyba.
+ */
+const pickHeading = (claimed: string, headings: string[], used: Set<string>): null | string => {
+  if (!headings.length) return null
+
+  const key = foldKey(claimed)
+  const exact = key ? headings.find((heading) => foldKey(heading) === key) : undefined
+
+  if (exact) return exact
+
+  const partial =
+    key.length >= 6
+      ? headings.find((heading) => foldKey(heading).includes(key) || key.includes(foldKey(heading)))
+      : undefined
+
+  if (partial) return partial
+
+  return headings.find((heading) => !used.has(heading)) ?? headings[headings.length - 1]!
+}
+
+const clampPrompt = (value: string): string => {
+  const text = stripMarkdown(value)
+
+  if (text.length <= MAX_IMAGE_PROMPT_CHARS) return text
+
+  const slice = text.slice(0, MAX_IMAGE_PROMPT_CHARS)
+  const lastSpace = slice.lastIndexOf(' ')
+
+  return (lastSpace > 0 ? slice.slice(0, lastSpace) : slice).replace(/[\s,;:–—-]+$/u, '')
+}
+
+/**
+ * Prečíta návrhy obrázkov z odpovede.
+ *
+ * Nikdy nehádže a nikdy nezhodí článok: čo sa nedá overiť, to sa ticho zahodí.
+ * Prázdne pole je legitímny výsledok — majiteľka si obrázky doplní sama, kým
+ * zlý prompt by ju poslal generovať fotku produktu, ktorý nepredáva.
+ */
+const readImagePrompts = (
+  value: unknown,
+  context: { headings: string[]; products: string[] },
+): ArticleImagePrompt[] => {
+  if (!Array.isArray(value) || !context.headings.length || !context.products.length) return []
+
+  const catalogue = new Map(context.products.map((title) => [foldKey(title), title]))
+  const used = new Set<string>()
+  const seen = new Set<string>()
+  const prompts: ArticleImagePrompt[] = []
+
+  for (const entry of value) {
+    if (prompts.length >= MAX_IMAGE_PROMPTS) break
+
+    const source = (entry ?? {}) as Record<string, unknown>
+    const product = matchProduct(readString(source, 'product'), catalogue)
+    const prompt = clampPrompt(readString(source, 'prompt'))
+
+    if (!product || prompt.length < MIN_IMAGE_PROMPT_CHARS) continue
+
+    const heading = pickHeading(readString(source, 'heading'), context.headings, used)
+
+    if (!heading) continue
+
+    const key = `${foldKey(product)}|${foldKey(prompt)}`
+
+    if (seen.has(key)) continue
+
+    seen.add(key)
+    used.add(heading)
+    prompts.push({ heading, product, prompt })
+  }
+
+  return prompts
+}
+
+/**
+ * Návrhy → text do poľa „Návrhy obrázkov (AI)".
+ *
+ * Tvar je čitateľný blok na skopírovanie: dva slovenské riadky pre majiteľku
+ * (kam obrázok patrí a ktorú fotku priložiť) a jeden anglický riadok pre
+ * obrazový model. Bloky oddeľuje prázdny riadok.
+ *
+ * Do `MAX_IMAGE_PROMPTS_CHARS` sa vojde vždy: keď by posledný blok limit
+ * prekročil, vynechá sa celý. Polovičný prompt je horší než o jeden menej —
+ * a `maxLength` poľa by inak zhodilo uloženie hotového článku.
+ */
+export const formatImagePrompts = (prompts: ArticleImagePrompt[]): string => {
+  const blocks: string[] = []
+  let length = 0
+
+  for (const entry of prompts) {
+    const block = [
+      `OBRÁZOK ${blocks.length + 1} — umiestnenie: pod sekciou „${entry.heading}"`,
+      `Produkt: ${entry.product} (k promptu priložte fotku tohto produktu z jeho galérie)`,
+      `Prompt: ${entry.prompt}`,
+    ].join('\n')
+
+    const next = length + block.length + (blocks.length ? 2 : 0)
+
+    if (next > MAX_IMAGE_PROMPTS_CHARS) break
+
+    blocks.push(block)
+    length = next
+  }
+
+  return blocks.join('\n\n')
+}
+
 /**
  * Meta popis do okna 140–160 znakov.
  *
@@ -344,6 +573,14 @@ const SLOP_PATTERNS: RegExp[] = [
   /ak máte akékoľvek otázky/i,
 ]
 
+/**
+ * Kontroluje sa **len text článku** — názov, perex a sekcie.
+ *
+ * Návrhy obrázkov (`imagePrompts`) do kontroly zámerne nevstupujú: sú po
+ * anglicky, na web sa nedostanú a slovenské frázy v nich nemajú čo hľadať.
+ * Rozšíriť sem tento zoznam by znamenalo zhodiť hotový článok kvôli poznámke
+ * v postrannom paneli.
+ */
 const findSlop = (article: GeneratedArticle): null | string => {
   const haystack = [
     article.title,
@@ -477,6 +714,15 @@ export const generateArticle = async (input: ArticleWriterInput): Promise<Articl
 
   const article: GeneratedArticle = {
     excerpt,
+    // Prompty sa overujú proti hotovému článku: produkt musí byť z katalógu,
+    // nadpis zo skutočných sekcií. Čo neprejde, ticho vypadne.
+    imagePrompts: readImagePrompts(parsed.imagePrompts, {
+      headings: sections.map((section) => section.heading ?? '').filter(Boolean),
+      products: (input.products ?? [])
+        .map((product) => product?.title ?? '')
+        .filter(Boolean)
+        .slice(0, MAX_PRODUCTS_IN_CONTEXT),
+    }),
     metaDescription: clampArticleDescription(
       readString(parsed, 'metaDescription') || excerpt,
       excerpt,

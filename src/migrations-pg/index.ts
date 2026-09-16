@@ -28,6 +28,7 @@ import * as migration_20260915_150558_z12_scraper from './20260915_150558_z12_sc
 import * as migration_20260915_151000_z12_mcp_scraper_grants from './20260915_151000_z12_mcp_scraper_grants';
 import * as migration_20260915_155500_z13_mcp_widen_all_keys from './20260915_155500_z13_mcp_widen_all_keys';
 import * as migration_20260915_190430_z14_scraper_categories_chain from './20260915_190430_z14_scraper_categories_chain';
+import * as migration_20260916_190202_z19_article_image_prompts from './20260916_190202_z19_article_image_prompts';
 
 export const migrations = [
   {
@@ -179,5 +180,10 @@ export const migrations = [
     up: migration_20260915_190430_z14_scraper_categories_chain.up,
     down: migration_20260915_190430_z14_scraper_categories_chain.down,
     name: '20260915_190430_z14_scraper_categories_chain',
+  },
+  {
+    up: migration_20260916_190202_z19_article_image_prompts.up,
+    down: migration_20260916_190202_z19_article_image_prompts.down,
+    name: '20260916_190202_z19_article_image_prompts'
   },
 ];

@@ -29,6 +29,8 @@ const EXPECTED_HINT = 'Píšem článok… (~1–2 minúty)'
 
 type GenerateResponse = {
   elapsedMs?: number
+  /** Koľko návrhov obrázkov pribudlo do poľa „Návrhy obrázkov (AI)" (Z19). */
+  imagePrompts?: number
   message?: string
   ok?: boolean
   title?: string
@@ -72,7 +74,14 @@ export const GenerateArticleButton: React.FC = () => {
         throw new Error(payload.message || `Server odpovedal ${response.status}.`)
       }
 
-      toast.success(`Článok „${payload.title}" je hotový (${payload.wordCount} slov).`)
+      // Slovenská zhoda: 1 návrh, 2–4 návrhy, 5+ návrhov.
+      const count = payload.imagePrompts ?? 0
+      const images =
+        count === 0
+          ? ''
+          : ` Pribudli aj ${count === 1 ? '1 návrh' : count < 5 ? `${count} návrhy` : `${count} návrhov`} na obrázky.`
+
+      toast.success(`Článok „${payload.title}" je hotový (${payload.wordCount} slov).${images}`)
 
       // Nech si stihne prečítať hlášku, než sa stránka načíta odznova.
       window.setTimeout(() => window.location.reload(), 600)
@@ -89,7 +98,7 @@ export const GenerateArticleButton: React.FC = () => {
     ? 'Najprv uložte koncept — článok potrebuje existovať, aby doňho bolo možné písať.'
     : missingPrompt
       ? 'Vyplňte tému alebo pokyny vyššie.'
-      : 'Zaberie to minútu až dve. Text sa uloží ako koncept — prečítajte si ho a publikujte až potom.'
+      : 'Zaberie to minútu až dve. Text sa uloží ako koncept — prečítajte si ho a publikujte až potom. Spolu s ním pribudnú návrhy obrázkov nižšie.'
 
   return (
     <div className={baseClass}>

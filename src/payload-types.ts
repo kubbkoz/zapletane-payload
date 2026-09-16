@@ -1312,6 +1312,10 @@ export interface Post {
    */
   aiPrompt?: string | null;
   /**
+   * Vyplní sa automaticky spolu s článkom. Každý blok je jeden obrázok: riadok „Prompt:" skopírujte do generátora obrázkov (Midjourney, DALL·E, Higgsfield) a k promptu priložte fotku uvedeného produktu z jeho galérie — na obrázku tak bude naozaj to, čo predávame. Prompt je po anglicky zámerne, obrazové modely jej rozumejú najlepšie. Text pokojne upravte.
+   */
+  aiImagePrompts?: string | null;
+  /**
    * Zobrazí sa na karte vo výpise aj na začiatku článku.
    */
   heroImage?: (number | null) | Media;
@@ -2523,6 +2527,7 @@ export interface PostsSelect<T extends boolean = true> {
   title?: T;
   publishedAt?: T;
   aiPrompt?: T;
+  aiImagePrompts?: T;
   heroImage?: T;
   excerpt?: T;
   content?: T;

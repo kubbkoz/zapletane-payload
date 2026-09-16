@@ -156,6 +156,11 @@ export const Posts: CollectionConfig = {
      * Pole `aiPrompt` zostáva uložené aj po vygenerovaní — je to poznámka,
      * z čoho článok vznikol, a zároveň východisko, keď si majiteľka nechá
      * napísať ďalšiu verziu.
+     *
+     * Z19 pridáva druhý stĺpec `ai_image_prompts` — prompty na obrázky, ktoré
+     * vzniknú v tom istom volaní ako text. Znova `textarea`, nie pole blokov:
+     * majiteľka z neho kopíruje do generátora obrázkov a text si pokojne
+     * prepíše, takže štruktúrovaná schéma by bola len prekážka navyše.
      */
     {
       type: 'collapsible',
@@ -184,6 +189,17 @@ export const Posts: CollectionConfig = {
             },
           },
           label: 'Vygenerovať článok',
+        },
+        {
+          name: 'aiImagePrompts',
+          type: 'textarea',
+          label: 'Návrhy obrázkov (AI)',
+          admin: {
+            description:
+              'Vyplní sa automaticky spolu s článkom. Každý blok je jeden obrázok: riadok „Prompt:" skopírujte do generátora obrázkov (Midjourney, DALL·E, Higgsfield) a k promptu priložte fotku uvedeného produktu z jeho galérie — na obrázku tak bude naozaj to, čo predávame. Prompt je po anglicky zámerne, obrazové modely jej rozumejú najlepšie. Text pokojne upravte.',
+            rows: 12,
+          },
+          maxLength: 4000,
         },
       ],
       label: 'AI asistent',

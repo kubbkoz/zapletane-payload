@@ -5,7 +5,7 @@ import { getPayload } from 'payload'
 
 import { checkRole } from '@/access/utilities'
 import { sectionsToLexical } from '@/ai/articleLexical'
-import { generateArticle, MAX_PRODUCTS_IN_CONTEXT } from '@/ai/articleWriter'
+import { formatImagePrompts, generateArticle, MAX_PRODUCTS_IN_CONTEXT } from '@/ai/articleWriter'
 
 /**
  * POST /api/posts/generate — napíše článok do rozpísaného konceptu (Z15).
@@ -16,6 +16,11 @@ import { generateArticle, MAX_PRODUCTS_IN_CONTEXT } from '@/ai/articleWriter'
  * `payload.update` s `draft: true`. **Nikdy sa nepublikuje.** Článok skončí
  * ako koncept, majiteľka si ho prečíta, upraví a publikuje sama — to je celý
  * zmysel toho, že tu nie je žiadna automatika navyše.
+ *
+ * V tom istom volaní vznikajú aj **návrhy obrázkov** (Z19) — do poľa
+ * `aiImagePrompts`. Každý návrh menuje jeden skutočný produkt z katalógu,
+ * lebo majiteľka k promptu priloží jeho fotku ako referenciu. Sú to len
+ * poznámky v bočnom paneli: keď sa nevygenerujú, článok sa uloží aj tak.
  *
  * `slug` sa zámerne nenastavuje. Postará sa oň továreň `slugField()`: pri
  * zmene názvu (a toto uloženie nie je autosave) sa adresa prepočíta z nového
@@ -82,8 +87,13 @@ export async function POST(request: Request): Promise<Response> {
 
   /**
    * Kontext pre model: čo e-shop naozaj predáva. Len publikované, len názov a
-   * adresa, maximálne osem — model má z čoho vyberať a pritom nedostane do
-   * kontextu celý katalóg (drahé a zbytočné).
+   * adresa, maximálne `MAX_PRODUCTS_IN_CONTEXT` — model má z čoho vyberať
+   * a pritom nedostane do kontextu celý katalóg (drahé a zbytočné).
+   *
+   * Od Z19 stojí na tomto zozname aj druhá vec: prompty na obrázky. Obrázok sa
+   * generuje s priloženou fotkou skutočného produktu, takže model smie
+   * pomenovať len to, čo tu naozaj je. Keď sa načítanie nepodarí alebo je
+   * katalóg prázdny, návrhy obrázkov jednoducho nevzniknú — článok áno.
    */
   let products: { slug: string; title: string }[] = []
 
@@ -91,6 +101,8 @@ export async function POST(request: Request): Promise<Response> {
     const found = await payload.find({
       collection: 'products',
       depth: 0,
+      // Publikovaná verzia, nie rozpísaný koncept: fotka musí byť na webe.
+      draft: false,
       // `pagination` sa nevypína — inak by sa `limit` ignoroval a do kontextu
       // by spadol celý katalóg.
       limit: MAX_PRODUCTS_IN_CONTEXT,
@@ -133,6 +145,15 @@ export async function POST(request: Request): Promise<Response> {
   // Meta skupina zo SEO pluginu sa dopĺňa, neprepisuje — obrázok musí prežiť.
   const meta = (existing as Post).meta ?? {}
 
+  /**
+   * Návrhy obrázkov sa zapisujú vždy, aj keď sú prázdne.
+   *
+   * Prompty patria ku konkrétnemu textu (citujú jeho podnadpisy), takže keď si
+   * majiteľka nechá napísať novú verziu článku, staré návrhy už neplatia.
+   * Nechať ich v poli by znamenalo prompty na sekcie, ktoré v článku nie sú.
+   */
+  const imagePrompts = formatImagePrompts(article.imagePrompts)
+
   try {
     await payload.update({
       id: postId,
@@ -140,6 +161,7 @@ export async function POST(request: Request): Promise<Response> {
       // Koncept, nikdy nie publikovanie — hotový text si majiteľka pustí von sama.
       draft: true,
       data: {
+        aiImagePrompts: imagePrompts,
         aiPrompt: prompt,
         // Lexical stav z `@payloadcms/richtext-lexical` je štruktúrne rovnaký
         // ako generovaný typ poľa, len bez indexovej signatúry.
@@ -162,12 +184,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   payload.logger.info(
-    { elapsedMs, postId, usage, words: article.wordCount },
+    { elapsedMs, imagePrompts: article.imagePrompts.length, postId, usage, words: article.wordCount },
     `[posts/generate] hotovo: „${article.title}"`,
   )
 
   return json({
     elapsedMs,
+    // Koľko návrhov obrázkov pribudlo — tlačidlo to povie v hláške.
+    imagePrompts: article.imagePrompts.length,
     ok: true,
     title: article.title,
     wordCount: article.wordCount,
