@@ -28,13 +28,16 @@ import { formatImagePrompts, generateArticle, MAX_PRODUCTS_IN_CONTEXT } from '@/
  * mechanizmus obišiel a pri zamknutej adrese („URL upravujem ručne") by ju
  * dokonca prepísal proti vôli majiteľky.
  *
- * `maxDuration` je 120 s: samotné písanie trvá 50–90 s (600–900 slov po
- * slovensky je ~5 tokenov na slovo) a model má vlastný strop 100 s, takže na
- * zápis konceptu ostáva rezerva.
+ * `maxDuration` je 180 s: písanie trvá 60–120 s (600–900 slov po slovensky je
+ * ~5 tokenov na slovo a od Z19 k nim pribudnú ešte prompty na obrázky) a model
+ * má vlastný strop 150 s, takže na zápis konceptu ostáva rezerva. Pred Z19 to
+ * bolo 120/100 s — na článok so štyrmi návrhmi obrázkov to už nestačilo.
+ * Scraper v tomto repozitári beží s `maxDuration = 300`, takže 180 s je pre
+ * túto tarifu overená hodnota.
  */
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 180
 
 type GenerateBody = {
   postId?: unknown

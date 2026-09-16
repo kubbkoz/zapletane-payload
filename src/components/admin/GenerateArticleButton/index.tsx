@@ -24,8 +24,11 @@ import './generateArticle.scss'
 
 const ENDPOINT = '/api/posts/generate'
 
-/** Merané na `claude-sonnet-5`: 600–900 slov po slovensky trvá 60–90 s. */
-const EXPECTED_HINT = 'Píšem článok… (~1–2 minúty)'
+/**
+ * Merané na `claude-sonnet-5`: 600–900 slov po slovensky trvá 60–90 s,
+ * s návrhmi obrázkov (Z19) to býva 80–120 s.
+ */
+const EXPECTED_HINT = 'Píšem článok a návrhy obrázkov… (~1–2 minúty)'
 
 type GenerateResponse = {
   elapsedMs?: number

@@ -52,10 +52,16 @@ const TEMPERATURE = 0.8
 const SAMPLING_FREE_MODEL = /^claude-(fable|mythos)-|^claude-opus-(4-6|4-7|4-8|5)|^claude-sonnet-(4-6|5)/
 
 /**
- * Tvrdý strop na jedno volanie. Routa má `maxDuration = 120`, takže 100 s
- * necháva rezervu na zápis konceptu a na odpoveď do prehliadača.
+ * Tvrdý strop na jedno volanie.
+ *
+ * Pôvodných 100 s stačilo na samotný článok (~2 900 tokenov, ~75 s). Prompty na
+ * obrázky pridali ďalších 400–700 tokenov v tom istom volaní a merania to
+ * potvrdili: článok so štyrmi návrhmi 100 s prekročil a majiteľka videla
+ * „AI neodpovedala (časový limit)" namiesto hotového textu. Strop je preto 150 s
+ * a routa má `maxDuration = 180` — rezerva na zápis konceptu a odpoveď ostáva
+ * rovnaká ako predtým.
  */
-const AI_TIMEOUT_MS = 100_000
+const AI_TIMEOUT_MS = 150_000
 
 /**
  * Koľko produktov ide modelu do kontextu.
@@ -197,7 +203,7 @@ const SYSTEM_PROMPT = [
   '- Každý obrázok stojí na JEDNOM skutočnom produkte zo zoznamu vyššie. Majiteľka k promptu priloží fotku toho produktu ako referenciu, takže vymyslený produkt = prompt, ku ktorému neexistuje fotka.',
   '- `product` je presný názov zo zoznamu, znak po znaku — neskracuj ho, neprekladaj, neohýbaj do vety (na rozdiel od textu článku). Produkt, ktorý v zozname nie je, nesmieš použiť ani náhodou.',
   '- Každý obrázok pod inú sekciu. `heading` je presný podnadpis (h2) z tvojho článku, skopírovaný znak po znaku.',
-  '- `prompt` píš PO ANGLICKY, 40 až 80 slov, súvislý popis bez odrážok: scéna, kompozícia, svetlo, nálada.',
+  '- `prompt` píš PO ANGLICKY, 35 až 60 slov, súvislý popis bez odrážok: scéna, kompozícia, svetlo, nálada. Drž sa tejto dĺžky — dlhší prompt obrazový model neposlúchne lepšie, len predlžuje čakanie na článok.',
   '  Štýl značky: cozy handmade wicker and knitted aesthetic, warm natural daylight, soft shadows, muted natural palette, editorial lifestyle photography, realistic photo.',
   '  V každom prompte výslovne napíš, že priložený referenčný produkt je na zábere nezmenený a dobre viditeľný — napríklad „the attached reference product shown exactly as in the reference photo, unchanged, prominently in frame".',
   '  Na konci promptu vždy: „no text overlays, no logos, no watermarks".',
