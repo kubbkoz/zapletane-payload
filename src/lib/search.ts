@@ -111,7 +111,12 @@ export async function buildProductSearchClauses(
     clauses.push({ title: { like: term } })
   }
   if (searchFields.includes('description')) {
-    clauses.push({ description: { like: term } })
+    // „Popis" sa vyhľadáva cez meta.description (textový stĺpec, Z4 hook ho
+    // plní slovenským súhrnom). Samotné `description` je lexical richtext
+    // uložený v Postgrese ako jsonb a `like` nad ním padá (42883: operator
+    // does not exist: jsonb ~~* unknown) — na SQLite to fungovalo len vďaka
+    // TEXT serializácii, preto to dev ani e2e neodhalili.
+    clauses.push({ 'meta.description': { like: term } })
   }
   if (searchFields.includes('categories')) {
     const matchingCategories = await payload.find({
