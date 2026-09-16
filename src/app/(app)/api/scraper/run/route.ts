@@ -587,7 +587,9 @@ export async function POST(request: Request): Promise<Response> {
           notes.push(
             `Na ${skippedForTime} ${
               skippedForTime === 1 ? 'produkt' : 'produkty'
-            } z testovacieho behu nezostal v 45 s čas — ukazujú sa len tie preložené. Spusti test znova, alebo rovno import (ten si čas rozdelí na viac krokov).`,
+            } z testovacieho behu nezostal v ${Math.round(
+              PREVIEW_BUDGET_MS / 1_000,
+            )} s čas — ukazujú sa len tie preložené. Spusti test znova, alebo rovno import (ten si čas rozdelí na viac krokov).`,
           )
         }
 
@@ -961,9 +963,30 @@ export async function POST(request: Request): Promise<Response> {
   })
 
   // Práca beží AŽ PO ODOSLANÍ ODPOVEDE. Odtiaľ sa už nikomu nič nevracia —
-  // jediný výstup je dokument úlohy, ktorý admin panel priebežne číta.
+  // jediný výstup je dokument úlohy, ktorý admin panel priebežne číta. Preto
+  // sa tu chytá aj to, čo by `work` nechytila samo: výnimka, ktorá by odtiaľto
+  // ušla, by nechala úlohu naveky v stave „importuje sa" bez riadku v logu a
+  // majiteľka by čakala na počítadlá, ktoré sa nepohnú.
   after(async () => {
-    await work('batch')
+    try {
+      await work('batch')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      payload.logger.error(`[scraper] Úloha ${String(jobId)} spadla po odpovedi: ${message}`)
+
+      await payload
+        .update({
+          collection: 'scraper-jobs',
+          id: jobId,
+          data: {
+            log: appendLog(job.log, [`CHYBA po odoslaní odpovede: ${message}`]),
+            status: 'failed',
+          },
+          overrideAccess: true,
+        })
+        .catch(() => undefined)
+    }
   })
 
   return json(
