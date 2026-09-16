@@ -2,14 +2,13 @@
 import type { Product, Variant } from '@/payload-types'
 
 import { RichText } from '@/components/RichText'
-import { AddToCart } from '@/components/Cart/AddToCart'
 import { Price } from '@/components/Price'
 import React, { Suspense } from 'react'
 import { Hand, Leaf, Truck } from 'lucide-react'
 
 import { VariantSelector } from './VariantSelector'
 import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
-import { StockIndicator } from '@/components/product/StockIndicator'
+import { PurchasePanel } from '@/components/product/PurchasePanel'
 
 /**
  * PDP information column.
@@ -21,6 +20,11 @@ import { StockIndicator } from '@/components/product/StockIndicator'
  * Price is `font-tech font-black` per §3.3, and the perk row under the CTA
  * repeats the hero's three brand pillars so the promise is restated at the
  * point of purchase.
+ *
+ * Purchase panel order (Z18 redesign): price → variant selector (untouched)
+ * → `PurchasePanel` (stock counter → quantity stepper → add-to-cart +
+ * wishlist row → Google Pay express button, the last gated behind
+ * `cardPaymentEnabled` resolved server-side in `products/[slug]/page.tsx`).
  */
 
 const PERKS = [
@@ -29,7 +33,13 @@ const PERKS = [
   { icon: Truck, label: 'Doručenie do 3 dní' },
 ]
 
-export function ProductDescription({ product }: { product: Product }) {
+type Props = {
+  /** Server-resolved (Z18): does an enabled `payment-methods` row of type `card` exist? */
+  cardPaymentEnabled?: boolean
+  product: Product
+}
+
+export function ProductDescription({ cardPaymentEnabled = false, product }: Props) {
   const { currency } = useCurrency()
   let amount = 0,
     lowestAmount = 0,
@@ -119,13 +129,7 @@ export function ProductDescription({ product }: { product: Product }) {
 
       <div className="mt-8">
         <Suspense fallback={null}>
-          <StockIndicator product={product} />
-        </Suspense>
-      </div>
-
-      <div className="mt-6">
-        <Suspense fallback={null}>
-          <AddToCart product={product} />
+          <PurchasePanel cardPaymentEnabled={cardPaymentEnabled} product={product} />
         </Suspense>
       </div>
 

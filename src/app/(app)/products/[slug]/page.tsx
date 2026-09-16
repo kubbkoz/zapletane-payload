@@ -111,7 +111,10 @@ export async function generateMetadata({ params }: Args): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Args) {
   const { slug } = await params
-  const product = await queryProductBySlug({ slug })
+  const [product, cardPaymentEnabled] = await Promise.all([
+    queryProductBySlug({ slug }),
+    queryCardPaymentEnabled(),
+  ])
 
   if (!product) {
     await redirectIfRenamed(slug)
@@ -170,7 +173,7 @@ export default async function ProductPage({ params }: Args) {
             </div>
 
             <div className="lg:pt-2">
-              <ProductDescription product={product} />
+              <ProductDescription cardPaymentEnabled={cardPaymentEnabled} product={product} />
             </div>
           </div>
         </div>
@@ -236,4 +239,32 @@ const queryProductBySlug = cache(async ({ slug }: { slug: string }) => {
   })
 
   return result.docs?.[0] || null
+})
+
+/**
+ * GPay express-button visibility gate (Z18) — a plain existence check, not
+ * the checkout page's stricter gateway-credential filter
+ * (`checkout/page.tsx`'s `getCheckoutMethods`): the owner spec only asks
+ * "does an enabled `payment-methods` row of type `card` exist", so that is
+ * all this resolves. `cache()` per request, same as `queryProductBySlug`.
+ */
+const queryCardPaymentEnabled = cache(async (): Promise<boolean> => {
+  try {
+    const payload = await getPayload({ config: configPromise })
+
+    const result = await payload.find({
+      collection: 'payment-methods',
+      depth: 0,
+      limit: 1,
+      pagination: false,
+      where: {
+        and: [{ type: { equals: 'card' } }, { enabled: { equals: true } }],
+      },
+    })
+
+    return result.docs.length > 0
+  } catch (error) {
+    console.error('[pdp] Could not resolve card payment method availability:', error)
+    return false
+  }
 })

@@ -16,18 +16,75 @@ import { ArrowRight, ShoppingCart } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { QuantityStepper } from '@/components/product/QuantityStepper'
 import { CartCrossSell } from './CartCrossSell'
 import { useCartDrawer } from './CartDrawerProvider'
 import { DeleteItemButton } from './DeleteItemButton'
-import { EditItemQuantityButton } from './EditItemQuantityButton'
 import { OpenCartButton } from './OpenCart'
 import { useIsMobileViewport } from './useIsMobileViewport'
 import { Product, Variant } from '@/payload-types'
+import type { CartItem } from './index'
 
 type GalleryItem = NonNullable<Product['gallery']>[number]
 type VariantOptionRef = Variant['options'][number]
+
+/**
+ * Cart-line quantity control — the shared `QuantityStepper` markup (Z18),
+ * bridged onto the only client-side primitives the cart hook exposes:
+ * `incrementItem`/`decrementItem`, each worth exactly ±1. A typed/clamped
+ * jump of more than one step is walked there via repeated calls — the same
+ * calls the old +/- buttons made (`EditItemQuantityButton`, now unused
+ * here), never a new "set quantity" operation. `min={0}` is deliberate: the
+ * drawer's original behaviour let decrementing the last unit remove the
+ * line entirely (the server's `removeOnZero` default) — a `min` of `1`
+ * (the PDP's default) would silently break that.
+ */
+function CartItemQuantityStepper({ item }: { item: CartItem }) {
+  const { decrementItem, incrementItem, isLoading } = useCart()
+
+  const target =
+    item.variant && typeof item.variant === 'object'
+      ? item.variant
+      : item.product && typeof item.product === 'object'
+        ? item.product
+        : null
+
+  const maxQuantity =
+    target && typeof target === 'object' && typeof target.inventory === 'number'
+      ? target.inventory
+      : undefined
+
+  const quantity = item.quantity ?? 1
+
+  const onChange = useCallback(
+    async (next: number) => {
+      if (!item.id || next === quantity) return
+
+      const steps = Math.abs(next - quantity)
+
+      for (let i = 0; i < steps; i++) {
+        if (next > quantity) {
+          await incrementItem(item.id)
+        } else {
+          await decrementItem(item.id)
+        }
+      }
+    },
+    [decrementItem, incrementItem, item.id, quantity],
+  )
+
+  return (
+    <QuantityStepper
+      disabled={isLoading || !item.id}
+      max={maxQuantity}
+      min={0}
+      onChange={(next) => void onChange(next)}
+      value={quantity}
+    />
+  )
+}
 
 /**
  * Cart drawer — the "Aero" off-canvas recipe (DESIGN-SPEC §3.2/§3.4): on desktop
@@ -243,13 +300,7 @@ export function CartModal() {
                           ) : null}
 
                           <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-                            <div className="flex h-11 items-center rounded-default border border-gray-200">
-                              <EditItemQuantityButton item={item} type="minus" />
-                              <span className="w-8 text-center font-tech text-sm font-bold text-black">
-                                {item.quantity}
-                              </span>
-                              <EditItemQuantityButton item={item} type="plus" />
-                            </div>
+                            <CartItemQuantityStepper item={item} />
 
                             {typeof price === 'number' && (
                               <Price

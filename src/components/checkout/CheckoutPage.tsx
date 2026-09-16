@@ -9,7 +9,7 @@ import { useAuth } from '@/providers/Auth'
 import { Elements } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { ShieldCheck, ShoppingCart } from 'lucide-react'
 
@@ -72,6 +72,7 @@ type Props = {
 export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods }) => {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { cart, clearCart } = useCart()
   const [error, setError] = useState<null | string>(null)
   /**
@@ -91,9 +92,19 @@ export const CheckoutPage: React.FC<Props> = ({ paymentMethods, shippingMethods 
   const [selectedShippingID, setSelectedShippingID] = useState<null | number>(
     shippingMethods[0]?.id ?? null,
   )
-  const [selectedPaymentID, setSelectedPaymentID] = useState<null | number>(
-    paymentMethods[0]?.id ?? null,
-  )
+  // Z18 — the PDP's "Kúpiť cez Google Pay" express button sends the shopper
+  // here with `?platba=karta`; when a card payment method is actually on
+  // offer, preselect it instead of the usual "first method wins" default. A
+  // one-time initializer (matches `selectedShippingID`'s own pattern) is
+  // enough: this is a preselection, not a param the UI stays synced to.
+  const [selectedPaymentID, setSelectedPaymentID] = useState<null | number>(() => {
+    if (searchParams.get('platba') === 'karta') {
+      const cardMethod = paymentMethods.find((method) => method.type === 'card')
+      if (cardMethod) return cardMethod.id
+    }
+
+    return paymentMethods[0]?.id ?? null
+  })
 
   const cartIsEmpty = !cart || !cart.items || !cart.items.length
 

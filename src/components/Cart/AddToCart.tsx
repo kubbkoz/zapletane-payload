@@ -13,17 +13,27 @@ import { cn } from '@/utilities/cn'
 type Props = {
   product: Product
   className?: string
+  /**
+   * Selected quantity to add (Z18 — the PDP's `QuantityStepper` controls
+   * this). Defaults to 1, matching every other caller (the product card's
+   * `CardAddToCartButton` still adds a single unit).
+   */
+  quantity?: number
 }
 
 /**
  * PDP primary CTA. Visual layer only — the cart wiring (useCart/addItem, the
- * inventory-aware disabled rule) is byte-for-byte the template's.
+ * inventory-aware disabled rule) is byte-for-byte the template's, now
+ * extended to pass the selected `quantity` straight through to `addItem`'s
+ * own `quantity` parameter (`@payloadcms/plugin-ecommerce/client/react`
+ * supports it natively — no loop needed).
  *
  * Styling is `BaseButton variant="primary" size="lg"` from DESIGN-SPEC §3.7:
  * bg-accent / hover bg-accent-dark, white text, uppercase tracking-widest,
- * rounded-default — full width on mobile, fixed min-width on desktop (§3.3).
+ * rounded-default. `flex-1` (not a fixed width) because the CTA now shares a
+ * row with the wishlist square button (Z18 purchase-panel redesign).
  */
-export function AddToCart({ product, className }: Props) {
+export function AddToCart({ product, className, quantity = 1 }: Props) {
   const { addItem, cart, isLoading } = useCart()
   const searchParams = useSearchParams()
 
@@ -52,14 +62,19 @@ export function AddToCart({ product, className }: Props) {
     (e: React.FormEvent<HTMLButtonElement>) => {
       e.preventDefault()
 
-      addItem({
-        product: product.id,
-        variant: selectedVariant?.id ?? undefined,
-      }).then(() => {
+      const qty = Math.max(1, Math.trunc(quantity) || 1)
+
+      addItem(
+        {
+          product: product.id,
+          variant: selectedVariant?.id ?? undefined,
+        },
+        qty,
+      ).then(() => {
         toast.success('Produkt bol pridaný do košíka.')
       })
     },
-    [addItem, product, selectedVariant],
+    [addItem, product, quantity, selectedVariant],
   )
 
   const disabled = useMemo<boolean>(() => {
@@ -118,7 +133,7 @@ export function AddToCart({ product, className }: Props) {
     <button
       aria-label="Pridať do košíka"
       className={cn(
-        'inline-flex w-full items-center justify-center gap-3 rounded-default border border-accent bg-accent px-8 py-4 font-sans text-sm font-bold uppercase tracking-widest text-white transition-colors duration-300 hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[260px]',
+        'inline-flex h-12 flex-1 items-center justify-center gap-3 rounded-default border border-accent bg-accent px-6 font-sans text-sm font-bold uppercase tracking-widest text-white transition-colors duration-300 hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       disabled={disabled || isLoading}
