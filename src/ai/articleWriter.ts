@@ -201,7 +201,7 @@ const SYSTEM_PROMPT = [
   'OBRÁZKY DO ČLÁNKU',
   `- K článku navrhni ${MIN_IMAGE_PROMPTS} až ${MAX_IMAGE_PROMPTS} obrázkov — prompty pre generátor obrázkov (Midjourney, DALL·E, Higgsfield).`,
   '- Každý obrázok stojí na JEDNOM skutočnom produkte zo zoznamu vyššie. Majiteľka k promptu priloží fotku toho produktu ako referenciu, takže vymyslený produkt = prompt, ku ktorému neexistuje fotka.',
-  '- `product` je presný názov zo zoznamu, znak po znaku — neskracuj ho, neprekladaj, neohýbaj do vety (na rozdiel od textu článku). Produkt, ktorý v zozname nie je, nesmieš použiť ani náhodou.',
+  '- `productNumber` je poradové číslo produktu zo zoznamu vyššie (1, 2, 3…). Nič iné tam nepatrí — názov si doplníme sami. Číslo mimo zoznamu = návrh sa zahodí.',
   '- Každý obrázok pod inú sekciu. `heading` je presný podnadpis (h2) z tvojho článku, skopírovaný znak po znaku.',
   '- `prompt` píš PO ANGLICKY, 35 až 60 slov, súvislý popis bez odrážok: scéna, kompozícia, svetlo, nálada. Drž sa tejto dĺžky — dlhší prompt obrazový model neposlúchne lepšie, len predlžuje čakanie na článok.',
   '  Štýl značky: cozy handmade wicker and knitted aesthetic, warm natural daylight, soft shadows, muted natural palette, editorial lifestyle photography, realistic photo.',
@@ -218,10 +218,14 @@ const SYSTEM_PROMPT = [
   '  "sections": [{ "heading": "podnadpis h2 (v prvej sekcii vynechaj)", "paragraphs": ["odsek", "odsek"] }],',
   `  "metaTitle": "maximálne 60 znakov vrátane prípony ' | ${BRAND}', ktorou musí končiť",`,
   `  "metaDescription": "${MIN_DESCRIPTION} až ${MAX_DESCRIPTION} znakov — spočítaj si ich, kratší popis je chyba; celé vety, vecne o čom článok je",`,
-  '  "imagePrompts": [{ "heading": "presný podnadpis sekcie z tohto článku", "product": "presný názov produktu zo zoznamu", "prompt": "image prompt in English" }]',
+  '  "imagePrompts": [{ "heading": "presný podnadpis sekcie z tohto článku", "productNumber": 1, "prompt": "image prompt in English" }]',
   '}',
   'Prvá sekcia je úvod — nechaj jej `heading` prázdny. Každá ďalšia sekcia má `heading` aj `paragraphs`.',
   'Text v `paragraphs` je čistý text bez HTML a bez markdownu (žiadne **, ##, -).',
+  // Rovná úvodzovka v texte ukončí reťazec a rozbije celý JSON. Model to raz
+  // za čas spraví práve pri názve produktu („Regan"), takže sa zakazuje znak,
+  // nie situácia — slovenský text rovnú úvodzovku nepotrebuje.
+  'V textoch NIKDY nepoužívaj rovnú úvodzovku ("). Keď potrebuješ úvodzovky, píš „ a “ (napríklad kreslo „Regan“). Apostrof píš ako ’.',
 ].join('\n')
 
 const buildUserPrompt = ({ products, prompt }: ArticleWriterInput): string => {
@@ -237,8 +241,11 @@ const buildUserPrompt = ({ products, prompt }: ArticleWriterInput): string => {
     // text bez odkazov a adresa v strede vety by z neho urobila katalóg.
     lines.push(
       '',
-      `Produkty, ktoré práve predávaš (spomeň len tie, ktoré sa k téme naozaj hodia — pokojne aj žiadny). Z tohto zoznamu vyberáš aj produkty do promptov na obrázky, a to presným názvom:`,
-      ...list.map((product) => `- ${product.title}`),
+      `Produkty, ktoré práve predávaš (spomeň len tie, ktoré sa k téme naozaj hodia — pokojne aj žiadny). Z tohto zoznamu vyberáš aj produkty do promptov na obrázky, a to ČÍSLOM:`,
+      // Číslovaný zoznam, nie odrážky: do `imagePrompts` sa vracia poradové
+      // číslo a názov si doplníme sami. Model tak nemusí prepisovať názvy
+      // s úvodzovkami („Regan") do JSON-u — presne na tom padal.
+      ...list.map((product, index) => `${index + 1}. ${product.title}`),
     )
   } else {
     // Bez katalógu nie je ku ktorej fotke prompt priložiť.
@@ -254,6 +261,57 @@ const buildUserPrompt = ({ products, prompt }: ArticleWriterInput): string => {
 
 const squash = (value: string): string => value.replace(/\s+/g, ' ').trim()
 
+/**
+ * Zalepí JSON, ktorý model pokazil vnútri reťazca.
+ *
+ * Prakticky vždy ide o dve veci: neuniknutú rovnú úvodzovku uprostred vety
+ * (`kreslo „Regan" — má taký tvar`) a surový nový riadok v odseku. Oboje
+ * ukončí reťazec skôr, než mal skončiť, a `JSON.parse` padne na celom článku —
+ * aj keď je text v poriadku a chýba mu jediné spätné lomítko.
+ *
+ * Prejde sa teda znak po znaku: úvodzovka vnútri reťazca ukončuje reťazec len
+ * vtedy, keď za ňou (po medzerách) nasleduje štruktúrny znak `, : } ]`.
+ * Inak sa jej doplní únik. Používa sa výhradne ako záchrana po neúspešnom
+ * `JSON.parse` — čistú odpoveď sa tento kód nikdy nedotkne.
+ */
+const CONTROL_ESCAPES: Record<string, string> = { '\n': '\\n', '\r': '\\r', '\t': '\\t' }
+
+const repairJson = (source: string): null | string => {
+  let out = ''
+  let inString = false
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]!
+
+    if (!inString) {
+      out += char
+
+      if (char === '"') inString = true
+
+      continue
+    }
+
+    if (char === '\\') {
+      out += char + (source[index + 1] ?? '')
+      index += 1
+      continue
+    }
+
+    if (char === '"') {
+      const closes = /^\s*[,:}\]]/.test(source.slice(index + 1))
+
+      out += closes ? char : '\\"'
+      inString = !closes
+      continue
+    }
+
+    // Surový riadkový zlom v reťazci je tá istá chyba, len menej viditeľná.
+    out += CONTROL_ESCAPES[char] ?? char
+  }
+
+  return inString ? null : out
+}
+
 /** Z odpovede modelu vytiahne JSON objekt aj spod ```-bloku či vety okolo. */
 const extractJson = (text: string): null | Record<string, unknown> => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
@@ -263,13 +321,25 @@ const extractJson = (text: string): null | Record<string, unknown> => {
 
   if (start === -1 || end <= start) return null
 
-  try {
-    const parsed: unknown = JSON.parse(candidate.slice(start, end + 1))
+  const slice = candidate.slice(start, end + 1)
 
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
-  } catch {
-    return null
+  const read = (value: string): null | Record<string, unknown> => {
+    try {
+      const parsed: unknown = JSON.parse(value)
+
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+    } catch {
+      return null
+    }
   }
+
+  const direct = read(slice)
+
+  if (direct) return direct
+
+  const repaired = repairJson(slice)
+
+  return repaired ? read(repaired) : null
 }
 
 /** Z odpovede Messages API poskladá text (content[] je pole blokov). */
@@ -465,7 +535,13 @@ const readImagePrompts = (
     if (prompts.length >= MAX_IMAGE_PROMPTS) break
 
     const source = (entry ?? {}) as Record<string, unknown>
-    const product = matchProduct(readString(source, 'product'), catalogue)
+    // Poradové číslo je hlavná cesta; názov sa číta len ako záloha, keby si
+    // model schému poplietol (staršie odpovede vracali `product`).
+    const number = Number(source.productNumber)
+    const product =
+      Number.isInteger(number) && number >= 1 && number <= context.products.length
+        ? context.products[number - 1]!
+        : matchProduct(readString(source, 'product'), catalogue)
     const prompt = clampPrompt(readString(source, 'prompt'))
 
     if (!product || prompt.length < MIN_IMAGE_PROMPT_CHARS) continue
