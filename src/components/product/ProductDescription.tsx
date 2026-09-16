@@ -105,6 +105,7 @@ export function ProductDescription({ product }: { product: Product }) {
           className="mt-7 max-w-[520px] font-sans text-sm leading-relaxed text-gray-600 md:text-base"
           data={product.description}
           enableGutter={false}
+          enableHeadingMark
         />
       ) : null}
 

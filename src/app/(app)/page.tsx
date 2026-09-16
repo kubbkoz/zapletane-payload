@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
-import type { Category, Product } from '@/payload-types'
+import type { Category, Post, Product } from '@/payload-types'
 
 import configPromise from '@payload-config'
+import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
 import React from 'react'
 
 import { RenderBlocks } from '@/blocks/RenderBlocks'
+import { HomeBlogSection } from '@/components/home/HomeBlogSection'
 import { HomeCategoryGrid } from '@/components/home/HomeCategoryGrid'
 import { HomeFeatures } from '@/components/home/HomeFeatures'
 import { HomeGiftCta } from '@/components/home/HomeGiftCta'
@@ -89,6 +91,53 @@ async function queryCategories(): Promise<Category[]> {
   }
 }
 
+/**
+ * Latest 3 published posts for the "Z nášho blogu" section (Z17).
+ *
+ * `Posts`' own `afterChange`/`afterDelete` hooks (src/collections/Posts.ts)
+ * only `revalidatePath` the `/blog` routes, not `/` — there is no existing
+ * tag a homepage listing could piggy-back on, so this is time-based only:
+ * `revalidate: 300` is the ceiling, same as the other homepage reads
+ * (`getHomepage.ts` uses 60s off its own global hook; a blog post is far
+ * less time-sensitive). The tag is still declared for a future targeted
+ * invalidation, it just has nothing revalidating it yet.
+ */
+const HOME_LATEST_POSTS_TAG = 'home-latest-posts'
+
+const readLatestPosts = unstable_cache(
+  async (): Promise<Partial<Post>[]> => {
+    const payload = await getPayload({ config: configPromise })
+    const result = await payload.find({
+      collection: 'posts',
+      depth: 1,
+      draft: false,
+      limit: 3,
+      overrideAccess: false,
+      select: {
+        title: true,
+        slug: true,
+        excerpt: true,
+        heroImage: true,
+        publishedAt: true,
+      },
+      sort: '-publishedAt',
+      where: { _status: { equals: 'published' } },
+    })
+    return result.docs
+  },
+  ['home-latest-posts'],
+  { revalidate: 300, tags: [HOME_LATEST_POSTS_TAG] },
+)
+
+async function queryLatestPosts(): Promise<Partial<Post>[]> {
+  try {
+    return await readLatestPosts()
+  } catch (_err) {
+    // Empty or unreachable database (fresh deploy) — the section simply hides.
+    return []
+  }
+}
+
 async function queryHomeLayout() {
   try {
     const payload = await getPayload({ config: configPromise })
@@ -112,10 +161,11 @@ export default async function HomePage() {
   const homepage = await getHomepage()
   const tabsConfig = resolveProductTabs(homepage)
 
-  const [tabProducts, categories, layout] = await Promise.all([
+  const [tabProducts, categories, layout, latestPosts] = await Promise.all([
     Promise.all(tabsConfig.tabs.map((tab) => queryProducts(tab.sort))),
     queryCategories(),
     queryHomeLayout(),
+    queryLatestPosts(),
   ])
 
   const tabs: ProductTab[] = tabsConfig.tabs
@@ -148,6 +198,9 @@ export default async function HomePage() {
       <HomeCategoryGrid categories={categories} content={resolveCategorySection(homepage)} />
       <HomeGiftCta content={resolveGiftCta(homepage)} />
       {layout?.length ? <RenderBlocks blocks={layout} /> : null}
+      {/* Last section on the page, directly above the Footer that
+          (app)/layout.tsx renders below `children` — see owner spec Z17. */}
+      <HomeBlogSection posts={latestPosts} />
     </React.Fragment>
   )
 }

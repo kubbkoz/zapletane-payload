@@ -3,6 +3,15 @@ import React from 'react'
 
 import { defaultTheme, themeLocalStorageKey } from '../shared'
 
+/**
+ * Z17 pin: the STOREFRONT is light-only by design (see the matching comment
+ * on `getImplicitPreference` in `../shared.ts`) — this script can't import
+ * that module (it has to run inline, before hydration, to avoid a
+ * light->dark flash), so the `prefers-color-scheme` read that used to live
+ * here is removed by hand, in step with `shared.ts`. Only a previously
+ * stored, explicit `light`/`dark` preference can still override
+ * `defaultTheme`; a device's dark system preference alone no longer can.
+ */
 export const InitTheme: React.FC = () => {
   return (
     // eslint-disable-next-line @next/next/no-before-interactive-script-outside-document
@@ -10,18 +19,6 @@ export const InitTheme: React.FC = () => {
       dangerouslySetInnerHTML={{
         __html: `
   (function () {
-    function getImplicitPreference() {
-      var mediaQuery = '(prefers-color-scheme: dark)'
-      var mql = window.matchMedia(mediaQuery)
-      var hasImplicitPreference = typeof mql.matches === 'boolean'
-
-      if (hasImplicitPreference) {
-        return mql.matches ? 'dark' : 'light'
-      }
-
-      return null
-    }
-
     function themeIsValid(theme) {
       return theme === 'light' || theme === 'dark'
     }
@@ -31,12 +28,6 @@ export const InitTheme: React.FC = () => {
 
     if (themeIsValid(preference)) {
       themeToSet = preference
-    } else {
-      var implicitPreference = getImplicitPreference()
-
-      if (implicitPreference) {
-        themeToSet = implicitPreference
-      }
     }
 
     document.documentElement.setAttribute('data-theme', themeToSet)

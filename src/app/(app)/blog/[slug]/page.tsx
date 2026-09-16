@@ -267,6 +267,7 @@ export default async function PostPage({ params }: Args) {
             className="mt-12 max-w-[760px] prose-headings:font-display prose-headings:font-medium prose-a:text-brand"
             data={post.content}
             enableGutter={false}
+            enableHeadingMark
           />
         ) : null}
       </article>

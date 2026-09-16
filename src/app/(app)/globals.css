@@ -738,3 +738,45 @@ button {
    23px TopBar + 67px main row + 41px DesktopNav = 131px; see HomeHero.tsx
    for the matching heading-size split). */
 @custom-variant large-desktop (@media (width >= 1600px));
+
+/* ============================================================================
+   Appended by the Z17 pass — content-heading brand mark. New class only;
+   nothing above is modified.
+   ============================================================================ */
+
+/* Small brown heart/knot to the left of every h2/h3 inside a RichText body
+   that opts in via `enableHeadingMark` (src/components/RichText) — wired
+   today for the blog article body and the PDP description, both rendered by
+   that same component. h1 is deliberately excluded (design.md — only
+   *content* headings get the mark, never the page's own h1).
+
+   The mark is a `mask-image` reproduction of the site's own logo shape
+   (src/components/Logo/Logo.tsx — two overlapping rounded "links", viewBox
+   0 0 136 108) rather than a second copy of the artwork, same technique the
+   admin nav icons use in custom.scss §7 (background-color + SVG mask, color
+   thrown away since a mask only reads alpha). Pure CSS: survives lexical
+   re-renders with no per-heading-node React work, and is scoped by class so
+   it never reaches ADMIN or any non-opted-in RichText usage (Banner/Content
+   blocks, hero copy, etc). */
+@layer components {
+  .richtext-heading-mark :where(h2, h3):not(:where([class~='not-prose'] *)) {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+  .richtext-heading-mark :where(h2, h3):not(:where([class~='not-prose'] *))::before {
+    content: '';
+    flex: none;
+    width: 16px;
+    height: 12.7px;
+    background-color: var(--color-brand);
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 136 108%27%3E%3Crect x=%27-40%27 y=%27-20%27 width=%2780%27 height=%2740%27 rx=%2720%27 stroke=%27black%27 stroke-width=%2715%27 fill=%27none%27 transform=%27translate(54,54) rotate(45)%27/%3E%3Crect x=%27-40%27 y=%27-20%27 width=%2780%27 height=%2740%27 rx=%2720%27 stroke=%27black%27 stroke-width=%2715%27 fill=%27none%27 transform=%27translate(82,54) rotate(-45)%27/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 136 108%27%3E%3Crect x=%27-40%27 y=%27-20%27 width=%2780%27 height=%2740%27 rx=%2720%27 stroke=%27black%27 stroke-width=%2715%27 fill=%27none%27 transform=%27translate(54,54) rotate(45)%27/%3E%3Crect x=%27-40%27 y=%27-20%27 width=%2780%27 height=%2740%27 rx=%2720%27 stroke=%27black%27 stroke-width=%2715%27 fill=%27none%27 transform=%27translate(82,54) rotate(-45)%27/%3E%3C/svg%3E");
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+}
