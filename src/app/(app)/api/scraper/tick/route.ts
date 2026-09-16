@@ -18,6 +18,10 @@ import { hasInternalToken, isHeartbeatStale, kickBatch, STALE_HEARTBEAT_MS } fro
  * (`heartbeatAt`) je starší než `STALE_HEARTBEAT_MS`, kopne znova. Živé úlohy
  * nechá na pokoji — inak by na tej istej fronte vznikli dve reťaze.
  *
+ * Od Z16 odpovedá `/api/scraper/run` na dávku 202-kou hneď po overení bŕzd a
+ * prácu robí až po odpovedi, takže „rozbehnutá" úloha tu znamená naozaj
+ * prijatá, nie len odoslaná do prázdna.
+ *
  * **Spúšťa ju `vercel.json` raz denne.** Denná frekvencia je zámerná: cron
  * s kratším intervalom je na Verceli vec tarifu a toto má fungovať na
  * ktoromkoľvek. Nie je to hlavný pohon importu (ten je reťaz), len poistka —
@@ -29,7 +33,15 @@ import { hasInternalToken, isHeartbeatStale, kickBatch, STALE_HEARTBEAT_MS } fro
  */
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+
+/**
+ * Strop platformy, nie náš pracovný čas (Z16).
+ *
+ * Táto routa len rozposiela kopnutia a od Z16 jej `/api/scraper/run` odpovedá
+ * 202-kou okamžite, takže reálne beží sekundy. Tristo je tu preto, aby sa
+ * hodnota nelíšila od `run` a nikoho nemýlilo, prečo je inde iná.
+ */
+export const maxDuration = 300
 
 /** Koľko úloh sa v jednom behu skontroluje. Viac ich naraz nikdy nebeží. */
 const MAX_JOBS = 20

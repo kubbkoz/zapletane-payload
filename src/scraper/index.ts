@@ -41,7 +41,7 @@ export {
   roundUpTo99,
   type PriceConversion,
 } from './price'
-export { scrapeAndPrepare, type ScrapeResult } from './pipeline'
+export { scrapeAndPrepare, type PreparedFailure, type ScrapeResult } from './pipeline'
 export {
   isShouted,
   normalizeTitle,
@@ -50,10 +50,17 @@ export {
   UPPERCASE_RATIO_THRESHOLD,
 } from './titleCase'
 export {
+  timeoutFor,
   translateBatch,
   translateCategoryNames,
   TRANSLATION_CHUNK_SIZE,
+  TRANSLATION_MAX_TIMEOUT_MS,
+  TRANSLATION_MIN_TIMEOUT_MS,
   type CategoryTranslation,
+  type TranslateBatchResult,
+  type TranslationFailureCause,
+  type TranslationOutcome,
+  type TranslationUsage,
 } from './translate'
 export type {
   CategoryMapEntry,

@@ -32,6 +32,14 @@
  * Keď reťaz aj tak padne (výpadok, reštart, timeout), úloha ostane v stave
  * „importuje sa" so starým tepom. Vtedy ju znova rozbehne buď majiteľka
  * tlačidlom „Pokračovať", alebo denný beh `/api/scraper/tick`.
+ *
+ * **Z16 — práca sa presunula za odpoveď.** Do Z15 route dávku spracovala a až
+ * potom odpovedala, takže prehliadač (a pri reťazení rodičovská dávka) čakal
+ * desiatky sekúnd a pri pomalom preklade ho platforma zabila — majiteľka videla
+ * HTTP 504. Teraz route pri `mode: 'batch'` iba overí brzdy, označí úlohu za
+ * bežiacu, odpovie **202** a CELÚ prácu spraví v `after()`, teda až po odoslaní
+ * odpovede. Odpoveď je preto vždy okamžitá a žiadne čakanie sa už nedá
+ * odstreliť. Poistky nižšie sa nezmenili — vyhodnocujú sa stále pred prácou.
  */
 import { timingSafeEqual } from 'node:crypto'
 
@@ -39,20 +47,54 @@ import { timingSafeEqual } from 'node:crypto'
 export const CHAIN_LIMIT = 500
 
 /**
+ * Jeden rozpočet na celú prácu jedného článku reťaze (Z16).
+ *
+ * Kryje VŠETKO: sťahovanie stránok, preklad, sťahovanie fotiek aj zápisy do
+ * databázy. Po jeho vyčerpaní sa nič nové nezačína a nespracované produkty
+ * ostávajú vo fronte pre ďalší článok — kurzor sa posunie len o to, čo je
+ * naozaj hotové.
+ *
+ * Prečo 40 s, keď `maxDuration` je 300: rozpočet nemá byť strop platformy, ale
+ * bezpečná vzdialenosť od nej. Tarifa môže `maxDuration` zrezať na 60 s a
+ * rozbehnutý produkt (posledné fotky + zápis) si po uplynutí rozpočtu ešte
+ * chvíľu doberá. Štyridsať sekúnd necháva na ten dobeh dosť aj pri najhoršom
+ * strope.
+ */
+export const BATCH_BUDGET_MS = 40_000
+
+/**
+ * Rozpočet testovacieho behu.
+ *
+ * Testovací beh ostáva SYNCHRÓNNY — majiteľka pri ňom stojí a chce vidieť
+ * náhľady — takže musí dobehnúť skôr, než ju prehliadač alebo platforma
+ * prestane baviť. Preklad troch dlhých produktov sa do toho nezmestí vždy;
+ * vtedy sa ukážu tie, ktoré sa stihli, a do logu sa napíše prečo.
+ */
+export const PREVIEW_BUDGET_MS = 45_000
+
+/**
  * Po akom tichu sa reťaz považuje za padnutú.
  *
- * Jedna dávka má strop 60 s, takže tri minúty sú trojnásobná rezerva — kratší
- * čas by rozbehol druhú reťaz popri pomalej, ale ešte živej dávke.
+ * Jedna dávka má rozpočet 40 s, takže tri minúty sú štvornásobná rezerva —
+ * kratší čas by rozbehol druhú reťaz popri pomalej, ale ešte živej dávke.
  */
 export const STALE_HEARTBEAT_MS = 3 * 60 * 1_000
+
+/** Koľko času zostáva do konca rozpočtu; bez rozpočtu „nekonečno". */
+export const msLeft = (deadlineAt: null | number | undefined): number =>
+  deadlineAt ? deadlineAt - Date.now() : Number.POSITIVE_INFINITY
+
+/** Zostáva v rozpočte aspoň `ms`? */
+export const hasTimeFor = (deadlineAt: null | number | undefined, ms: number): boolean =>
+  msLeft(deadlineAt) >= ms
 
 /**
  * Koľko čakáme na odovzdanie ďalšej dávky.
  *
  * Nečaká sa na jej DOKONČENIE — to je samostatné volanie funkcie, ktoré si
- * beží ďalej aj potom, čo my prestaneme počúvať. Osem sekúnd bohato stačí na
- * nadviazanie spojenia a odoslanie tela požiadavky; zvyšok už nie je naša vec
- * a držať kvôli nemu nažive rodičovské volanie by len míňalo čas jeho limitu.
+ * beží ďalej aj potom, čo my prestaneme počúvať. Od Z16 odpovedá dieťa 202-kou
+ * hneď po overení bŕzd, takže osem sekúnd je pohodlná rezerva a nie odhad:
+ * dozvieme sa naozaj, či bola ďalšia dávka prijatá, alebo odmietnutá.
  */
 const HANDOFF_TIMEOUT_MS = 8_000
 
@@ -161,8 +203,10 @@ export const kickBatch = async (options: {
   } catch (error) {
     const name = error instanceof Error ? error.name : ''
 
-    // Prerušenie čakania je očakávaný koniec: dávka sa spracúva ďalej vo
-    // vlastnom volaní, len jej odpoveď nás už nezaujíma.
+    // Od Z16 odpovedá dieťa 202-kou okamžite, takže sem sa už za normálnych
+    // okolností nepríde. Keď predsa (studený štart funkcie, zaseknutá sieť),
+    // považujeme dávku za odovzdanú: požiadavka odišla a dieťa si ju spracuje
+    // vo vlastnom volaní — my na jej odpoveď už len prestávame čakať.
     if (name === 'AbortError' || name === 'TimeoutError') return 'handed-off'
 
     options.onError?.(

@@ -1,37 +1,51 @@
 /**
- * Preklad naskenovaných produktov do slovenčiny (Z12, prepísané Z14).
+ * Preklad naskenovaných produktov do slovenčiny (Z12, prepísané Z14, opravené Z16).
  *
  * Vzor volania (priamy `fetch`, žiadna SDK závislosť, obranné parsovanie JSON,
- * tvrdý timeout, pád na použiteľný výsledok) je zámerne rovnaký ako v
- * `src/seo/generate.ts` — je to zavedená konvencia projektu. Kód je tu
- * *skopírovaný*, nie importovaný: SEO generátor rieši dve krátke polia s
- * pevnými dĺžkovými limitmi, tento modul dávkový preklad celých produktov.
- * Zdieľaný „univerzálny klient" by musel slúžiť obom a ani jednému poriadne.
+ * tvrdý timeout) je zámerne rovnaký ako v `src/seo/generate.ts` — je to zavedená
+ * konvencia projektu. Kód je tu *skopírovaný*, nie importovaný: SEO generátor
+ * rieši dve krátke polia s pevnými dĺžkovými limitmi, tento modul dávkový
+ * preklad celých produktov. Zdieľaný „univerzálny klient" by musel slúžiť obom
+ * a ani jednému poriadne.
  *
  * **Čo sa zmenilo v Z14 a prečo.** Prvá verzia prekladala haiku po šiestich
  * produktoch naraz a časť importu „nemala hlavu ani pätu": model dostal šesť
  * kusov textu v jednom balíku, kontext sa mu medzi nimi rozmazal a poľské
  * slová z remeselníckeho slovníka (wiklina, kokarda, nosidełka) prekladal
- * doslovne, teda nesprávne. Tri veci to riešia naraz:
+ * doslovne, teda nesprávne. Riešia to tri veci: model `claude-sonnet-5`,
+ * malá dávka a slovník priamo v systémovom prompte.
  *
- *   1. **Model** — predvolene `claude-sonnet-5` namiesto haiku. Za vstup
- *      platíme 2× a za výstup 2× viac ($2/$10 vs. $1/$5 za milión tokenov),
- *      čo pri ~2 500 tokenoch na produkt vychádza rádovo na jeden cent za
- *      produkt navyše. Import stoviek produktov sa robí raz; oprava stoviek
- *      nezmyselných popisov ručne stojí neporovnateľne viac.
- *   2. **Dávka 3 produkty** namiesto šiestich — model drží kontext jedného
- *      výrobku (názov + popis + kategória + parametre) pokope a nemieša ho so
- *      susedmi.
- *   3. **Slovník** priamo v systémovom prompte. Poľský nábytkársko-prútikársky
- *      slovník je dosť úzky na to, aby sa dal vymenovať, a práve na ňom
- *      všeobecný preklad padal.
+ * **Čo sa zmenilo v Z16 a prečo — DÔLEŽITÉ.** Z14 nechalo v module poistku z
+ * čias haiku: „keď model zlyhá, vráť vstup nepreložený". S pomalším sonnetom
+ * začal 45-sekundový timeout na trojici produktov s dlhým popisom naozaj
+ * vypršiavať (nameraná realita: 1 dlhý produkt ≈ 29 s, dva ≈ 42 s, tri > 45 s)
+ * a tá poistka potom TICHO naimportovala poľský originál — presne to, čo
+ * majiteľka videla v obchode. Preto:
+ *
+ *   1. **Pád na pôvodný jazyk je preč.** Zlyhaný produkt sa vráti ako
+ *      `{ kind: 'failed' }` s dôvodom (timeout / HTTP / JSON / neúplná
+ *      odpoveď). Volajúci ho NESMIE naimportovať — má ho skúsiť znova a po
+ *      treťom neúspechu započítať medzi chyby. Jediný zostávajúci passthrough
+ *      je `fromLang === 'sk'`, kde niet čo prekladať.
+ *   2. **Timeout sa nehádže od oka, ale z rozpočtu dávky.** Volajúci posiela
+ *      `deadlineAt` (kedy musí byť celá dávka hotová) a `reserveMs` (koľko si
+ *      po preklade necháva na zápis produktu). Z toho vyjde strop na jedno
+ *      volanie. Keď na volanie nezostáva rozumný čas, preklad sa ANI NEZAČNE a
+ *      produkty sa vrátia ako `deferred` — to nie je chyba, len odklad na
+ *      ďalší článok reťaze. Dva nezávislé časovače (jeden v module, druhý v
+ *      route) by si inak konkurovali a vždy by vyhral ten horší.
+ *   3. **Dávka 2 produkty.** Pri dlhých popisoch je trojica za hranicou toho,
+ *      čo sa dá v jednom volaní stihnúť; dvojica sa zmestí a pri opakovaní
+ *      (`chunkSize: 1`) sa zmestí aj ten najdlhší produkt.
  *
  * Kontrakt:
- *   - `translateBatch` NIKDY nehodí výnimku. Keď model zlyhá, vráti vstup
- *     nepreložený — import potom založí produkt s pôvodným textom a majiteľka
- *     ho opraví, čo je vždy lepšie než spadnutá dávka.
+ *   - `translateBatch` NIKDY nehodí výnimku, ale ani nikdy nevráti nepreložený
+ *     text ako preklad. Výsledok je pole `TranslationOutcome` 1:1 so vstupom.
  *   - `fromLang === 'sk'` preklad úplne preskočí (žiadne volanie, žiadne
  *     náklady).
+ *   - `translateCategoryNames` si pád na pôvodné názvy PONECHÁVA: názov
+ *     kategórie je kozmetika, ktorú majiteľka vidí v zozname a prepíše, a
+ *     dôvod zlyhania sa aj tak vracia so sebou.
  */
 import type { ScrapedAttribute, ScrapedProduct, TranslatedProduct } from './types'
 
@@ -48,17 +62,42 @@ const ANTHROPIC_VERSION = '2023-06-01'
  */
 const DEFAULT_MODEL = 'claude-sonnet-5'
 
-/** Tvrdý strop na jedno volanie. Dávka musí dobehnúť v rámci 60 s routy. */
-const AI_TIMEOUT_MS = 45_000
+/**
+ * Strop na jedno prekladové volanie (Z16).
+ *
+ * Merané na reálnom produkte z wiklinowa-wies.pl s dlhým popisom (20 odsekov,
+ * 12 parametrov): jeden produkt 28,7 s, dva 41,9 s, tri viac než 45 s. Krátke
+ * produkty toho istého obchodu sú 6–11 s. 60 s je teda strop, nie očakávanie —
+ * skutočný časovač vyrába `timeoutFor` z rozpočtu dávky a býva nižší.
+ */
+export const TRANSLATION_MAX_TIMEOUT_MS = 60_000
 
 /**
- * Koľko produktov ide do jedného volania.
+ * Pod týmto časom sa volanie ani nezačne.
  *
- * Tri je kompromis: menej kontextovej kaše než pri šiestich, a stále len dve
- * volania na štandardnú dávku piatich produktov (teda sa to do 60 s routy
- * zmestí aj s pauzami na sťahovanie stránok).
+ * Volanie, ktoré vypršalo, stojí peniaze aj pokus navyše a nevráti nič. Keď v
+ * rozpočte dávky nezostáva aspoň toľko, je správne produkty odložiť do ďalšieho
+ * článku reťaze — ten začína s plným rozpočtom.
  */
-export const TRANSLATION_CHUNK_SIZE = 3
+export const TRANSLATION_MIN_TIMEOUT_MS = 15_000
+
+/**
+ * Strop na preklad názvov kategórií.
+ *
+ * Samostatná konštanta zámerne: je to JEDNO krátke volanie (desiatky
+ * dvojslovných názvov) mimo dávkového rozpočtu, spúšťa ho majiteľka tlačidlom a
+ * v produkcii dobieha bez problémov.
+ */
+const CATEGORY_TIMEOUT_MS = 45_000
+
+/**
+ * Koľko produktov ide do jedného volania pri importe (Z16: 3 → 2).
+ *
+ * Dvojka je najväčšia dávka, ktorá sa aj pri najdlhšom nameranom produkte
+ * zmestí do jedného volania. Pri opakovaní po zlyhaní posiela route
+ * `chunkSize: 1` — vtedy má aj ten najpomalší produkt celý rozpočet pre seba.
+ */
+export const TRANSLATION_CHUNK_SIZE = 2
 
 /** Koľko odsekov popisu sa posiela na preklad (zvyšok sa zahodí). */
 const MAX_PARAGRAPHS = 30
@@ -135,7 +174,13 @@ const toTranslationItem = (product: ScrapedProduct, index: number): TranslationI
   title: product.title,
 })
 
-/** Neupravený vstup ako výstup — používa sa pri `sk` aj pri zlyhaní modelu. */
+/**
+ * Neupravený vstup ako výstup.
+ *
+ * Od Z16 sa používa VÝHRADNE pri `fromLang === 'sk'`, teda keď je zdroj už po
+ * slovensky a prekladať niet čo. Pri zlyhaní modelu sa nepoužíva — presne tá
+ * cesta importovala poľské produkty.
+ */
 const passthrough = (item: TranslationItem): TranslatedProduct => ({
   attributes: item.attributes,
   categoryPath: item.categoryPath,
@@ -160,15 +205,15 @@ const JSON_VALUE_START = /["{[\-\dtfn]/
  *     "Predstavujeme kolekciu „Little Cottage", ktorú tvoria:"
  *                                            ↑ tu sa JSON.parse zlomí
  *
- * Bez opravy padne celá dávka na pôvodný jazyk a majiteľka dostane poľské
- * produkty. Preto sa reťazec prejde znak po znaku a každá úvodzovka vnútri
- * reťazca sa posúdi: skutočná koncová je len tá, za ktorou (po bielych
- * znakoch) nasleduje `:` `}` `]`, alebo `,` a po nej začiatok ďalšej hodnoty.
- * Čokoľvek iné je úvodzovka v texte a doplní sa jej spätné lomítko.
+ * Bez opravy padne celá dávka a produkty sa zbytočne prekladajú druhýkrát.
+ * Preto sa reťazec prejde znak po znaku a každá úvodzovka vnútri reťazca sa
+ * posúdi: skutočná koncová je len tá, za ktorou (po bielych znakoch) nasleduje
+ * `:` `}` `]`, alebo `,` a po nej začiatok ďalšej hodnoty. Čokoľvek iné je
+ * úvodzovka v texte a doplní sa jej spätné lomítko.
  *
  * Zámerne sa nič iné neopravuje (chýbajúce čiarky, komentáre…): tam už je
  * riziko, že sa „oprava" trafí vedľa, väčšie než úžitok — vtedy je správne
- * nechať text nepreložený a napísať to do logu.
+ * ohlásiť zlyhanie a produkt skúsiť znova.
  */
 export const repairJsonQuotes = (input: string): string => {
   let out = ''
@@ -274,7 +319,8 @@ const responseText = (payload: unknown): string => {
 
 const asStringArray = (value: unknown): string[] =>
   Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    ? value
+        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
         .map((entry) => entry.trim())
     : []
 
@@ -288,37 +334,96 @@ const asAttributes = (value: unknown): ScrapedAttribute[] =>
         .filter((entry) => entry.name && entry.value)
     : []
 
+/**
+ * Prečo sa produkt nepreložil. Ide do logu úlohy, aby sa timeout (pomalý model,
+ * dlhý popis) dal odlíšiť od 429 (vyčerpaný kredit) a od rozbitého JSON-u.
+ */
+export type TranslationFailureCause =
+  /** Chýba `ANTHROPIC_API_KEY` — preklad sa vôbec nedá spustiť. */
+  | 'config'
+  /** API odpovedalo chybovým stavom (429, 5xx…). */
+  | 'http'
+  /** Odpoveď sa nedala prečítať ako JSON, alebo v nej produkt chýbal. */
+  | 'json'
+  /** Odpoveď prišla, ale bez názvu alebo bez popisu — nedá sa z nej importovať. */
+  | 'incomplete'
+  /** Sieťová chyba pri volaní API. */
+  | 'network'
+  /** Volanie nestihlo dobehnúť v pridelenom čase. */
+  | 'timeout'
+
+/**
+ * Výsledok prekladu JEDNÉHO produktu.
+ *
+ * Tri stavy, nie dva: `deferred` (na produkt v tomto volaní routy nezvýšil čas)
+ * je zásadne iné než `failed` (model zlyhal). Odložený produkt ostáva vo fronte
+ * a nič sa nepočíta; zlyhaný sa počíta ako pokus a po treťom sa vzdáva.
+ */
+export type TranslationOutcome =
+  | { cause: TranslationFailureCause; kind: 'failed'; reason: string }
+  | { kind: 'deferred'; reason: string }
+  | { kind: 'ok'; product: TranslatedProduct }
+
 export type TranslationUsage = {
   calls: number
-  /**
-   * Prečo niektorá dávka ostala nepreložená. Prázdne pole = všetko prešlo.
-   *
-   * Preklad zámerne nikdy nehodí výnimku (import nesmie spadnúť kvôli
-   * prekladu), takže bez tejto stopy by zlyhanie vyzeralo v admine úplne
-   * rovnako ako zdroj, ktorý je náhodou po slovensky — a nikto by sa to
-   * nedozvedel. Route ju vypisuje do logu úlohy.
-   */
-  failures: string[]
   inputTokens: number
   outputTokens: number
 }
 
-/** Jedna dávka (≤ `TRANSLATION_CHUNK_SIZE` produktov) v jednom volaní. */
+export type TranslateOptions = {
+  /** Koľko produktov ide do jedného volania (predvolene `TRANSLATION_CHUNK_SIZE`). */
+  chunkSize?: number
+  /** Kedy musí byť celá práca routy hotová (epoch ms). `null` = bez rozpočtu. */
+  deadlineAt?: null | number
+  /** Koľko času si volajúci necháva po preklade na zápis produktu. */
+  reserveMs?: number
+}
+
+export type TranslateBatchResult = {
+  /** 1:1 so vstupom a v rovnakom poradí. */
+  outcomes: TranslationOutcome[]
+  usage: TranslationUsage
+}
+
+/**
+ * Koľko času smie dostať jedno volanie modelu.
+ *
+ * `0` znamená „nezačínaj" — v rozpočte nezostáva ani `TRANSLATION_MIN_TIMEOUT_MS`,
+ * takže volanie by s veľkou pravdepodobnosťou vypršalo a minulo pokus aj kredit
+ * zadarmo.
+ */
+export const timeoutFor = (deadlineAt: null | number | undefined, reserveMs = 0): number => {
+  if (!deadlineAt) return TRANSLATION_MAX_TIMEOUT_MS
+
+  const available = deadlineAt - Date.now() - reserveMs
+
+  if (available < TRANSLATION_MIN_TIMEOUT_MS) return 0
+
+  return Math.min(TRANSLATION_MAX_TIMEOUT_MS, available)
+}
+
+const failAll = (
+  items: TranslationItem[],
+  cause: TranslationFailureCause,
+  reason: string,
+): TranslationOutcome[] => items.map(() => ({ cause, kind: 'failed', reason }))
+
+/** Jedna dávka (≤ `chunkSize` produktov) v jednom volaní. */
 const translateChunk = async (
   items: TranslationItem[],
   fromLang: null | string,
   usage: TranslationUsage,
-): Promise<TranslatedProduct[]> => {
+  timeoutMs: number,
+): Promise<TranslationOutcome[]> => {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
 
   if (!apiKey) {
-    usage.failures.push('Chýba ANTHROPIC_API_KEY — texty ostávajú v pôvodnom jazyku.')
-
-    return items.map(passthrough)
+    return failAll(items, 'config', 'Chýba ANTHROPIC_API_KEY — preklad sa nedá spustiť.')
   }
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const startedAt = Date.now()
 
   try {
     const response = await fetch(ANTHROPIC_ENDPOINT, {
@@ -339,9 +444,9 @@ const translateChunk = async (
         model: process.env.ANTHROPIC_SCRAPER_MODEL?.trim() || DEFAULT_MODEL,
         system: SYSTEM_PROMPT,
         // Preklad nie je úloha na uvažovanie a `claude-sonnet-5` má adaptívne
-        // myslenie predvolene zapnuté — pri dávke v 60 s route by nám zjedlo
-        // čas aj tokeny bez úžitku. Vypnutý stav je na tomto modeli platná
-        // hodnota (na rozdiel od `budget_tokens`, ktorý už vracia 400).
+        // myslenie predvolene zapnuté — pri dávke v rozpočte routy by nám
+        // zjedlo čas aj tokeny bez úžitku. Vypnutý stav je na tomto modeli
+        // platná hodnota (na rozdiel od `budget_tokens`, ktorý už vracia 400).
         thinking: { type: 'disabled' },
       }),
       cache: 'no-store',
@@ -355,9 +460,7 @@ const translateChunk = async (
     })
 
     if (!response.ok) {
-      usage.failures.push(`Preklad: API odpovedalo ${response.status}.`)
-
-      return items.map(passthrough)
+      return failAll(items, 'http', `Preklad: API odpovedalo ${response.status}.`)
     }
 
     const payload = (await response.json()) as {
@@ -378,77 +481,133 @@ const translateChunk = async (
       // JSON-u a parser z nej nevytiahne nič. Preto je v hláške aj dôvod
       // zastavenia a začiatok odpovede — z toho sa dá rozhodnúť, či stačí
       // zmenšiť dávku, alebo je zlý prompt.
-      usage.failures.push(
+      return failAll(
+        items,
+        'json',
         `Preklad: z odpovede sa nedali prečítať produkty (stop_reason=${
           payload.stop_reason ?? '?'
         }, ${raw.length} znakov): ${raw.slice(0, 200).replace(/\s+/g, ' ')}`,
       )
     }
 
-    return items.map((item) => {
+    return items.map((item): TranslationOutcome => {
       const match = translatedList.find(
         (entry) => Number((entry as { index?: unknown })?.index) === item.index,
       ) as Record<string, unknown> | undefined
 
-      if (!match) return passthrough(item)
+      if (!match) {
+        return {
+          cause: 'json',
+          kind: 'failed',
+          reason: `Preklad: v odpovedi chýba produkt s indexom ${item.index} („${item.title}").`,
+        }
+      }
 
       const title = typeof match.title === 'string' ? match.title.trim() : ''
       const paragraphs = asStringArray(match.paragraphs)
-      const categoryPath = asStringArray(match.categoryPath)
-      const attributes = asAttributes(match.attributes)
+
+      // Názov je jediné povinné pole produktu — bez neho niet čo zakladať.
+      // Popis je povinný len vtedy, keď ho zdroj mal: prázdny popis v zdroji
+      // znamená prázdny popis v cieli, nie zlyhanie.
+      if (!title) {
+        return {
+          cause: 'incomplete',
+          kind: 'failed',
+          reason: `Preklad: k produktu „${item.title}" sa vrátil prázdny názov.`,
+        }
+      }
+
+      if (item.paragraphs.length && !paragraphs.length) {
+        return {
+          cause: 'incomplete',
+          kind: 'failed',
+          reason: `Preklad: k produktu „${item.title}" sa vrátil prázdny popis (zdroj mal ${item.paragraphs.length} odsekov).`,
+        }
+      }
 
       return {
-        // Každé pole padá na originál samostatne: keď model vynechá kategórie,
-        // nie je dôvod zahodiť aj preložený názov a popis.
-        attributes: attributes.length === item.attributes.length ? attributes : item.attributes,
-        categoryPath: categoryPath.length ? categoryPath : item.categoryPath,
-        descriptionParagraphs: paragraphs.length ? paragraphs : item.paragraphs,
-        title: title || item.title,
+        kind: 'ok',
+        product: {
+          // Kategórie ani parametre sa NIKDY nedopĺňajú z originálu: poľský
+          // názov kategórie by v obchode založil poľskú kategóriu a poľský
+          // názov vlastnosti poľskú vlastnosť. Radšej prázdne než cudzie.
+          attributes: asAttributes(match.attributes),
+          categoryPath: asStringArray(match.categoryPath),
+          descriptionParagraphs: paragraphs,
+          title,
+        },
       }
     })
   } catch (error) {
-    usage.failures.push(
+    const name = error instanceof Error ? error.name : ''
+    const elapsed = Date.now() - startedAt
+
+    if (name === 'AbortError' || name === 'TimeoutError') {
+      return failAll(
+        items,
+        'timeout',
+        `Preklad nestihol dobehnúť do ${Math.round(timeoutMs / 1_000)} s (trval ${Math.round(
+          elapsed / 1_000,
+        )} s, ${items.length} ${items.length === 1 ? 'produkt' : 'produkty'}).`,
+      )
+    }
+
+    return failAll(
+      items,
+      'network',
       `Preklad zlyhal: ${error instanceof Error ? error.message : String(error)}`,
     )
-
-    return items.map(passthrough)
   } finally {
     clearTimeout(timer)
   }
-}
-
-export type TranslateBatchResult = {
-  items: TranslatedProduct[]
-  usage: TranslationUsage
 }
 
 /**
  * Preloží zoznam naskenovaných produktov do slovenčiny.
  *
  * Poradie výstupu zodpovedá poradiu vstupu 1:1 — volajúci môže spárovať
- * `scraped[i]` s `translated[i]` bez ďalšieho hľadania.
+ * `products[i]` s `outcomes[i]` bez ďalšieho hľadania.
  */
 export const translateBatch = async (
   products: ScrapedProduct[],
   fromLang: null | string,
+  options: TranslateOptions = {},
 ): Promise<TranslateBatchResult> => {
-  const usage: TranslationUsage = { calls: 0, failures: [], inputTokens: 0, outputTokens: 0 }
+  const usage: TranslationUsage = { calls: 0, inputTokens: 0, outputTokens: 0 }
   const items = products.map(toTranslationItem)
 
-  if (!items.length) return { items: [], usage }
+  if (!items.length) return { outcomes: [], usage }
 
   // Zdroj je už po slovensky — netreba volať model.
-  if (fromLang === 'sk') return { items: items.map(passthrough), usage }
-
-  const out: TranslatedProduct[] = []
-
-  for (let i = 0; i < items.length; i += TRANSLATION_CHUNK_SIZE) {
-    const chunk = items.slice(i, i + TRANSLATION_CHUNK_SIZE)
-
-    out.push(...(await translateChunk(chunk, fromLang, usage)))
+  if (fromLang === 'sk') {
+    return { outcomes: items.map((item) => ({ kind: 'ok', product: passthrough(item) })), usage }
   }
 
-  return { items: out, usage }
+  const chunkSize = Math.max(1, options.chunkSize ?? TRANSLATION_CHUNK_SIZE)
+  const reserveMs = options.reserveMs ?? 0
+  const outcomes: TranslationOutcome[] = []
+
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize)
+    const timeoutMs = timeoutFor(options.deadlineAt, reserveMs)
+
+    if (!timeoutMs) {
+      // Na ďalšie volanie už v rozpočte nie je čas. Zvyšok sa neoznačí za
+      // chybu — ostáva vo fronte a spracuje ho ďalší článok reťaze.
+      for (let rest = i; rest < items.length; rest++) {
+        outcomes.push({
+          kind: 'deferred',
+          reason: 'Na preklad v tomto kroku nezostal čas — pokračuje sa v ďalšom.',
+        })
+      }
+
+      break
+    }
+
+    outcomes.push(...(await translateChunk(chunk, fromLang, usage, timeoutMs)))
+  }
+
+  return { outcomes, usage }
 }
 
 export type CategoryTranslation = {
@@ -461,15 +620,15 @@ export type CategoryTranslation = {
  * Preklad zoznamu názvov kategórií — JEDNO volanie na celý zoznam (Z14).
  *
  * Kategórie sú dvoj- až trojslovné pomenovania tovaru („Fotele wiklinowe"),
- * nie súvislý text; posielať ich po troch ako produkty by bolo zbytočne drahé
+ * nie súvislý text; posielať ich po dvoch ako produkty by bolo zbytočne drahé
  * aj pomalé. Zoznam z Shoper navigácie má rádovo desiatky položiek a do jednej
  * odpovede sa zmestí bez problémov.
  *
- * Nikdy nehádže výnimku: pri akomkoľvek probléme vráti pôvodné názvy, takže
- * majiteľka uvidí v admine aspoň poľský zoznam a môže si vyberať z neho. Dôvod
- * ale vracia so sebou — nepreložený zoznam a zoznam, ktorý bol po slovensky už
- * v zdroji, vyzerajú inak úplne rovnako a bez tejto stopy by sa tichá chyba
- * (vypršaný kredit, 429 z API) nedala od seba odlíšiť.
+ * **Pád na pôvodné názvy tu ostáva aj po Z16** — a je to zámer, nie prehliadnutie.
+ * Nepreložený názov kategórie sa nikam neimportuje: majiteľka ho vidí v zozname
+ * na výber, prečíta si v logu dôvod a môže to skúsiť znova. Poľský názov
+ * PRODUKTU je oproti tomu zápis do obchodu, ktorý treba ručne opravovať — preto
+ * je tam pád zakázaný.
  */
 export const translateCategoryNames = async (
   names: string[],
@@ -482,11 +641,14 @@ export const translateCategoryNames = async (
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
 
   if (!apiKey) {
-    return { failure: 'Chýba ANTHROPIC_API_KEY — názvy kategórií ostávajú v pôvodnom jazyku.', names: clean }
+    return {
+      failure: 'Chýba ANTHROPIC_API_KEY — názvy kategórií ostávajú v pôvodnom jazyku.',
+      names: clean,
+    }
   }
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), CATEGORY_TIMEOUT_MS)
 
   try {
     const response = await fetch(ANTHROPIC_ENDPOINT, {

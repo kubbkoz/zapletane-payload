@@ -33,7 +33,13 @@ import { adminOnly } from '@/access/adminOnly'
  * **Kto slučku riadi (zmena v Z14).** Pôvodne ju točil prehliadač: zatvorená
  * karta = zastavený import. Teraz si dávku reťazí server sám — po dopočítaní
  * dávky si cez `after()` zavolá tú istú routu na ďalšiu (interným tokenom).
- * Prehliadač už len raz kopne a potom sa pozerá. Poistky proti splašenej
+ * Prehliadač už len raz kopne a potom sa pozerá.
+ *
+ * **Kedy sa odpovedá (zmena v Z16).** Na „Potvrdiť a importovať" route
+ * odpovedá 202 okamžite a celú dávku spracuje až po odoslaní odpovede. Nič sa
+ * teda nedá odstreliť limitom funkcie a prehliadač nikdy nečaká (predtým padal
+ * na HTTP 504). Jediný zdroj pravdy o priebehu je preto TENTO dokument —
+ * počítadlá, `status` a `log`. Poistky proti splašenej
  * reťazi sú tri a všetky žijú tu v dokumente:
  *
  *   - `status` — „zastavené" reťaz na začiatku ďalšej dávky zastaví,
@@ -128,15 +134,19 @@ export const ScraperJobs: CollectionConfig = {
           },
         },
         {
+          // Z16: predvolene 3 (bolo 5), strop 5 (bol 10). Jeden krok importu má
+          // rozpočet 40 sekúnd a do neho sa pri preklade sonnetom a sťahovaní
+          // fotiek zmestia dva až tri produkty. Väčšia dávka nič nezrýchli —
+          // len sa presunie do ďalšieho kroku.
           name: 'batchSize',
           type: 'number',
           label: 'Veľkosť dávky',
-          defaultValue: 5,
-          max: 10,
+          defaultValue: 3,
+          max: 5,
           min: 1,
           admin: {
             description:
-              'Koľko produktov sa naimportuje v jednom kroku. Viac než 10 sa do jedného volania nezmestí.',
+              'Horný strop na počet produktov v jednom kroku importu. Koľko sa ich naozaj stihne, rozhoduje čas kroku — zvyšok pokračuje automaticky v ďalšom.',
             width: '33%',
           },
         },
@@ -188,9 +198,14 @@ export const ScraperJobs: CollectionConfig = {
             {
               name: 'failed',
               type: 'number',
-              label: 'Chyby',
+              label: 'Chyby (nenaimportované)',
               defaultValue: 0,
-              admin: { readOnly: true, width: '25%' },
+              admin: {
+                description:
+                  'Produkty, ktoré sa nepodarilo stiahnuť ani po opakovaní, alebo trikrát po sebe preložiť. Nepreložený produkt sa zámerne NEIMPORTUJE — v obchode by skončil v pôvodnom jazyku. Dôvod každého je v poli „Priebeh“.',
+                readOnly: true,
+                width: '25%',
+              },
             },
           ],
         },

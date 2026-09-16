@@ -1543,7 +1543,7 @@ export interface ScraperJob {
    */
   fallbackRate?: number | null;
   /**
-   * Koľko produktov sa naimportuje v jednom kroku. Viac než 10 sa do jedného volania nezmestí.
+   * Horný strop na počet produktov v jednom kroku importu. Koľko sa ich naozaj stihne, rozhoduje čas kroku — zvyšok pokračuje automaticky v ďalšom.
    */
   batchSize?: number | null;
   /**
@@ -1557,6 +1557,9 @@ export interface ScraperJob {
     discovered?: number | null;
     imported?: number | null;
     skipped?: number | null;
+    /**
+     * Produkty, ktoré sa nepodarilo stiahnuť ani po opakovaní, alebo trikrát po sebe preložiť. Nepreložený produkt sa zámerne NEIMPORTUJE — v obchode by skončil v pôvodnom jazyku. Dôvod každého je v poli „Priebeh“.
+     */
     failed?: number | null;
     /**
      * Produkty, ktoré sa nepridali preto, že rovnaký názov už v obchode je — nech prišiel odkiaľkoľvek. Existujúci produkt sa nikdy neprepisuje.

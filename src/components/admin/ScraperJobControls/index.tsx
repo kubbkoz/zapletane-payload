@@ -6,7 +6,7 @@ import React from 'react'
 import './scraperJob.scss'
 
 /**
- * Ovládanie importu z webu (Z12, prepísané Z14) — bočný panel úlohy.
+ * Ovládanie importu z webu (Z12, prepísané Z14, doplnené Z16) — bočný panel úlohy.
  *
  * **Zmena oproti Z12: slučku dávok už neriadi prehliadač.** Predtým sa
  * `/api/scraper/run` volalo dookola z tejto komponenty, takže zavretá karta
@@ -14,6 +14,15 @@ import './scraperJob.scss'
  * dávky reťazí sám; prehliadač len každých pár sekúnd načíta dokument úlohy a
  * prekreslí počítadlá. Zavretie karty preto na nič nevplýva a „Zastaviť" nie
  * je „prestanem volať", ale požiadavka, ktorá stav úlohy naozaj prepne.
+ *
+ * **Zmena v Z16: import odpovedá 202 a nič viac.** Route pri `mode: 'batch'`
+ * odpovie „prijaté" okamžite a dávku spracuje až po odpovedi, takže v odpovedi
+ * už NIE JE výsledok prvej dávky (`done`, `processed`, počítadlá po dávke).
+ * Bolo by to aj zavádzajúce — do príchodu odpovede sa ešte nič nestalo. Panel
+ * preto po 202 len prepne text na „beží na pozadí" a ďalej číta dokument
+ * úlohy, čo aj tak robil. Jediné, čo si zo 202 berie navyše, je `chaining`:
+ * keď chýba `SCRAPER_INTERNAL_TOKEN`, import sa sám nezreťazí a treba to
+ * povedať hneď, nie čakať na počítadlá, ktoré sa nepohnú.
  *
  * Poradie tlačidiel zodpovedá poradiu krokov: kategórie → testovací beh →
  * import. „Pokračovať" sa ukáže len vtedy, keď je čo pokračovať — po zastavení
@@ -55,17 +64,17 @@ type JobSnapshot = {
 }
 
 type RunResponse = {
+  /** 202 pri `mode: 'batch'` — dávka je prijatá a beží po odpovedi. */
+  accepted?: boolean
   alreadyRunning?: boolean
   categories?: unknown
-  chained?: boolean
+  /** Je nastavený `SCRAPER_INTERNAL_TOKEN`, teda pokračuje import sám? */
+  chaining?: boolean
   counters?: Counters
-  done?: boolean
   message?: string
   ok?: boolean
   previews?: unknown
-  remaining?: number
   status?: string
-  total?: number
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -227,7 +236,14 @@ export const ScraperJobControls: React.FC = () => {
 
       window.dispatchEvent(new CustomEvent(PREVIEWS_EVENT, { detail: previews }))
 
-      setProgress(`Testovací beh hotový — ${previews.length} náhľadov nižšie.`)
+      // Menej náhľadov než tri neznamená chybu: na pomalý preklad nemusí v
+      // jednom kroku zvýšiť čas. Dôvod je v poli „Priebeh" a import si ten istý
+      // produkt rozdelí do viacerých krokov, takže mu to nevadí.
+      setProgress(
+        previews.length < 3
+          ? `Testovací beh hotový — ${previews.length} náhľadov nižšie. Zvyšok sa do času testu nezmestil; dôvod je v poli „Priebeh“.`
+          : `Testovací beh hotový — ${previews.length} náhľadov nižšie.`,
+      )
       toast.success(`Testovací beh hotový: ${previews.length} produktov na ukážku.`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -243,11 +259,12 @@ export const ScraperJobControls: React.FC = () => {
   /**
    * Kopne import a ďalej sa už len pozerá.
    *
-   * Jedno volanie, žiadna slučka: ďalšie dávky si objednáva server sám
-   * (`src/scraper/chain.ts`). Keď server odpovie `chained: false` a import
-   * nie je hotový, znamená to, že reťazenie nie je nastavené (chýba
-   * `SCRAPER_INTERNAL_TOKEN`) — vtedy je na mieste to majiteľke povedať,
-   * nie ticho čakať na počítadlá, ktoré sa nepohnú.
+   * Jedno volanie, žiadna slučka: server odpovie 202 („prijaté") a dávku aj
+   * všetky ďalšie si spracuje sám (`src/scraper/chain.ts`). Odpoveď preto
+   * neobsahuje výsledok — ten sa objaví v počítadlách, ktoré sa dovtedy
+   * pravidelne načítavajú. Jediné, čo sa dá povedať hneď, je či je reťazenie
+   * vôbec nastavené: bez `SCRAPER_INTERNAL_TOKEN` sa počítadlá nepohnú a je
+   * poctivé to napísať, nie nechať majiteľku pozerať sa do prázdna.
    */
   const startImport = React.useCallback(async () => {
     setBusy('batch')
@@ -263,17 +280,16 @@ export const ScraperJobControls: React.FC = () => {
       if (result.alreadyRunning) {
         setProgress('Import už beží — nechaj ho dobehnúť, kartu môžeš zavrieť.')
         toast.message('Import už beží.')
-      } else if (result.done) {
-        setProgress('Import dokončený.')
-        toast.success('Import dokončený.')
-      } else if (result.chained) {
-        setProgress('Import beží na serveri. Kartu môžeš pokojne zavrieť — dobehne aj bez teba.')
-        toast.success('Import spustený, pokračuje na serveri.')
-      } else {
+      } else if (result.chaining === false) {
         setProgress(
-          'Prvá dávka hotová, ale server si ďalšiu neobjednal. Skontroluj premennú SCRAPER_INTERNAL_TOKEN a pokračuj tlačidlom „Pokračovať“.',
+          'Import beží na pozadí, ale server si ďalšie kroky neobjedná — chýba premenná SCRAPER_INTERNAL_TOKEN. Po prvom kroku bude treba klikať „Pokračovať“.',
         )
         toast.warning('Import pokračuje len ručne — chýba nastavenie reťazenia.')
+      } else {
+        setProgress(
+          'Import beží na pozadí. Kartu môžeš pokojne zavrieť — dobehne aj bez teba. Počítadlá nižšie sa samy obnovujú.',
+        )
+        toast.success('Import spustený, beží na pozadí.')
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
