@@ -36,6 +36,18 @@ const USER_AGENT =
 const DEFAULT_HEADERS: Record<string, string> = {
   'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'accept-language': 'pl,en;q=0.8,sk;q=0.6',
+  // Plná sada Chrome hlavičiek: jednoduché WAF filtre (home.pl, cyberfolks…)
+  // často kontrolujú práve sec-ch-ua/sec-fetch-*, nie len User-Agent. Proti
+  // skutočnej JS výzve (Cloudflare managed challenge) to nepomôže — tam
+  // spoľahlivo prezradí príčinu server hlavička v HttpError nižšie.
+  'sec-ch-ua': '"Chromium";v="125", "Google Chrome";v="125", "Not.A/Brand";v="24"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'sec-fetch-dest': 'document',
+  'sec-fetch-mode': 'navigate',
+  'sec-fetch-site': 'none',
+  'sec-fetch-user': '?1',
+  'upgrade-insecure-requests': '1',
   'user-agent': USER_AGENT,
 }
 
@@ -86,8 +98,16 @@ export type FetchBufferResult = FetchResult & { buffer: Buffer }
 class HttpError extends Error {
   status: number
 
-  constructor(status: number, url: string) {
-    super(`HTTP ${status} pri ${url}`)
+  constructor(status: number, url: string, response?: Response) {
+    // `server`/`cf-mitigated` prezradia, KTO blokuje (cloudflare, LiteSpeed…)
+    // — bez toho sa 403 od anti-bot ochrany nedá odlíšiť od obyčajného zákazu.
+    const server = response?.headers.get('server')
+    const mitigated = response?.headers.get('cf-mitigated')
+    const detail = [server && `server: ${server}`, mitigated && `cf-mitigated: ${mitigated}`]
+      .filter(Boolean)
+      .join(', ')
+
+    super(`HTTP ${status} pri ${url}${detail ? ` [${detail}]` : ''}`)
     this.name = 'HttpError'
     this.status = status
   }
@@ -116,7 +136,7 @@ const attempt = async (url: string, headers: Record<string, string>): Promise<Re
       ...(dispatcher ? ({ dispatcher } as Record<string, unknown>) : {}),
     })
 
-    if (!response.ok) throw new HttpError(response.status, url)
+    if (!response.ok) throw new HttpError(response.status, url, response)
 
     return response
   } finally {
