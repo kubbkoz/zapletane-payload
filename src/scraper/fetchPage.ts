@@ -180,3 +180,20 @@ export const tryFetchPage = async (url: string): Promise<FetchPageResult | null>
     return null
   }
 }
+
+/**
+ * Ľudský popis dôvodu zlyhania fetchu — do logu úlohy. `HTTP 403` vs.
+ * `fetch failed / ETIMEDOUT` rozhoduje o diagnóze (anti-bot ochrana vs.
+ * sieťový výpadok), a bez tohto helperu sa dôvod strácal v generickej
+ * hláške „nepodarilo stiahnuť".
+ */
+export const fetchFailureReason = (error: unknown): string => {
+  if (error instanceof Error) {
+    const cause = (error as { cause?: { code?: string; message?: string } }).cause
+    const detail = cause?.code || cause?.message
+
+    return detail && !error.message.includes(detail) ? `${error.message} / ${detail}` : error.message
+  }
+
+  return String(error)
+}

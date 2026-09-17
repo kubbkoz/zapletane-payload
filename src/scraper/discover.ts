@@ -25,7 +25,24 @@
  */
 import * as cheerio from 'cheerio'
 
-import { politeDelay, tryFetchPage } from './fetchPage'
+import { fetchFailureReason, fetchPage, politeDelay, tryFetchPage } from './fetchPage'
+
+import type { FetchPageResult } from './fetchPage'
+
+/**
+ * Vstupná stránka je jediné miesto, kde ticho zlyhať nesmieme: bez nej úloha
+ * nemá čo objavovať, a majiteľka potrebuje vidieť DÔVOD (HTTP 403 = anti-bot
+ * ochrana, timeout = pomalý server…), nie len „nepodarilo stiahnuť".
+ */
+const fetchEntryPage = async (startUrl: string): Promise<FetchPageResult> => {
+  try {
+    return await fetchPage(startUrl)
+  } catch (error) {
+    throw new Error(
+      `Stránku ${startUrl} sa nepodarilo stiahnuť (${fetchFailureReason(error)}).`,
+    )
+  }
+}
 
 /** Strop na počet stiahnutých *výpisov* (kategórie + stránkovanie + sitemapy). */
 const MAX_LISTING_FETCHES = 60
@@ -316,9 +333,7 @@ export const discoverCategories = async (
   options: { onProgress?: (message: string) => void } = {},
 ): Promise<{ categories: DiscoveredCategory[]; html: string }> => {
   const base = new URL(startUrl)
-  const entry = await tryFetchPage(startUrl)
-
-  if (!entry) throw new Error(`Stránku ${startUrl} sa nepodarilo stiahnuť.`)
+  const entry = await fetchEntryPage(startUrl)
 
   const $ = cheerio.load(entry.html)
   const byUrl = new Map<string, DiscoveredCategory>()
@@ -450,9 +465,7 @@ export const discover = async (
 
   budget.fetches++
 
-  const entry = await tryFetchPage(startUrl)
-
-  if (!entry) throw new Error(`Stránku ${startUrl} sa nepodarilo stiahnuť.`)
+  const entry = await fetchEntryPage(startUrl)
 
   await politeDelay()
 
